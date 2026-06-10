@@ -30,7 +30,75 @@ REQUEST_TIMEOUT = 12
 HEADERS = {
     "User-Agent": "OpenStudy/0.1 (open-source research-bias-screening; https://huggingface.co/spaces)"
 }
-THEME = gr.themes.Soft(primary_hue="teal", neutral_hue="slate")
+# --- OpenStudy design tokens ---------------------------------------------
+BRAND = "#0e6b5f"
+BRAND_DEEP = "#0a554b"
+BRAND_BRIGHT = "#2fa08f"
+PAPER = "#f6f4ee"
+CARD = "#fffdf8"
+INK = "#20312d"
+INK_SOFT = "#5b6b66"
+BORDER = "#e4dfd3"
+WARN = "#b45309"
+RISK = "#b91c1c"
+
+THEME = gr.themes.Soft(
+    primary_hue="teal",
+    secondary_hue="emerald",
+    neutral_hue="stone",
+    font=[gr.themes.GoogleFont("Inter"), "ui-sans-serif", "system-ui", "sans-serif"],
+    font_mono=[gr.themes.GoogleFont("IBM Plex Mono"), "ui-monospace", "SFMono-Regular", "monospace"],
+).set(
+    body_background_fill=PAPER,
+    body_background_fill_dark="#101614",
+    body_text_color=INK,
+    body_text_color_dark="#e9e7df",
+    body_text_color_subdued=INK_SOFT,
+    body_text_color_subdued_dark="#9fafa9",
+    background_fill_primary=CARD,
+    background_fill_primary_dark="#19221f",
+    background_fill_secondary=PAPER,
+    background_fill_secondary_dark="#141c19",
+    border_color_primary=BORDER,
+    border_color_primary_dark="#2b3733",
+    block_background_fill=CARD,
+    block_background_fill_dark="#19221f",
+    block_border_color=BORDER,
+    block_border_color_dark="#2b3733",
+    block_shadow="0 1px 2px rgba(32, 49, 45, 0.05)",
+    block_title_text_color=INK,
+    block_title_text_color_dark="#e9e7df",
+    block_label_text_color=INK_SOFT,
+    block_label_text_color_dark="#9fafa9",
+    block_label_background_fill=PAPER,
+    block_label_background_fill_dark="#141c19",
+    input_background_fill="#ffffff",
+    input_background_fill_dark="#101614",
+    input_border_color="#d8d2c4",
+    input_border_color_dark="#33403b",
+    button_primary_background_fill=BRAND,
+    button_primary_background_fill_hover=BRAND_DEEP,
+    button_primary_background_fill_dark=BRAND,
+    button_primary_background_fill_hover_dark="#128172",
+    button_primary_text_color="#ffffff",
+    button_primary_text_color_dark="#ffffff",
+    button_secondary_background_fill="#edebe0",
+    button_secondary_background_fill_hover="#e3e0d2",
+    button_secondary_background_fill_dark="#243029",
+    button_secondary_background_fill_hover_dark="#2c3a32",
+    button_secondary_text_color=INK,
+    button_secondary_text_color_dark="#e9e7df",
+    table_even_background_fill="#fbfaf4",
+    table_even_background_fill_dark="#1b2421",
+    table_odd_background_fill=CARD,
+    table_odd_background_fill_dark="#19221f",
+    link_text_color=BRAND,
+    link_text_color_dark="#3db2a0",
+    color_accent_soft="#e3efec",
+    color_accent_soft_dark="#16302b",
+    slider_color=BRAND,
+    slider_color_dark=BRAND_BRIGHT,
+)
 STUDY_TYPE_CHOICES = [
     "Auto-detect",
     "Clinical trial",
@@ -593,15 +661,217 @@ BENCHMARKS: tuple[Benchmark, ...] = (
 
 
 APP_CSS = """
-.gradio-container { max-width: 1280px !important; }
-.openstudy-note {
-  border-left: 4px solid #0f766e;
-  padding: 0.8rem 1rem;
-  background: #f0fdfa;
-  color: #12302d;
-  border-radius: 6px;
+/* ===================== OpenStudy design system ===================== */
+:root {
+  --os-paper: #f6f4ee;
+  --os-card: #fffdf8;
+  --os-ink: #20312d;
+  --os-ink-soft: #5b6b66;
+  --os-brand: #0e6b5f;
+  --os-brand-deep: #0a554b;
+  --os-brand-tint: #e3efec;
+  --os-border: #e4dfd3;
+  --os-serif: "Source Serif 4", "Iowan Old Style", Georgia, serif;
+  --os-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
 }
-.compact-table textarea { font-size: 0.9rem !important; }
+.dark {
+  --os-paper: #101614;
+  --os-card: #19221f;
+  --os-ink: #e9e7df;
+  --os-ink-soft: #9fafa9;
+  --os-brand: #2fa08f;
+  --os-brand-deep: #3db2a0;
+  --os-brand-tint: #16302b;
+  --os-border: #2b3733;
+}
+
+.gradio-container {
+  max-width: 1240px !important;
+  margin: 0 auto !important;
+}
+
+/* ---------- Hero header ---------- */
+.os-hero {
+  padding: 2.1rem 0.2rem 1.5rem;
+  border-bottom: 1px solid var(--os-border);
+  margin-bottom: 0.35rem;
+}
+.os-wordmark {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-weight: 700;
+  font-size: 1.02rem;
+  letter-spacing: 0.012em;
+  color: var(--os-ink);
+}
+.os-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--os-brand);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.dark .os-logo { color: #0d1a17; }
+.os-hero h1 {
+  font-family: var(--os-serif);
+  font-weight: 600;
+  font-size: clamp(1.65rem, 3.2vw, 2.35rem);
+  line-height: 1.16;
+  letter-spacing: -0.012em;
+  color: var(--os-ink);
+  max-width: 30ch;
+  margin: 1rem 0 0.55rem;
+}
+.os-lede {
+  color: var(--os-ink-soft);
+  font-size: 1.02rem;
+  line-height: 1.55;
+  max-width: 72ch;
+  margin: 0 0 1.05rem;
+}
+.os-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 1.1rem;
+}
+.os-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.28rem 0.72rem;
+  border: 1px solid var(--os-border);
+  border-radius: 999px;
+  background: var(--os-card);
+  color: var(--os-ink-soft);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.os-badge.os-badge-brand {
+  border-color: transparent;
+  background: var(--os-brand-tint);
+  color: var(--os-brand-deep);
+}
+
+/* ---------- Callout note ---------- */
+.os-note, .openstudy-note {
+  border: 1px solid var(--os-border);
+  border-left: 4px solid var(--os-brand);
+  padding: 0.85rem 1.05rem;
+  background: var(--os-card);
+  color: var(--os-ink);
+  border-radius: 10px;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  max-width: 86ch;
+}
+.os-note strong { color: var(--os-brand-deep); }
+
+/* ---------- Tabs as underlined nav ---------- */
+.gradio-container button[role="tab"] {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--os-ink-soft);
+  background: transparent;
+  border-radius: 6px 6px 0 0;
+  padding: 0.6rem 1rem;
+  border-bottom: 2px solid transparent;
+}
+.gradio-container button[role="tab"][aria-selected="true"] {
+  color: var(--os-brand-deep);
+  border-bottom: 2px solid var(--os-brand);
+  background: transparent;
+}
+.gradio-container .tabitem {
+  padding-top: 0.85rem;
+  border: none;
+  background: transparent;
+}
+
+/* ---------- Typography in markdown blocks ---------- */
+.gradio-container .prose h1,
+.gradio-container .prose h2,
+.gradio-container .prose h3 {
+  font-family: var(--os-serif);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--os-ink);
+}
+.gradio-container .prose code {
+  font-family: var(--os-mono);
+  font-size: 0.85em;
+  background: var(--os-brand-tint);
+  color: var(--os-brand-deep);
+  border-radius: 4px;
+  padding: 0.08em 0.35em;
+}
+
+/* ---------- Buttons ---------- */
+.gradio-container button.primary,
+.gradio-container button.secondary {
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: transform 0.08s ease, box-shadow 0.12s ease;
+}
+.gradio-container button.primary:hover {
+  box-shadow: 0 3px 10px rgba(14, 107, 95, 0.28);
+}
+.gradio-container button.primary:active,
+.gradio-container button.secondary:active {
+  transform: translateY(1px);
+}
+
+/* ---------- Tables ---------- */
+.gradio-container .table-wrap {
+  border: 1px solid var(--os-border);
+  border-radius: 10px;
+}
+.gradio-container thead th,
+.gradio-container thead th span {
+  font-size: 0.72rem !important;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-weight: 700;
+  color: var(--os-ink-soft);
+}
+.gradio-container tbody td,
+.gradio-container tbody td span {
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+.compact-table textarea { font-size: 0.88rem !important; }
+
+/* ---------- Inputs ---------- */
+.gradio-container input:focus,
+.gradio-container textarea:focus {
+  border-color: var(--os-brand) !important;
+  box-shadow: 0 0 0 3px rgba(14, 107, 95, 0.14) !important;
+}
+
+/* ---------- Footer ---------- */
+.os-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem 1.5rem;
+  border-top: 1px solid var(--os-border);
+  margin-top: 2.2rem;
+  padding: 1.1rem 0.2rem 0.4rem;
+  color: var(--os-ink-soft);
+  font-size: 0.82rem;
+}
+.os-footer a { color: var(--os-brand); text-decoration: none; }
+
+@media (max-width: 720px) {
+  .os-hero { padding-top: 1.4rem; }
+  .os-badge { font-size: 0.72rem; }
+}
 """
 
 
@@ -1197,24 +1467,45 @@ def build_bias_rows(checklist: list[dict[str, Any]], study_key: str) -> list[lis
     return rows
 
 
+def style_plot(fig, ax) -> None:
+    fig.patch.set_facecolor(CARD)
+    ax.set_facecolor(CARD)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+    ax.tick_params(colors=INK, length=0, labelsize=9.5)
+
+
 def score_plot(scores: dict[str, float]):
     fig, ax = plt.subplots(figsize=(8.5, max(3.2, 0.42 * len(scores))))
+    style_plot(fig, ax)
     if not scores:
-        ax.text(0.5, 0.5, "No scores available", ha="center", va="center")
+        ax.text(0.5, 0.5, "No scores available", ha="center", va="center", color=INK_SOFT)
         ax.axis("off")
         return fig
 
     ordered = sorted(scores.items(), key=lambda item: item[1])
     labels = [item[0] for item in ordered]
     values = [item[1] for item in ordered]
-    colors = ["#dc2626" if value < 50 else "#d97706" if value < 75 else "#0f766e" for value in values]
-    ax.barh(labels, values, color=colors)
+    colors = [RISK if value < 50 else WARN if value < 75 else BRAND for value in values]
+    ax.barh(labels, values, color=colors, height=0.62, zorder=3)
+    ax.barh(labels, [100] * len(values), color=BORDER, height=0.62, zorder=1, alpha=0.45)
     ax.set_xlim(0, 100)
-    ax.set_xlabel("Reported safeguard score")
-    ax.grid(axis="x", alpha=0.22)
+    ax.set_xlabel("Reported safeguard score", color=INK_SOFT, fontsize=9.5)
+    ax.grid(axis="x", color=BORDER, linewidth=0.8, zorder=0)
     for index, value in enumerate(values):
-        ax.text(min(value + 1.5, 96), index, f"{value:.0f}%", va="center", fontsize=9)
-    ax.set_title("Reporting safeguards by category")
+        inside = value > 88
+        ax.text(
+            value - 2 if inside else value + 1.5,
+            index,
+            f"{value:.0f}%",
+            va="center",
+            ha="right" if inside else "left",
+            fontsize=9,
+            fontweight="bold",
+            color="#ffffff" if inside else INK,
+            zorder=4,
+        )
+    ax.set_title("Reporting safeguards by category", loc="left", color=INK, fontsize=11, fontweight="bold", pad=12)
     fig.tight_layout()
     return fig
 
@@ -1792,7 +2083,8 @@ def report_outputs(report: dict[str, Any]):
 
 def empty_outputs(message: str):
     fig, ax = plt.subplots(figsize=(7, 2.5))
-    ax.text(0.5, 0.5, message, ha="center", va="center", wrap=True)
+    style_plot(fig, ax)
+    ax.text(0.5, 0.5, message, ha="center", va="center", wrap=True, color=INK_SOFT)
     ax.axis("off")
     return (
         f"### {message}",
@@ -1814,15 +2106,33 @@ def build_app() -> gr.Blocks:
         blocks_kwargs["css"] = APP_CSS
 
     with gr.Blocks(**blocks_kwargs) as demo:
-        gr.Markdown(
+        gr.HTML(
             f"""
-# {APP_NAME}
-
-Search for a study or upload a manuscript to screen for reported bias controls, conduct details, ethics safeguards, funding disclosures, and transparency signals.
-
-<div class="openstudy-note">
-This app is a decision-support checklist. It flags what is reported or missing in the supplied text; it does not certify that a study is ethical, unbiased, valid, or invalid.
-</div>
+<header class="os-hero">
+  <div class="os-wordmark">
+    <span class="os-logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+           stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/>
+        <path d="M9 12l2 2 4-4"/>
+      </svg>
+    </span>
+    <span>{APP_NAME}</span>
+  </div>
+  <h1>Screen any study for the safeguards it actually reports.</h1>
+  <p class="os-lede">Search public study metadata, upload a manuscript, or review your own protocol.
+  {APP_NAME} checks for reported bias controls, study-conduct details, ethics safeguards, funding
+  disclosures, and transparency signals &mdash; and tells you what is missing.</p>
+  <div class="os-badges">
+    <span class="os-badge os-badge-brand">Rule-based &amp; transparent</span>
+    <span class="os-badge">Nothing stored after your session</span>
+    <span class="os-badge">Optional AI review: {QWEN_MODEL_ID}</span>
+    <span class="os-badge">Open source &middot; MIT</span>
+  </div>
+  <div class="os-note"><strong>Decision support, not a verdict.</strong> {APP_NAME} flags what is
+  reported or missing in the supplied text; it does not certify that a study is ethical, unbiased,
+  valid, or invalid.</div>
+</header>
 """
         )
 
@@ -1849,7 +2159,7 @@ This app is a decision-support checklist. It flags what is reported or missing i
 
             with gr.Row():
                 summary = gr.Markdown()
-                plot = gr.Plot(label="Category scores")
+                plot = gr.Plot(label="Category scores", show_label=False)
             conduct = gr.Markdown()
             benchmarks_table = gr.Dataframe(
                 headers=["Benchmark", "Status", "Score", "Description", "Evidence", "Required action"],
@@ -1901,7 +2211,7 @@ This app is a decision-support checklist. It flags what is reported or missing i
             upload_button = gr.Button("Evaluate uploaded study", variant="primary")
             with gr.Row():
                 upload_summary = gr.Markdown()
-                upload_plot = gr.Plot(label="Category scores")
+                upload_plot = gr.Plot(label="Category scores", show_label=False)
             upload_conduct = gr.Markdown()
             upload_benchmarks = gr.Dataframe(
                 headers=["Benchmark", "Status", "Score", "Description", "Evidence", "Required action"],
@@ -2005,7 +2315,7 @@ For Hugging Face Spaces, set a secret named `HF_TOKEN`, or paste a temporary Hug
 
             with gr.Row():
                 project_summary = gr.Markdown()
-                project_plot = gr.Plot(label="Category scores")
+                project_plot = gr.Plot(label="Category scores", show_label=False)
             project_conduct = gr.Markdown()
             project_benchmarks = gr.Dataframe(
                 headers=["Benchmark", "Status", "Score", "Description", "Evidence", "Required action"],
@@ -2099,6 +2409,15 @@ Recommended human follow-up:
 - Upload protocol, benchmark, or preregistration files in the project tab to check whether planned safeguards are present.
 """
             )
+
+        gr.HTML(
+            f"""
+<footer class="os-footer">
+  <span>{APP_NAME} &mdash; open-source study screening &middot; MIT license</span>
+  <span>A reported-safeguard screen, not a verdict on validity or ethics.</span>
+</footer>
+"""
+        )
 
     return demo
 
