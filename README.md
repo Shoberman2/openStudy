@@ -15,9 +15,9 @@ OpenStudy is an open-source Gradio app for screening research studies for report
 
 Users can:
 
-- Search public study metadata by DOI, URL, title, or keywords — up to 100 studies per topic — and evaluate a result with one click.
+- Search public study metadata by DOI, URL, title, or keywords (up to 100 studies per topic) and evaluate a result with one click.
 - Evaluate abstracts and available metadata from public sources, with plain-language explanations of what every score and category means.
-- Define their own screening standards and parameters — categories that count, safeguards that must be reported, a minimum score, adjustable risk thresholds, and custom required terms — and get a pass/fail verdict against them on every evaluation.
+- Define their own screening standards and parameters (categories that count, safeguards that must be reported, a minimum score, adjustable risk thresholds, and custom required terms) and get a pass/fail verdict against them on every evaluation.
 - Add their own research study (PDF, DOCX, text, or pasted manuscript) to screen it for bias-control and credibility safeguards against those standards.
 - Upload their own research projects, protocols, benchmark plans, or preregistrations to review planned conduct before or during a study.
 - Keep an in-session project dashboard and export project summaries as JSON.

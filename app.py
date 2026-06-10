@@ -34,11 +34,11 @@ HEADERS = {
 BRAND = "#0e6b5f"
 BRAND_DEEP = "#0a554b"
 BRAND_BRIGHT = "#2fa08f"
-PAPER = "#f6f4ee"
-CARD = "#fffdf8"
-INK = "#20312d"
-INK_SOFT = "#5b6b66"
-BORDER = "#e4dfd3"
+PAPER = "#eef4f2"
+CARD = "#ffffff"
+INK = "#172522"
+INK_SOFT = "#4f6660"
+BORDER = "#d9e4e0"
 WARN = "#b45309"
 RISK = "#b91c1c"
 
@@ -46,7 +46,7 @@ THEME = gr.themes.Soft(
     primary_hue="teal",
     secondary_hue="emerald",
     neutral_hue="stone",
-    font=[gr.themes.GoogleFont("Inter"), "ui-sans-serif", "system-ui", "sans-serif"],
+    font=[gr.themes.GoogleFont("Plus Jakarta Sans"), "ui-sans-serif", "system-ui", "sans-serif"],
     font_mono=[gr.themes.GoogleFont("IBM Plex Mono"), "ui-monospace", "SFMono-Regular", "monospace"],
 ).set(
     body_background_fill=PAPER,
@@ -74,7 +74,7 @@ THEME = gr.themes.Soft(
     block_label_background_fill_dark="#141c19",
     input_background_fill="#ffffff",
     input_background_fill_dark="#101614",
-    input_border_color="#d8d2c4",
+    input_border_color="#c4d5cf",
     input_border_color_dark="#33403b",
     button_primary_background_fill=BRAND,
     button_primary_background_fill_hover=BRAND_DEEP,
@@ -82,13 +82,13 @@ THEME = gr.themes.Soft(
     button_primary_background_fill_hover_dark="#128172",
     button_primary_text_color="#ffffff",
     button_primary_text_color_dark="#ffffff",
-    button_secondary_background_fill="#edebe0",
-    button_secondary_background_fill_hover="#e3e0d2",
+    button_secondary_background_fill="#e2ece9",
+    button_secondary_background_fill_hover="#d6e4e0",
     button_secondary_background_fill_dark="#243029",
     button_secondary_background_fill_hover_dark="#2c3a32",
     button_secondary_text_color=INK,
     button_secondary_text_color_dark="#e9e7df",
-    table_even_background_fill="#fbfaf4",
+    table_even_background_fill="#f5f9f8",
     table_even_background_fill_dark="#1b2421",
     table_odd_background_fill=CARD,
     table_odd_background_fill_dark="#19221f",
@@ -694,18 +694,24 @@ def iconize(status: str) -> str:
     return STATUS_ICONS.get(status, status)
 
 
+APP_HEAD = """
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+"""
+
 APP_CSS = """
 /* ===================== OpenStudy design system ===================== */
 :root {
-  --os-paper: #f6f4ee;
-  --os-card: #fffdf8;
-  --os-ink: #20312d;
-  --os-ink-soft: #5b6b66;
+  --os-paper: #eef4f2;
+  --os-card: #ffffff;
+  --os-ink: #172522;
+  --os-ink-soft: #4f6660;
   --os-brand: #0e6b5f;
   --os-brand-deep: #0a554b;
-  --os-brand-tint: #e3efec;
-  --os-border: #e4dfd3;
-  --os-serif: "Source Serif 4", "Iowan Old Style", Georgia, serif;
+  --os-brand-tint: #e0efeb;
+  --os-border: #d9e4e0;
+  --os-serif: "Space Grotesk", "Plus Jakarta Sans", ui-sans-serif, sans-serif;
   --os-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
 }
 .dark {
@@ -719,9 +725,32 @@ APP_CSS = """
   --os-border: #2b3733;
 }
 
+body {
+  background: linear-gradient(180deg, #e0eeea 0%, var(--os-paper) 340px) fixed !important;
+}
+.dark body { background: var(--os-paper) !important; }
+
 .gradio-container {
   max-width: 1020px !important;
   margin: 0 auto !important;
+  background: transparent !important;
+}
+
+/* Readability: roomier body text */
+.gradio-container .prose p,
+.gradio-container .prose li {
+  font-size: 0.98rem;
+  line-height: 1.62;
+}
+
+/* Hero CTA buttons: identical fixed size, side by side */
+button.os-cta {
+  width: 280px !important;
+  min-width: 280px !important;
+  flex: 0 0 280px !important;
+  height: 48px;
+  white-space: nowrap;
+  font-weight: 600;
 }
 
 /* Action buttons keep their natural width instead of stretching */
@@ -795,34 +824,21 @@ button.os-action {
   margin-bottom: 0.35rem;
 }
 .os-wordmark {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
+  font-family: var(--os-serif);
   font-weight: 700;
-  font-size: 1.02rem;
-  letter-spacing: 0.012em;
-  color: var(--os-ink);
+  font-size: 1.15rem;
+  letter-spacing: -0.01em;
+  color: var(--os-brand-deep);
 }
-.os-logo {
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
-  background: var(--os-brand);
-  color: #fff;
-  display: grid;
-  place-items: center;
-  flex: none;
-}
-.dark .os-logo { color: #0d1a17; }
 .os-hero h1 {
   font-family: var(--os-serif);
-  font-weight: 600;
-  font-size: clamp(1.65rem, 3.2vw, 2.35rem);
-  line-height: 1.16;
-  letter-spacing: -0.012em;
+  font-weight: 700;
+  font-size: clamp(1.6rem, 3.1vw, 2.25rem);
+  line-height: 1.18;
+  letter-spacing: -0.022em;
   color: var(--os-ink);
-  max-width: 30ch;
-  margin: 1rem 0 0.55rem;
+  max-width: 32ch;
+  margin: 0.9rem 0 0.6rem;
 }
 .os-lede {
   color: var(--os-ink-soft);
@@ -2348,7 +2364,9 @@ def empty_outputs(message: str):
 
 
 def build_app() -> gr.Blocks:
-    blocks_kwargs: dict[str, Any] = {"title": f"{APP_NAME}: Study Bias and Ethics Screen"}
+    blocks_kwargs: dict[str, Any] = {"title": f"{APP_NAME}: Check Studies for Bias Controls, Ethics, and Credibility"}
+    if "head" in inspect.signature(gr.Blocks.__init__).parameters:
+        blocks_kwargs["head"] = APP_HEAD
     launch_params = inspect.signature(gr.Blocks.launch).parameters
     if "theme" not in launch_params:
         blocks_kwargs["theme"] = THEME
@@ -2359,20 +2377,13 @@ def build_app() -> gr.Blocks:
         gr.HTML(
             f"""
 <header class="os-hero">
-  <div class="os-wordmark">
-    <span class="os-logo" aria-hidden="true">
-      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
-           stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/>
-        <path d="M9 12l2 2 4-4"/>
-      </svg>
-    </span>
-    <span>{APP_NAME}</span>
-  </div>
-  <h1>Screen any study for the safeguards it actually reports.</h1>
-  <p class="os-lede">Search public study metadata, upload a manuscript, or review your own protocol.
-  {APP_NAME} checks for reported bias controls, study-conduct details, ethics safeguards, funding
-  disclosures, and transparency signals &mdash; and tells you what is missing.</p>
+  <div class="os-wordmark">{APP_NAME}</div>
+  <h1>Check research studies for bias controls, ethics, and credibility.</h1>
+  <p class="os-lede">{APP_NAME} scores how completely a study reports the safeguards that make
+  research trustworthy: randomization and blinding, ethics approval and consent, funding and
+  conflict disclosures, data sharing, and limitations. It then judges the study against standards
+  you set. Look up any published paper by topic, title, or DOI, or add your own study to see
+  exactly which safeguards are missing before reviewers find them.</p>
   <div class="os-badges">
     <span class="os-badge os-badge-brand">Rule-based &amp; transparent</span>
     <span class="os-badge">Nothing stored after your session</span>
@@ -2387,8 +2398,8 @@ def build_app() -> gr.Blocks:
         )
 
         with gr.Row():
-            cta_lookup = gr.Button("🔍 Look up a paper", variant="primary", elem_classes=["os-action"])
-            cta_add = gr.Button("➕ Add your research study", variant="secondary", elem_classes=["os-action"])
+            cta_lookup = gr.Button("🔍 Look up a paper", variant="primary", elem_classes=["os-cta"])
+            cta_add = gr.Button("➕ Add your research study", variant="secondary", elem_classes=["os-cta"])
 
         category_legend = "\n".join(
             f"| **{category}** | {explanation} |" for category, explanation in CATEGORY_EXPLANATIONS.items()
@@ -2399,13 +2410,13 @@ def build_app() -> gr.Blocks:
 Every paper is checked against a transparent checklist of reporting safeguards. Each safeguard is marked
 ✅ **Reported** (full credit), ⚠️ **Potential concern** (quarter credit), or ❌ **Missing or unclear** (no credit).
 A category's score is the share of credit earned, from 0 to 100. The score measures **how completely the study
-is reported** — not whether its findings are true.
+is reported**, not whether its findings are true.
 
 | Score | Default reading |
 | --- | --- |
-| 75–100 | **Lower reporting risk** — the text reports most safeguards readers expect. |
-| 50–74 | **Moderate reporting risk** — several safeguards reported, but important items need review. |
-| 0–49 | **Higher reporting risk** — many expected safeguards are missing or unclear. |
+| 75–100 | **Lower reporting risk**: the text reports most safeguards readers expect. |
+| 50–74 | **Moderate reporting risk**: several safeguards reported, but important items need review. |
+| 0–49 | **Higher reporting risk**: many expected safeguards are missing or unclear. |
 
 You can move these boundaries in *Your screening standards* below.
 
@@ -2415,12 +2426,12 @@ You can move these boundaries in *Your screening standards* below.
 | --- | --- |
 {category_legend}
 
-A low score can also mean the available text was short (for example, only an abstract) — it does not by
+A low score can also mean the available text was short (for example, only an abstract); it does not by
 itself prove poor conduct.
 """
             )
 
-        with gr.Accordion("Your screening standards — applied when you evaluate or add a paper", open=False):
+        with gr.Accordion("Your screening standards (applied when you evaluate or add a paper)", open=False):
             gr.Markdown(
                 "Set the bar a paper must meet. Every evaluation shows a clear verdict against these standards."
             )
@@ -2533,7 +2544,7 @@ itself prove poor conduct.
             with gr.Tab("Add your study", id="add"):
                 gr.Markdown(
                     """
-Add your own research study — or any paper — by file or pasted text. OpenStudy screens it for the
+Add your own research study, or any paper, by file or pasted text. OpenStudy screens it for the
 bias-control, ethics, transparency, and credibility safeguards it reports, using the standards and
 parameters you set above, and tells you exactly what to strengthen.
 """
@@ -2764,7 +2775,7 @@ parameters you set above, and tells you exactly what to strengthen.
         gr.HTML(
             f"""
 <footer class="os-footer">
-  <span>{APP_NAME} &mdash; open-source study screening &middot; MIT license</span>
+  <span>{APP_NAME} &middot; open-source study screening &middot; MIT license</span>
   <span>A reported-safeguard screen, not a verdict on validity or ethics.</span>
 </footer>
 """
