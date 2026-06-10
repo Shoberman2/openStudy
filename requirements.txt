@@ -1,5 +1,7 @@
 gradio>=4.44.1
+huggingface_hub>=0.33.5
 requests>=2.32.0
 beautifulsoup4>=4.12.0
 pypdf>=4.3.0
+python-docx>=1.1.2
 matplotlib>=3.8.0

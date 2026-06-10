@@ -1,6 +1,7 @@
 import html
 import inspect
 import json
+import os
 import re
 import tempfile
 from dataclasses import dataclass
@@ -13,6 +14,8 @@ import gradio as gr
 import matplotlib
 import requests
 from bs4 import BeautifulSoup
+from docx import Document
+from huggingface_hub import InferenceClient
 from pypdf import PdfReader
 
 
@@ -20,7 +23,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 APP_NAME = "OpenStudy"
+QWEN_MODEL_ID = "Qwen/Qwen3.6-27B"
 MAX_ANALYSIS_CHARS = 180_000
+MAX_QWEN_CONTEXT_CHARS = 18_000
 REQUEST_TIMEOUT = 12
 HEADERS = {
     "User-Agent": "OpenStudy/0.1 (open-source research-bias-screening; https://huggingface.co/spaces)"
@@ -45,6 +50,15 @@ class Criterion:
     positive: tuple[str, ...]
     recommendation: str
     concern: tuple[str, ...] = ()
+    applies_to: tuple[str, ...] = ()
+    excludes: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class Benchmark:
+    name: str
+    description: str
+    criteria: tuple[str, ...]
     applies_to: tuple[str, ...] = ()
     excludes: tuple[str, ...] = ()
 
@@ -488,6 +502,96 @@ CRITERIA: tuple[Criterion, ...] = (
 )
 
 
+BENCHMARKS: tuple[Benchmark, ...] = (
+    Benchmark(
+        "Protocol readiness",
+        "Design, protocol, outcomes, and sample-size planning are clear before strong claims are made.",
+        (
+            "Study design is named",
+            "Protocol or preregistration is reported",
+            "Primary outcomes or endpoints are specified",
+            "Sample size or power rationale is reported",
+        ),
+    ),
+    Benchmark(
+        "Participant selection fairness",
+        "Recruitment, eligibility, and participant characteristics are transparent enough to judge selection bias and generalizability.",
+        (
+            "Eligibility criteria are described",
+            "Recruitment source or study period is described",
+            "Participant characteristics are reported",
+        ),
+    ),
+    Benchmark(
+        "Bias control readiness",
+        "The project includes design or analysis safeguards that reduce expected sources of bias.",
+        (
+            "Random allocation is reported",
+            "Blinding or masking is reported",
+            "Comparator or control condition is described",
+            "Confounding is addressed",
+            "Measurement validity or reliability is addressed",
+        ),
+    ),
+    Benchmark(
+        "Ethical conduct readiness",
+        "Oversight, consent, privacy, safety, or welfare safeguards are described before data collection or publication.",
+        (
+            "Ethics approval or oversight is reported",
+            "Consent process is reported",
+            "Privacy, confidentiality, or safety safeguards are reported",
+            "Animal welfare oversight is reported",
+        ),
+    ),
+    Benchmark(
+        "Analysis integrity",
+        "The analysis plan reports methods, uncertainty, robustness checks, and missing-data handling.",
+        (
+            "Statistical methods are named",
+            "Uncertainty is reported",
+            "Sensitivity, subgroup, or robustness checks are reported",
+            "Missing data, attrition, or follow-up is addressed",
+        ),
+    ),
+    Benchmark(
+        "Transparency and conflicts",
+        "Data, code, funding, sponsor role, competing interests, and limitations are visible to reviewers.",
+        (
+            "Data or code availability is reported",
+            "Funding source is reported",
+            "Conflicts or competing interests are reported",
+            "Funder or sponsor role is clarified",
+            "Limitations are discussed",
+        ),
+    ),
+    Benchmark(
+        "Review-method completeness",
+        "Search strategy, included-study appraisal, and publication-bias assessment are planned or reported.",
+        (
+            "Search strategy and databases are reported",
+            "Risk-of-bias or quality appraisal is reported",
+            "Publication bias is considered",
+        ),
+        applies_to=("review",),
+    ),
+    Benchmark(
+        "Qualitative rigor",
+        "Qualitative coding, reflexivity, triangulation, or member-checking safeguards are planned or reported.",
+        ("Coding, reflexivity, or triangulation is reported",),
+        applies_to=("qualitative",),
+    ),
+    Benchmark(
+        "Algorithmic fairness",
+        "Model validation and subgroup or fairness checks are planned or reported for algorithmic studies.",
+        (
+            "Validation split or external validation is reported",
+            "Fairness or subgroup performance is reported",
+        ),
+        applies_to=("ml",),
+    ),
+)
+
+
 APP_CSS = """
 .gradio-container { max-width: 1280px !important; }
 .openstudy-note {
@@ -781,6 +885,14 @@ def criterion_applies(criterion: Criterion, study_key: str) -> bool:
     return True
 
 
+def benchmark_applies(benchmark: Benchmark, study_key: str) -> bool:
+    if study_key in benchmark.excludes:
+        return False
+    if benchmark.applies_to:
+        return study_key in benchmark.applies_to
+    return True
+
+
 def split_sentences(text: str) -> list[str]:
     normalized = normalize_space(text)
     pieces = re.split(r"(?<=[.!?])\s+(?=[A-Z0-9])", normalized)
@@ -870,6 +982,7 @@ def evaluate_study_text(
     overall = round(sum(item["score"] for item in checklist) / max(len(checklist), 1) * 100, 1)
     level, level_detail = risk_level(overall)
     conducted = extract_conduct_summary(analysis_text, metadata, study_label)
+    benchmarks = build_benchmark_rows(checklist, study_key)
     biases = build_bias_rows(checklist, study_key)
     return {
         "metadata": metadata,
@@ -882,6 +995,7 @@ def evaluate_study_text(
         "level": level,
         "level_detail": level_detail,
         "conducted": conducted,
+        "benchmarks": benchmarks,
         "biases": biases,
         "truncated": truncated,
         "text_chars": len(text),
@@ -962,6 +1076,41 @@ def bias_status(items: list[dict[str, Any]]) -> str:
     if all(status == "Reported" for status in statuses if status):
         return "Lower signal"
     return "Needs review"
+
+
+def benchmark_status(score: float) -> str:
+    if score >= 0.85:
+        return "Meets benchmark"
+    if score >= 0.55:
+        return "Partially meets benchmark"
+    return "Needs work"
+
+
+def build_benchmark_rows(checklist: list[dict[str, Any]], study_key: str) -> list[list[str]]:
+    lookup = checklist_lookup(checklist)
+    rows = []
+    for benchmark in BENCHMARKS:
+        if not benchmark_applies(benchmark, study_key):
+            continue
+        items = [lookup[label] for label in benchmark.criteria if label in lookup]
+        if not items:
+            continue
+        score = sum(float(item["score"]) for item in items) / len(items)
+        missing = [item["criterion"] for item in items if item["status"] != "Reported"]
+        action = "Maintain this benchmark and keep evidence in the protocol or report."
+        if missing:
+            action = "Address: " + "; ".join(missing[:4])
+        rows.append(
+            [
+                benchmark.name,
+                benchmark_status(score),
+                f"{score * 100:.0f}%",
+                benchmark.description,
+                combine_evidence(items),
+                action,
+            ]
+        )
+    return rows
 
 
 def build_bias_rows(checklist: list[dict[str, Any]], study_key: str) -> list[list[str]]:
@@ -1113,11 +1262,24 @@ def report_to_markdown(report: dict[str, Any]) -> str:
         "",
         conduct_markdown(report).strip(),
         "",
+        "## Benchmarks",
+        "",
+        "| Benchmark | Status | Score | Description | Evidence | Required action |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ]
+    for benchmark, status, score, description, evidence, action in report.get("benchmarks", []):
+        lines.append(
+            f"| {escape_table(benchmark)} | {escape_table(status)} | {escape_table(score)} | {escape_table(description)} | {escape_table(evidence)} | {escape_table(action)} |"
+        )
+    lines.extend(
+        [
+            "",
         "## Potential bias and ethics signals",
         "",
         "| Signal | Status | Evidence | Next check |",
         "| --- | --- | --- | --- |",
-    ]
+        ]
+    )
     for signal, status, evidence, next_check in report["biases"]:
         lines.append(f"| {escape_table(signal)} | {escape_table(status)} | {escape_table(evidence)} | {escape_table(next_check)} |")
     lines.extend(
@@ -1194,17 +1356,19 @@ def analyze_selected_ui(choice: str, records: list[dict[str, Any]] | None):
     return report_outputs(report)
 
 
-def analyze_upload_ui(file_path: Any, pasted_text: str, title: str, study_type_hint: str):
-    extracted = ""
-    source_name = "pasted text"
+def uploaded_file_text(file_path: Any) -> tuple[str, str]:
     if file_path:
         path = file_path
         if isinstance(file_path, dict):
             path = file_path.get("path") or file_path.get("name")
         elif hasattr(file_path, "name"):
             path = file_path.name
-        source_name = Path(str(path)).name
-        extracted = extract_text_from_file(str(path))
+        return Path(str(path)).name, extract_text_from_file(str(path))
+    return "pasted text", ""
+
+
+def analyze_upload_ui(file_path: Any, pasted_text: str, title: str, study_type_hint: str):
+    source_name, extracted = uploaded_file_text(file_path)
     text = normalize_space(" ".join(part for part in (title, pasted_text, extracted) if part))
     if not text:
         return empty_outputs("Upload a PDF/text file or paste manuscript text to evaluate.")
@@ -1219,6 +1383,7 @@ def analyze_upload_ui(file_path: Any, pasted_text: str, title: str, study_type_h
 
 
 def project_text_from_fields(
+    uploaded_project_text: str,
     title: str,
     team: str,
     project_status: str,
@@ -1242,6 +1407,7 @@ def project_text_from_fields(
     notes: str,
 ) -> str:
     fields = [
+        ("Uploaded project or protocol file text", uploaded_project_text),
         ("Project title", title),
         ("Team or owner", team),
         ("Project status", project_status),
@@ -1304,6 +1470,7 @@ def project_choices(projects: list[dict[str, Any]] | None) -> list[str]:
 
 
 def make_project_record(
+    file_path: Any,
     title: str,
     team: str,
     project_status: str,
@@ -1326,7 +1493,9 @@ def make_project_record(
     funding_conflicts: str,
     notes: str,
 ) -> dict[str, Any] | None:
+    source_name, uploaded_project_text = uploaded_file_text(file_path)
     project_text = project_text_from_fields(
+        uploaded_project_text,
         title,
         team,
         project_status,
@@ -1357,7 +1526,7 @@ def make_project_record(
         "title": display_title,
         "team": normalize_space(team),
         "project_status": normalize_space(project_status),
-        "source": "User research project form",
+        "source": source_name if uploaded_project_text else "User research project form",
     }
     report = evaluate_study_text(
         project_text,
@@ -1370,6 +1539,7 @@ def make_project_record(
         "team": normalize_space(team),
         "project_status": normalize_space(project_status),
         "study_type": report["study_label"],
+        "source": metadata["source"],
         "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "text": project_text,
         "report": report,
@@ -1377,6 +1547,7 @@ def make_project_record(
 
 
 def add_project_ui(
+    file_path: Any,
     title: str,
     team: str,
     project_status: str,
@@ -1401,6 +1572,7 @@ def add_project_ui(
     projects: list[dict[str, Any]] | None,
 ):
     project = make_project_record(
+        file_path,
         title,
         team,
         project_status,
@@ -1471,6 +1643,16 @@ def download_projects_ui(projects: list[dict[str, Any]] | None):
                 "created_at": project.get("created_at"),
                 "overall_score": report.get("overall"),
                 "risk_level": report.get("level"),
+                "source": project.get("source"),
+                "benchmarks": [
+                    {
+                        "benchmark": row[0],
+                        "status": row[1],
+                        "score": row[2],
+                        "required_action": row[5],
+                    }
+                    for row in report.get("benchmarks", [])
+                ],
                 "key_gaps": top_project_gaps(report, limit=6),
                 "plan_text": project.get("text"),
             }
@@ -1478,6 +1660,101 @@ def download_projects_ui(projects: list[dict[str, Any]] | None):
     with tempfile.NamedTemporaryFile("w", delete=False, suffix=".json", encoding="utf-8") as handle:
         json.dump(exportable, handle, indent=2)
         return handle.name
+
+
+def qwen_project_prompt(project: dict[str, Any], extra_instruction: str) -> str:
+    report = project.get("report", {})
+    benchmark_lines = [
+        f"- {row[0]}: {row[1]} ({row[2]}). Required action: {row[5]}"
+        for row in report.get("benchmarks", [])
+    ]
+    checklist_lines = [
+        f"- {item['criterion']}: {item['status']}. Recommendation: {item['recommendation']}"
+        for item in report.get("checklist", [])
+        if item.get("status") != "Reported"
+    ]
+    return f"""
+You are OpenStudy's research benchmark review agent.
+
+Review only the supplied project text and benchmark results. Do not invent approvals, methods, outcomes, or safeguards. Do not certify that the study is ethical or unbiased. Identify concrete protocol improvements a scientist can make before or during the project.
+
+Project title: {project.get('title', 'Untitled project')}
+Study type: {report.get('study_label', 'Unknown')}
+Overall benchmark screen: {report.get('overall', 0):.1f}/100 - {report.get('level', 'Unknown')}
+
+Benchmarks:
+{chr(10).join(benchmark_lines) or '- No benchmark rows available.'}
+
+Open checklist gaps:
+{chr(10).join(checklist_lines[:16]) or '- No open checklist gaps flagged.'}
+
+Project text:
+{truncate(project.get('text', ''), MAX_QWEN_CONTEXT_CHARS)}
+
+Extra reviewer instruction:
+{normalize_space(extra_instruction) or 'None'}
+
+Return Markdown with these sections:
+1. Qwen benchmark verdict
+2. Highest-priority fixes before continuing
+3. Bias and ethics risks to monitor
+4. Evidence missing from the project file
+5. Suggested next protocol edits
+"""
+
+
+def qwen_agent_review(project: dict[str, Any], hf_token: str, extra_instruction: str) -> str:
+    token = normalize_space(hf_token) or os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACEHUB_API_TOKEN")
+    prompt = qwen_project_prompt(project, extra_instruction)
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                f"You are a research-methods benchmark reviewer. You must use only {QWEN_MODEL_ID} "
+                "as the configured model and must not mention or rely on any other model."
+            ),
+        },
+        {"role": "user", "content": prompt},
+    ]
+    try:
+        client = InferenceClient(model=QWEN_MODEL_ID, token=token or None, timeout=90)
+        response = client.chat_completion(
+            messages=messages,
+            model=QWEN_MODEL_ID,
+            max_tokens=900,
+            temperature=0.2,
+        )
+        content = response.choices[0].message.content
+        if not content:
+            raise RuntimeError("The model returned an empty response.")
+        return f"### Qwen agent review\n\n**Model used:** `{QWEN_MODEL_ID}`\n\n{content}"
+    except Exception as exc:
+        return (
+            "### Qwen agent review unavailable\n\n"
+            f"**Required model:** `{QWEN_MODEL_ID}`\n\n"
+            "OpenStudy did not run another model. Configure a Hugging Face token as a Space secret named `HF_TOKEN`, "
+            "or paste a temporary token in the project tab, then retry.\n\n"
+            f"Technical detail: `{truncate(str(exc), 500)}`"
+        )
+
+
+def qwen_agent_review_ui(
+    choice: str,
+    projects: list[dict[str, Any]] | None,
+    hf_token: str,
+    extra_instruction: str,
+) -> str:
+    projects = projects or []
+    if not projects:
+        return "### Qwen agent review\n\nAdd or upload a research project first."
+    if not choice:
+        index = len(projects) - 1
+    else:
+        match = re.match(r"^(\d+)\.", choice)
+        index = int(match.group(1)) - 1 if match else len(projects) - 1
+    if index < 0 or index >= len(projects):
+        return "### Qwen agent review\n\nSelected project was not found in this session."
+    return qwen_agent_review(projects[index], hf_token, extra_instruction)
 
 
 def extract_text_from_file(path: str) -> str:
@@ -1489,6 +1766,13 @@ def extract_text_from_file(path: str) -> str:
             for page in reader.pages[:80]:
                 pages.append(page.extract_text() or "")
             return normalize_space("\n".join(pages))
+        if suffix == ".docx":
+            document = Document(path)
+            blocks = [paragraph.text for paragraph in document.paragraphs]
+            for table in document.tables:
+                for row in table.rows:
+                    blocks.append(" | ".join(cell.text for cell in row.cells))
+            return normalize_space("\n".join(blocks))
         return Path(path).read_text(encoding="utf-8", errors="ignore")
     except Exception as exc:
         return f"Could not extract file text: {exc}"
@@ -1499,6 +1783,7 @@ def report_outputs(report: dict[str, Any]):
         summary_markdown(report),
         score_plot(report["scores"]),
         conduct_markdown(report),
+        report.get("benchmarks", []),
         report["biases"],
         checklist_rows(report),
         write_report_file(report),
@@ -1513,6 +1798,7 @@ def empty_outputs(message: str):
         f"### {message}",
         fig,
         "### How the study appears to have been conducted\nNo study has been evaluated yet.",
+        [],
         [],
         [],
         None,
@@ -1565,6 +1851,11 @@ This app is a decision-support checklist. It flags what is reported or missing i
                 summary = gr.Markdown()
                 plot = gr.Plot(label="Category scores")
             conduct = gr.Markdown()
+            benchmarks_table = gr.Dataframe(
+                headers=["Benchmark", "Status", "Score", "Description", "Evidence", "Required action"],
+                interactive=False,
+                wrap=True,
+            )
             bias_table = gr.Dataframe(
                 headers=["Signal", "Status", "Evidence from available text", "Suggested next check"],
                 interactive=False,
@@ -1585,14 +1876,14 @@ This app is a decision-support checklist. It flags what is reported or missing i
             analyze_button.click(
                 analyze_selected_ui,
                 inputs=[selected, studies_state],
-                outputs=[summary, plot, conduct, bias_table, checklist, report_file],
+                outputs=[summary, plot, conduct, benchmarks_table, bias_table, checklist, report_file],
             )
 
         with gr.Tab("Upload manuscript"):
             with gr.Row():
                 upload = gr.File(
-                    label="Upload study PDF, TXT, or Markdown",
-                    file_types=[".pdf", ".txt", ".md"],
+                    label="Upload study PDF, DOCX, TXT, or Markdown",
+                    file_types=[".pdf", ".docx", ".txt", ".md"],
                     type="filepath",
                 )
                 with gr.Column():
@@ -1612,6 +1903,11 @@ This app is a decision-support checklist. It flags what is reported or missing i
                 upload_summary = gr.Markdown()
                 upload_plot = gr.Plot(label="Category scores")
             upload_conduct = gr.Markdown()
+            upload_benchmarks = gr.Dataframe(
+                headers=["Benchmark", "Status", "Score", "Description", "Evidence", "Required action"],
+                interactive=False,
+                wrap=True,
+            )
             upload_bias = gr.Dataframe(
                 headers=["Signal", "Status", "Evidence from available text", "Suggested next check"],
                 interactive=False,
@@ -1627,18 +1923,23 @@ This app is a decision-support checklist. It flags what is reported or missing i
             upload_button.click(
                 analyze_upload_ui,
                 inputs=[upload, pasted, upload_title, type_hint],
-                outputs=[upload_summary, upload_plot, upload_conduct, upload_bias, upload_checklist, upload_report_file],
+                outputs=[upload_summary, upload_plot, upload_conduct, upload_benchmarks, upload_bias, upload_checklist, upload_report_file],
             )
 
         with gr.Tab("My research projects"):
             gr.Markdown(
                 """
-Add a study idea, protocol, or active project to review whether the planned conduct includes the safeguards readers and reviewers will expect.
+Add a study idea, protocol, or active project to review whether the planned conduct follows the benchmarks readers and reviewers will expect.
 
 Project data is kept in this browser session only. Download the report or portfolio export if you want to keep it.
 """
             )
             projects_state = gr.State([])
+            project_file = gr.File(
+                label="Upload project, protocol, benchmark plan, or preregistration",
+                file_types=[".pdf", ".docx", ".txt", ".md", ".json", ".csv", ".tsv"],
+                type="filepath",
+            )
             with gr.Row():
                 project_title = gr.Textbox(label="Project title", placeholder="Example: Community sleep intervention pilot")
                 project_team = gr.Textbox(label="Team or owner", placeholder="Lab, PI, student group, or organization")
@@ -1685,10 +1986,32 @@ Project data is kept in this browser session only. Download the report or portfo
                 export_projects_button = gr.Button("Download project portfolio JSON")
             projects_file = gr.File(label="Project portfolio export")
 
+            with gr.Accordion(f"Qwen agent benchmark review ({QWEN_MODEL_ID} only)", open=False):
+                gr.Markdown(
+                    f"""
+The AI reviewer is constrained to `{QWEN_MODEL_ID}`. OpenStudy will not fall back to another model.
+
+For Hugging Face Spaces, set a secret named `HF_TOKEN`, or paste a temporary Hugging Face token below for this session.
+"""
+                )
+                qwen_token = gr.Textbox(label="Hugging Face token (optional)", type="password")
+                qwen_instruction = gr.Textbox(
+                    label="Extra Qwen review focus (optional)",
+                    lines=2,
+                    placeholder="Example: Focus on recruitment fairness and IRB readiness.",
+                )
+                qwen_button = gr.Button("Run Qwen benchmark agent", variant="secondary")
+                qwen_output = gr.Markdown()
+
             with gr.Row():
                 project_summary = gr.Markdown()
                 project_plot = gr.Plot(label="Category scores")
             project_conduct = gr.Markdown()
+            project_benchmarks = gr.Dataframe(
+                headers=["Benchmark", "Status", "Score", "Description", "Evidence", "Required action"],
+                interactive=False,
+                wrap=True,
+            )
             project_bias = gr.Dataframe(
                 headers=["Signal", "Status", "Evidence from project plan", "Suggested next check"],
                 interactive=False,
@@ -1702,6 +2025,7 @@ Project data is kept in this browser session only. Download the report or portfo
             project_report_file = gr.File(label="Download project review report")
 
             project_inputs = [
+                project_file,
                 project_title,
                 project_team,
                 project_status,
@@ -1736,6 +2060,7 @@ Project data is kept in this browser session only. Download the report or portfo
                     project_summary,
                     project_plot,
                     project_conduct,
+                    project_benchmarks,
                     project_bias,
                     project_checklist,
                     project_report_file,
@@ -1744,18 +2069,25 @@ Project data is kept in this browser session only. Download the report or portfo
             review_project_button.click(
                 review_project_ui,
                 inputs=[project_select, projects_state],
-                outputs=[project_summary, project_plot, project_conduct, project_bias, project_checklist, project_report_file],
+                outputs=[project_summary, project_plot, project_conduct, project_benchmarks, project_bias, project_checklist, project_report_file],
             )
             export_projects_button.click(download_projects_ui, inputs=[projects_state], outputs=[projects_file])
+            qwen_button.click(
+                qwen_agent_review_ui,
+                inputs=[project_select, projects_state, qwen_token, qwen_instruction],
+                outputs=[qwen_output],
+            )
 
         with gr.Tab("Method"):
             gr.Markdown(
                 """
 ## How the screen works
 
-OpenStudy uses rule-based, transparent text checks inspired by common reporting safeguards across trials, observational studies, reviews, qualitative research, animal studies, and model studies.
+OpenStudy uses rule-based, transparent benchmark checks inspired by common reporting safeguards across trials, observational studies, reviews, qualitative research, animal studies, and model studies.
 
 The score is a **reported-or-planned safeguard score**, not a truth score. A low score can mean the study is poorly reported, the public abstract is too short, the uploaded text did not include the methods, ethics, funding, and limitations sections, or a project plan still needs those safeguards added.
+
+The optional AI review uses **`Qwen/Qwen3.6-27B` only** through Hugging Face inference. If that model is not available with the configured token/provider, OpenStudy does not switch to another model.
 
 Recommended human follow-up:
 
@@ -1764,6 +2096,7 @@ Recommended human follow-up:
 - Ask domain experts to judge whether the design and analysis fit the research question.
 - Treat ethics and participant-protection findings as prompts for review, not legal or IRB determinations.
 - For unpublished projects, use the project report as a protocol-improvement checklist before recruitment or data collection.
+- Upload protocol, benchmark, or preregistration files in the project tab to check whether planned safeguards are present.
 """
             )
 

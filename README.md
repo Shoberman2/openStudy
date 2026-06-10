@@ -18,9 +18,16 @@ Users can:
 - Search public study metadata by DOI, URL, title, or keywords.
 - Evaluate abstracts and available metadata from public sources.
 - Upload a PDF, text file, or pasted manuscript text for a deeper checklist review.
-- Add their own research projects or protocols to review planned conduct before or during a study.
+- Upload their own research projects, protocols, benchmark plans, or preregistrations to review planned conduct before or during a study.
 - Keep an in-session project dashboard and export project summaries as JSON.
+- Run an optional Qwen agent review using `Qwen/Qwen3.6-27B` only.
 - Download a Markdown report with evidence snippets and follow-up questions.
+
+## Required AI model
+
+OpenStudy's AI review path is restricted to `Qwen/Qwen3.6-27B` only. It does not fall back to another model.
+
+For Hugging Face Spaces, configure a Space secret named `HF_TOKEN` with access to the model or paste a temporary token into the Qwen review control in the app.
 
 ## Important limitation
 

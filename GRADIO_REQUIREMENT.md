@@ -21,3 +21,7 @@ All user-facing application features must run through a Gradio interface so the 
 ## Deployment Target
 
 The app must remain compatible with Hugging Face Spaces using the Gradio SDK.
+
+## AI Model Requirement
+
+Any AI agent review must use `Qwen/Qwen3.6-27B` only. Do not add fallback models or alternate LLM providers.
