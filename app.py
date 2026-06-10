@@ -660,6 +660,40 @@ BENCHMARKS: tuple[Benchmark, ...] = (
 )
 
 
+STANDARD_CATEGORIES = list(dict.fromkeys(criterion.category for criterion in CRITERIA))
+STANDARD_CRITERIA_LABELS = [criterion.label for criterion in CRITERIA]
+DEFAULT_RISK_THRESHOLDS = (50.0, 75.0)
+
+CATEGORY_EXPLANATIONS = {
+    "Design and protocol": "Is the study design named, was it planned ahead (protocol or preregistration), and were primary outcomes specified before results?",
+    "Sampling and participants": "Who was studied, how they were recruited, eligibility rules, sample size justification, and participant characteristics.",
+    "Bias controls": "Protections against skewed results: randomization, blinding, comparator groups, validated measures, and confounder control.",
+    "Analysis": "Whether the statistical or qualitative analysis approach is described, including how missing data and attrition were handled.",
+    "Transparency": "Whether data, code, and materials are shared or their availability is explained.",
+    "Ethics": "Ethics approval or oversight, informed consent, privacy and safety safeguards, and animal welfare where relevant.",
+    "Funding and conflicts": "Who paid for the study, what role the funder played, and whether competing interests are disclosed.",
+    "Interpretation": "Whether limitations are discussed and conclusions stay within what the evidence supports.",
+    "Review methods": "For reviews: search strategy, quality appraisal of included studies, and publication-bias assessment.",
+    "Qualitative methods": "For qualitative work: coding approach, reflexivity, triangulation, or member checking.",
+    "Model or algorithm studies": "For models: validation on held-out or external data and fairness or subgroup performance checks.",
+}
+
+STATUS_ICONS = {
+    "Reported": "✅ Reported",
+    "Potential concern": "⚠️ Potential concern",
+    "Missing or unclear": "❌ Missing or unclear",
+    "Meets benchmark": "✅ Meets benchmark",
+    "Partially meets benchmark": "🟡 Partially meets benchmark",
+    "Needs work": "❌ Needs work",
+    "Lower signal": "✅ Lower signal",
+    "Needs review": "🟡 Needs review",
+}
+
+
+def iconize(status: str) -> str:
+    return STATUS_ICONS.get(status, status)
+
+
 APP_CSS = """
 /* ===================== OpenStudy design system ===================== */
 :root {
@@ -686,8 +720,72 @@ APP_CSS = """
 }
 
 .gradio-container {
-  max-width: 1240px !important;
+  max-width: 1020px !important;
   margin: 0 auto !important;
+}
+
+/* Action buttons keep their natural width instead of stretching */
+button.os-action {
+  width: fit-content !important;
+  flex-grow: 0 !important;
+  align-self: flex-start;
+  min-width: 230px;
+  padding-left: 1.5rem !important;
+  padding-right: 1.5rem !important;
+}
+
+/* ---------- Scorecard ---------- */
+.os-scorecard {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  margin: 0.35rem 0 0.6rem;
+}
+.os-score-chip {
+  font-family: var(--os-mono);
+  font-weight: 700;
+  font-size: 1.18rem;
+  padding: 0.32rem 0.8rem;
+  border-radius: 10px;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+.os-chip-good { background: #0e6b5f; }
+.os-chip-warn { background: #b45309; }
+.os-chip-risk { background: #b91c1c; }
+.os-score-level { font-weight: 650; font-size: 1.02rem; }
+
+/* ---------- Standards verdict ---------- */
+.os-verdict {
+  border: 1px solid var(--os-border);
+  border-radius: 10px;
+  padding: 0.85rem 1.05rem;
+  margin: 0.5rem 0 0.75rem;
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+.os-verdict ul { margin: 0.4rem 0 0 1.15rem; padding: 0; }
+.os-verdict li { margin: 0.15rem 0; }
+.os-verdict-pass {
+  background: #ecf6f1;
+  border-color: #bfe0d4;
+  color: #0a554b;
+}
+.dark .os-verdict-pass {
+  background: #14302a;
+  border-color: #265e51;
+  color: #9fd9cb;
+}
+.os-verdict-fail {
+  background: #fdf3ee;
+  border-color: #f0d4c4;
+  color: #9a3412;
+}
+.dark .os-verdict-fail {
+  background: #321d14;
+  border-color: #6b3a22;
+  color: #f0b893;
 }
 
 /* ---------- Hero header ---------- */
@@ -1094,7 +1192,7 @@ def search_studies(query: str, rows: int) -> list[dict[str, Any]]:
     query = normalize_space(query)
     if not query:
         return []
-    rows = max(1, min(int(rows), 10))
+    rows = max(1, min(int(rows), 100))
     records: list[dict[str, Any]] = []
     doi = normalize_doi(query)
 
@@ -1225,10 +1323,11 @@ def category_scores(results: list[dict[str, Any]]) -> dict[str, float]:
     return {category: round(sum(values) / len(values) * 100, 1) for category, values in grouped.items()}
 
 
-def risk_level(score: float) -> tuple[str, str]:
-    if score >= 75:
+def risk_level(score: float, thresholds: tuple[float, float] = DEFAULT_RISK_THRESHOLDS) -> tuple[str, str]:
+    moderate_at, lower_at = thresholds
+    if score >= lower_at:
         return "Lower reporting risk", "The available text reports many safeguards readers expect."
-    if score >= 50:
+    if score >= moderate_at:
         return "Moderate reporting risk", "Several safeguards are reported, but important items need review."
     return "Higher reporting risk", "Many expected safeguards are missing or unclear in the available text."
 
@@ -1238,6 +1337,7 @@ def evaluate_study_text(
     metadata: dict[str, Any] | None = None,
     scope: str = "available text",
     forced_study_key: str | None = None,
+    risk_thresholds: tuple[float, float] = DEFAULT_RISK_THRESHOLDS,
 ) -> dict[str, Any]:
     metadata = metadata or {}
     text = normalize_space(text)
@@ -1250,7 +1350,7 @@ def evaluate_study_text(
     checklist = [evaluate_criterion(analysis_text, criterion) for criterion in criteria]
     scores = category_scores(checklist)
     overall = round(sum(item["score"] for item in checklist) / max(len(checklist), 1) * 100, 1)
-    level, level_detail = risk_level(overall)
+    level, level_detail = risk_level(overall, risk_thresholds)
     conducted = extract_conduct_summary(analysis_text, metadata, study_label)
     benchmarks = build_benchmark_rows(checklist, study_key)
     biases = build_bias_rows(checklist, study_key)
@@ -1269,6 +1369,8 @@ def evaluate_study_text(
         "biases": biases,
         "truncated": truncated,
         "text_chars": len(text),
+        "analysis_text": analysis_text,
+        "risk_thresholds": risk_thresholds,
     }
 
 
@@ -1373,7 +1475,7 @@ def build_benchmark_rows(checklist: list[dict[str, Any]], study_key: str) -> lis
         rows.append(
             [
                 benchmark.name,
-                benchmark_status(score),
+                iconize(benchmark_status(score)),
                 f"{score * 100:.0f}%",
                 benchmark.description,
                 combine_evidence(items),
@@ -1464,7 +1566,7 @@ def build_bias_rows(checklist: list[dict[str, Any]], study_key: str) -> list[lis
                 "Check subgroup performance, external validation, leakage, and whether affected groups are represented.",
             ]
         )
-    return rows
+    return [[row[0], iconize(row[1]), *row[2:]] for row in rows]
 
 
 def style_plot(fig, ax) -> None:
@@ -1475,7 +1577,7 @@ def style_plot(fig, ax) -> None:
     ax.tick_params(colors=INK, length=0, labelsize=9.5)
 
 
-def score_plot(scores: dict[str, float]):
+def score_plot(scores: dict[str, float], thresholds: tuple[float, float] = DEFAULT_RISK_THRESHOLDS):
     fig, ax = plt.subplots(figsize=(8.5, max(3.2, 0.42 * len(scores))))
     style_plot(fig, ax)
     if not scores:
@@ -1483,10 +1585,11 @@ def score_plot(scores: dict[str, float]):
         ax.axis("off")
         return fig
 
+    moderate_at, lower_at = thresholds
     ordered = sorted(scores.items(), key=lambda item: item[1])
     labels = [item[0] for item in ordered]
     values = [item[1] for item in ordered]
-    colors = [RISK if value < 50 else WARN if value < 75 else BRAND for value in values]
+    colors = [RISK if value < moderate_at else WARN if value < lower_at else BRAND for value in values]
     ax.barh(labels, values, color=colors, height=0.62, zorder=3)
     ax.barh(labels, [100] * len(values), color=BORDER, height=0.62, zorder=1, alpha=0.45)
     ax.set_xlim(0, 100)
@@ -1510,18 +1613,88 @@ def score_plot(scores: dict[str, float]):
     return fig
 
 
+def user_standards_markdown(
+    report: dict[str, Any],
+    categories: list[str] | None,
+    required: list[str] | None,
+    min_score: float,
+    terms: str,
+) -> str:
+    categories = [cat for cat in (categories or []) if cat in STANDARD_CATEGORIES]
+    required = list(required or [])
+    term_list = [term.strip() for term in (terms or "").split(",") if term.strip()]
+
+    scores = report.get("scores", {})
+    chosen = {cat: scores[cat] for cat in categories if cat in scores}
+    if chosen:
+        user_score = round(sum(chosen.values()) / len(chosen), 1)
+        score_scope = ", ".join(chosen)
+    else:
+        user_score = report.get("overall", 0.0)
+        score_scope = "all categories"
+
+    status_by_label = {item.get("criterion"): item.get("status") for item in report.get("checklist", [])}
+    failures: list[str] = []
+    notes: list[str] = []
+
+    if user_score < float(min_score):
+        failures.append(
+            f"Safeguard score is {user_score:.1f}, below your minimum of {float(min_score):.0f} (scored on: {score_scope})."
+        )
+    for label in required:
+        if label not in status_by_label:
+            notes.append(f"&ldquo;{html.escape(label)}&rdquo; was not checked for this study type.")
+        elif status_by_label[label] != "Reported":
+            failures.append(f"Required safeguard not reported: {html.escape(label)}.")
+
+    haystack = (report.get("analysis_text") or "").lower()
+    for term in term_list:
+        if term.lower() not in haystack:
+            failures.append(f"Required term not found in the text: &ldquo;{html.escape(term)}&rdquo;.")
+
+    if failures:
+        items = "".join(f"<li>{item}</li>" for item in failures + notes)
+        return (
+            f'<div class="os-verdict os-verdict-fail"><strong>Does not meet your standards</strong> '
+            f"({len(failures)} unmet requirement{'s' if len(failures) != 1 else ''})."
+            f"<ul>{items}</ul></div>"
+        )
+    detail = f"Score {user_score:.1f} &ge; your minimum of {float(min_score):.0f} (scored on: {score_scope})"
+    if required:
+        detail += f"; all {len(required)} required safeguards reported"
+    if term_list:
+        detail += f"; all {len(term_list)} required terms found"
+    note_items = "".join(f"<li>{item}</li>" for item in notes)
+    note_html = f"<ul>{note_items}</ul>" if note_items else ""
+    return (
+        f'<div class="os-verdict os-verdict-pass"><strong>Meets your standards.</strong> '
+        f"{detail}.{note_html}</div>"
+    )
+
+
 def summary_markdown(report: dict[str, Any]) -> str:
     metadata = report["metadata"]
     title = metadata.get("title") or "Untitled study"
     caution = " This upload was truncated for analysis." if report["truncated"] else ""
+    moderate_at, lower_at = report.get("risk_thresholds", DEFAULT_RISK_THRESHOLDS)
+    overall = report["overall"]
+    tier = "good" if overall >= lower_at else "warn" if overall >= moderate_at else "risk"
     return f"""
 ### {strip_markup(title)}
 
-**Overall screen:** {report['overall']:.1f}/100 - **{report['level']}**
+<div class="os-scorecard">
+  <span class="os-score-chip os-chip-{tier}">{overall:.0f}/100</span>
+  <span class="os-score-level">{report['level']}</span>
+</div>
 
-{report['level_detail']} This is a transparent screening of the **{report['scope']}**, not proof that the research is ethical, unethical, biased, or unbiased.{caution}
+{report['level_detail']}
 
-**Detected study type:** {report['study_label']}  
+**What this score means:** {overall:.0f}% of the reporting safeguards expected for a
+{report['study_label'].lower()} were found in the text reviewed. It measures how completely the
+study is *reported*, not whether its findings are true. This is a transparent screening of the
+**{report['scope']}**, not proof that the research is ethical, unethical, biased, or unbiased.{caution}
+
+**Detected study type:** {report['study_label']}
 **Text reviewed:** {report['text_chars']:,} characters
 """
 
@@ -1537,7 +1710,7 @@ def checklist_rows(report: dict[str, Any]) -> list[list[str]]:
         [
             item["category"],
             item["criterion"],
-            item["status"],
+            iconize(item["status"]),
             item["evidence"] or "Not found in available text",
             item["recommendation"],
         ]
@@ -1627,11 +1800,47 @@ def search_studies_ui(query: str, rows: int):
             ]
         )
     choices = [format_choice(index, record) for index, record in enumerate(records)]
-    status = f"Found {len(records)} candidate studies. Select one to evaluate." if records else "No candidate studies found. Try a DOI, a more exact title, or paste an abstract in the Upload tab."
+    status = (
+        f"Found {len(records)} candidate studies. **Click a row** to evaluate it against your standards."
+        if records
+        else "No candidate studies found. Try a DOI, a more exact title, or paste an abstract in the Add your study tab."
+    )
     return table, gr.update(choices=choices, value=choices[0] if choices else None), records, status
 
 
-def analyze_selected_ui(choice: str, records: list[dict[str, Any]] | None):
+def clean_thresholds(moderate_at: float, lower_at: float) -> tuple[float, float]:
+    moderate_at = float(moderate_at)
+    lower_at = float(lower_at)
+    if moderate_at > lower_at:
+        moderate_at, lower_at = lower_at, moderate_at
+    return moderate_at, lower_at
+
+
+def analyze_search_record(
+    record: dict[str, Any],
+    risk_thresholds: tuple[float, float] = DEFAULT_RISK_THRESHOLDS,
+) -> dict[str, Any] | None:
+    text_parts = [record.get("title", ""), record.get("abstract", "")]
+    if not normalize_space(" ".join(text_parts)):
+        return None
+    return evaluate_study_text(
+        " ".join(text_parts),
+        record,
+        scope="metadata and abstract available from public search",
+        risk_thresholds=risk_thresholds,
+    )
+
+
+def analyze_selected_ui(
+    choice: str,
+    records: list[dict[str, Any]] | None,
+    std_categories: list[str] | None = None,
+    std_required: list[str] | None = None,
+    std_min_score: float = 0,
+    std_terms: str = "",
+    std_risk_moderate: float = DEFAULT_RISK_THRESHOLDS[0],
+    std_risk_lower: float = DEFAULT_RISK_THRESHOLDS[1],
+):
     records = records or []
     if not choice or not records:
         return empty_outputs("Search for studies first, then select a result.")
@@ -1639,12 +1848,38 @@ def analyze_selected_ui(choice: str, records: list[dict[str, Any]] | None):
     index = int(match.group(1)) - 1 if match else 0
     if index < 0 or index >= len(records):
         return empty_outputs("Selected study was not found in the current search results.")
+    report = analyze_search_record(records[index], clean_thresholds(std_risk_moderate, std_risk_lower))
+    if report is None:
+        return empty_outputs("That result does not include enough text to evaluate. Paste the abstract or add the paper in the Add your study tab.")
+    return report_outputs(report, user_standards_markdown(report, std_categories, std_required, std_min_score, std_terms))
+
+
+def select_result_ui(
+    records: list[dict[str, Any]] | None,
+    std_categories: list[str] | None,
+    std_required: list[str] | None,
+    std_min_score: float,
+    std_terms: str,
+    std_risk_moderate: float,
+    std_risk_lower: float,
+    evt: gr.SelectData,
+):
+    records = records or []
+    index = evt.index[0] if isinstance(evt.index, (list, tuple)) else int(evt.index)
+    if index < 0 or index >= len(records):
+        return (gr.update(), *empty_outputs("Search for studies first, then click a result row."))
     record = records[index]
-    text_parts = [record.get("title", ""), record.get("abstract", "")]
-    if not normalize_space(" ".join(text_parts)):
-        return empty_outputs("That result does not include enough text to evaluate. Paste the abstract or upload the manuscript.")
-    report = evaluate_study_text(" ".join(text_parts), record, scope="metadata and abstract available from public search")
-    return report_outputs(report)
+    choice = format_choice(index, record)
+    report = analyze_search_record(record, clean_thresholds(std_risk_moderate, std_risk_lower))
+    if report is None:
+        return (
+            gr.update(value=choice),
+            *empty_outputs("That result does not include enough text to evaluate. Paste the abstract or add the paper in the Add your study tab."),
+        )
+    return (
+        gr.update(value=choice),
+        *report_outputs(report, user_standards_markdown(report, std_categories, std_required, std_min_score, std_terms)),
+    )
 
 
 def uploaded_file_text(file_path: Any) -> tuple[str, str]:
@@ -1658,7 +1893,18 @@ def uploaded_file_text(file_path: Any) -> tuple[str, str]:
     return "pasted text", ""
 
 
-def analyze_upload_ui(file_path: Any, pasted_text: str, title: str, study_type_hint: str):
+def analyze_upload_ui(
+    file_path: Any,
+    pasted_text: str,
+    title: str,
+    study_type_hint: str,
+    std_categories: list[str] | None = None,
+    std_required: list[str] | None = None,
+    std_min_score: float = 0,
+    std_terms: str = "",
+    std_risk_moderate: float = DEFAULT_RISK_THRESHOLDS[0],
+    std_risk_lower: float = DEFAULT_RISK_THRESHOLDS[1],
+):
     source_name, extracted = uploaded_file_text(file_path)
     text = normalize_space(" ".join(part for part in (title, pasted_text, extracted) if part))
     if not text:
@@ -1669,8 +1915,9 @@ def analyze_upload_ui(file_path: Any, pasted_text: str, title: str, study_type_h
         metadata,
         scope="uploaded or pasted manuscript text",
         forced_study_key=key_for_type_hint(study_type_hint),
+        risk_thresholds=clean_thresholds(std_risk_moderate, std_risk_lower),
     )
-    return report_outputs(report)
+    return report_outputs(report, user_standards_markdown(report, std_categories, std_required, std_min_score, std_terms))
 
 
 def project_text_from_fields(
@@ -2069,10 +2316,13 @@ def extract_text_from_file(path: str) -> str:
         return f"Could not extract file text: {exc}"
 
 
-def report_outputs(report: dict[str, Any]):
+def report_outputs(report: dict[str, Any], standards_md: str = ""):
+    summary = summary_markdown(report)
+    if standards_md:
+        summary = f"{summary}\n{standards_md}"
     return (
-        summary_markdown(report),
-        score_plot(report["scores"]),
+        summary,
+        score_plot(report["scores"], report.get("risk_thresholds", DEFAULT_RISK_THRESHOLDS)),
         conduct_markdown(report),
         report.get("benchmarks", []),
         report["biases"],
@@ -2136,279 +2386,380 @@ def build_app() -> gr.Blocks:
 """
         )
 
-        with gr.Tab("Search studies"):
+        with gr.Row():
+            cta_lookup = gr.Button("🔍 Look up a paper", variant="primary", elem_classes=["os-action"])
+            cta_add = gr.Button("➕ Add your research study", variant="secondary", elem_classes=["os-action"])
+
+        category_legend = "\n".join(
+            f"| **{category}** | {explanation} |" for category, explanation in CATEGORY_EXPLANATIONS.items()
+        )
+        with gr.Accordion("What the safeguard scores mean", open=False):
+            gr.Markdown(
+                f"""
+Every paper is checked against a transparent checklist of reporting safeguards. Each safeguard is marked
+✅ **Reported** (full credit), ⚠️ **Potential concern** (quarter credit), or ❌ **Missing or unclear** (no credit).
+A category's score is the share of credit earned, from 0 to 100. The score measures **how completely the study
+is reported** — not whether its findings are true.
+
+| Score | Default reading |
+| --- | --- |
+| 75–100 | **Lower reporting risk** — the text reports most safeguards readers expect. |
+| 50–74 | **Moderate reporting risk** — several safeguards reported, but important items need review. |
+| 0–49 | **Higher reporting risk** — many expected safeguards are missing or unclear. |
+
+You can move these boundaries in *Your screening standards* below.
+
+**What each category checks**
+
+| Category | What it measures |
+| --- | --- |
+{category_legend}
+
+A low score can also mean the available text was short (for example, only an abstract) — it does not by
+itself prove poor conduct.
+"""
+            )
+
+        with gr.Accordion("Your screening standards — applied when you evaluate or add a paper", open=False):
+            gr.Markdown(
+                "Set the bar a paper must meet. Every evaluation shows a clear verdict against these standards."
+            )
+            std_categories = gr.CheckboxGroup(
+                label="Categories that count toward your score",
+                choices=STANDARD_CATEGORIES,
+                value=STANDARD_CATEGORIES,
+            )
             with gr.Row():
-                query = gr.Textbox(
-                    label="Study title, DOI, URL, or keywords",
-                    placeholder="Example: 10.1056/NEJMoa2034577 or paste a paper title",
-                    scale=5,
+                std_required = gr.Dropdown(
+                    label="Safeguards that must be reported",
+                    choices=STANDARD_CRITERIA_LABELS,
+                    multiselect=True,
+                    value=[],
+                    scale=3,
                 )
-                rows = gr.Slider(1, 10, value=5, step=1, label="Results")
-            search_button = gr.Button("Search public study metadata", variant="primary")
-            search_status = gr.Markdown()
-            studies_state = gr.State([])
-            results_table = gr.Dataframe(
-                headers=["#", "Title", "Year", "Venue", "DOI", "Source", "Available abstract preview"],
-                datatype=["number", "str", "str", "str", "str", "str", "str"],
-                interactive=False,
-                wrap=True,
-                elem_classes=["compact-table"],
-            )
-            selected = gr.Dropdown(label="Select a result to evaluate", choices=[], interactive=True)
-            analyze_button = gr.Button("Evaluate selected study", variant="secondary")
-
+                std_min_score = gr.Slider(0, 100, value=60, step=5, label="Minimum safeguard score", scale=2)
             with gr.Row():
-                summary = gr.Markdown()
-                plot = gr.Plot(label="Category scores", show_label=False)
-            conduct = gr.Markdown()
-            benchmarks_table = gr.Dataframe(
-                headers=["Benchmark", "Status", "Score", "Description", "Evidence", "Required action"],
-                interactive=False,
-                wrap=True,
+                std_risk_moderate = gr.Slider(
+                    0, 100, value=DEFAULT_RISK_THRESHOLDS[0], step=5,
+                    label='"Higher risk" below this score',
+                )
+                std_risk_lower = gr.Slider(
+                    0, 100, value=DEFAULT_RISK_THRESHOLDS[1], step=5,
+                    label='"Lower risk" at or above this score',
+                )
+            std_terms = gr.Textbox(
+                label="Custom required terms (comma-separated)",
+                placeholder="Example: preregistration, informed consent, data sharing",
             )
-            bias_table = gr.Dataframe(
-                headers=["Signal", "Status", "Evidence from available text", "Suggested next check"],
-                interactive=False,
-                wrap=True,
-            )
-            checklist = gr.Dataframe(
-                headers=["Category", "Criterion", "Status", "Evidence", "Recommendation"],
-                interactive=False,
-                wrap=True,
-            )
-            report_file = gr.File(label="Download Markdown report")
+        standards_inputs = [std_categories, std_required, std_min_score, std_terms, std_risk_moderate, std_risk_lower]
 
-            search_button.click(
-                search_studies_ui,
-                inputs=[query, rows],
-                outputs=[results_table, selected, studies_state, search_status],
-            )
-            analyze_button.click(
-                analyze_selected_ui,
-                inputs=[selected, studies_state],
-                outputs=[summary, plot, conduct, benchmarks_table, bias_table, checklist, report_file],
-            )
+        with gr.Tabs() as main_tabs:
+            with gr.Tab("Look up a paper", id="lookup"):
+                with gr.Row():
+                    query = gr.Textbox(
+                        label="Find a paper by title, DOI, URL, or keywords",
+                        placeholder="Example: 10.1056/NEJMoa2034577 or paste a paper title, then press Enter",
+                        scale=6,
+                    )
+                    search_button = gr.Button("Search", variant="primary", scale=1, min_width=130)
+                gr.Examples(
+                    label="Try one of these",
+                    examples=[
+                        ["10.1056/NEJMoa2034577"],
+                        ["mediterranean diet cardiovascular randomized trial"],
+                        ["deep learning chest x-ray diagnosis"],
+                    ],
+                    inputs=[query],
+                )
+                with gr.Accordion("Search options", open=False):
+                    rows = gr.Slider(
+                        5, 100, value=50, step=5,
+                        label="Number of results (search up to 100 studies on a topic)",
+                    )
+                search_status = gr.Markdown()
+                studies_state = gr.State([])
+                results_table = gr.Dataframe(
+                    headers=["#", "Title", "Year", "Venue", "DOI", "Source", "Available abstract preview"],
+                    datatype=["number", "str", "str", "str", "str", "str", "str"],
+                    interactive=False,
+                    wrap=True,
+                    elem_classes=["compact-table"],
+                )
+                selected = gr.Dropdown(label="Selected result (click a row above, or pick here)", choices=[], interactive=True)
+                analyze_button = gr.Button("Evaluate selected study", variant="secondary", elem_classes=["os-action"])
 
-        with gr.Tab("Upload manuscript"):
-            with gr.Row():
-                upload = gr.File(
-                    label="Upload study PDF, DOCX, TXT, or Markdown",
-                    file_types=[".pdf", ".docx", ".txt", ".md"],
+                with gr.Row():
+                    summary = gr.Markdown()
+                    plot = gr.Plot(label="Category scores", show_label=False)
+                conduct = gr.Markdown()
+                benchmarks_table = gr.Dataframe(
+                    headers=["Benchmark", "Status", "Score", "Description", "Evidence", "Required action"],
+                    interactive=False,
+                    wrap=True,
+                )
+                bias_table = gr.Dataframe(
+                    headers=["Signal", "Status", "Evidence from available text", "Suggested next check"],
+                    interactive=False,
+                    wrap=True,
+                )
+                checklist = gr.Dataframe(
+                    headers=["Category", "Criterion", "Status", "Evidence", "Recommendation"],
+                    interactive=False,
+                    wrap=True,
+                )
+                report_file = gr.File(label="Download Markdown report")
+
+                search_button.click(
+                    search_studies_ui,
+                    inputs=[query, rows],
+                    outputs=[results_table, selected, studies_state, search_status],
+                )
+                query.submit(
+                    search_studies_ui,
+                    inputs=[query, rows],
+                    outputs=[results_table, selected, studies_state, search_status],
+                )
+                results_table.select(
+                    select_result_ui,
+                    inputs=[studies_state, *standards_inputs],
+                    outputs=[selected, summary, plot, conduct, benchmarks_table, bias_table, checklist, report_file],
+                )
+                analyze_button.click(
+                    analyze_selected_ui,
+                    inputs=[selected, studies_state, *standards_inputs],
+                    outputs=[summary, plot, conduct, benchmarks_table, bias_table, checklist, report_file],
+                )
+
+            with gr.Tab("Add your study", id="add"):
+                gr.Markdown(
+                    """
+Add your own research study — or any paper — by file or pasted text. OpenStudy screens it for the
+bias-control, ethics, transparency, and credibility safeguards it reports, using the standards and
+parameters you set above, and tells you exactly what to strengthen.
+"""
+                )
+                with gr.Row():
+                    upload = gr.File(
+                        label="Upload study PDF, DOCX, TXT, or Markdown",
+                        file_types=[".pdf", ".docx", ".txt", ".md"],
+                        type="filepath",
+                    )
+                    with gr.Column():
+                        upload_title = gr.Textbox(label="Study title (optional)")
+                        type_hint = gr.Dropdown(
+                            label="Study type hint",
+                            choices=STUDY_TYPE_CHOICES,
+                            value="Auto-detect",
+                        )
+                pasted = gr.Textbox(
+                    label="Paste abstract, methods, or manuscript text (optional)",
+                    lines=10,
+                    placeholder="Paste text here if you do not have a PDF or want to supplement extraction.",
+                )
+                upload_button = gr.Button("Add paper and evaluate against my standards", variant="primary", elem_classes=["os-action"])
+                with gr.Row():
+                    upload_summary = gr.Markdown()
+                    upload_plot = gr.Plot(label="Category scores", show_label=False)
+                upload_conduct = gr.Markdown()
+                upload_benchmarks = gr.Dataframe(
+                    headers=["Benchmark", "Status", "Score", "Description", "Evidence", "Required action"],
+                    interactive=False,
+                    wrap=True,
+                )
+                upload_bias = gr.Dataframe(
+                    headers=["Signal", "Status", "Evidence from available text", "Suggested next check"],
+                    interactive=False,
+                    wrap=True,
+                )
+                upload_checklist = gr.Dataframe(
+                    headers=["Category", "Criterion", "Status", "Evidence", "Recommendation"],
+                    interactive=False,
+                    wrap=True,
+                )
+                upload_report_file = gr.File(label="Download Markdown report")
+
+                upload_button.click(
+                    analyze_upload_ui,
+                    inputs=[upload, pasted, upload_title, type_hint, *standards_inputs],
+                    outputs=[upload_summary, upload_plot, upload_conduct, upload_benchmarks, upload_bias, upload_checklist, upload_report_file],
+                )
+
+            with gr.Tab("My research projects", id="projects"):
+                gr.Markdown(
+                    """
+    Add a study idea, protocol, or active project to review whether the planned conduct follows the benchmarks readers and reviewers will expect.
+
+    Project data is kept in this browser session only. Download the report or portfolio export if you want to keep it.
+    """
+                )
+                projects_state = gr.State([])
+                project_file = gr.File(
+                    label="Upload project, protocol, benchmark plan, or preregistration",
+                    file_types=[".pdf", ".docx", ".txt", ".md", ".json", ".csv", ".tsv"],
                     type="filepath",
                 )
-                with gr.Column():
-                    upload_title = gr.Textbox(label="Study title (optional)")
-                    type_hint = gr.Dropdown(
-                        label="Study type hint",
-                        choices=STUDY_TYPE_CHOICES,
-                        value="Auto-detect",
+                with gr.Row():
+                    project_title = gr.Textbox(label="Project title", placeholder="Example: Community sleep intervention pilot")
+                    project_team = gr.Textbox(label="Team or owner", placeholder="Lab, PI, student group, or organization")
+                with gr.Row():
+                    project_status = gr.Dropdown(
+                        label="Project status",
+                        choices=["Idea", "Protocol drafting", "Ethics review", "Recruiting", "Data collection", "Analysis", "Manuscript drafting", "Completed"],
+                        value="Protocol drafting",
                     )
-            pasted = gr.Textbox(
-                label="Paste abstract, methods, or manuscript text (optional)",
-                lines=10,
-                placeholder="Paste text here if you do not have a PDF or want to supplement extraction.",
-            )
-            upload_button = gr.Button("Evaluate uploaded study", variant="primary")
-            with gr.Row():
-                upload_summary = gr.Markdown()
-                upload_plot = gr.Plot(label="Category scores", show_label=False)
-            upload_conduct = gr.Markdown()
-            upload_benchmarks = gr.Dataframe(
-                headers=["Benchmark", "Status", "Score", "Description", "Evidence", "Required action"],
-                interactive=False,
-                wrap=True,
-            )
-            upload_bias = gr.Dataframe(
-                headers=["Signal", "Status", "Evidence from available text", "Suggested next check"],
-                interactive=False,
-                wrap=True,
-            )
-            upload_checklist = gr.Dataframe(
-                headers=["Category", "Criterion", "Status", "Evidence", "Recommendation"],
-                interactive=False,
-                wrap=True,
-            )
-            upload_report_file = gr.File(label="Download Markdown report")
+                    project_type = gr.Dropdown(label="Study type", choices=STUDY_TYPE_CHOICES, value="Auto-detect")
 
-            upload_button.click(
-                analyze_upload_ui,
-                inputs=[upload, pasted, upload_title, type_hint],
-                outputs=[upload_summary, upload_plot, upload_conduct, upload_benchmarks, upload_bias, upload_checklist, upload_report_file],
-            )
+                research_question = gr.Textbox(label="Research question or hypothesis", lines=2)
+                with gr.Accordion("Design and participants", open=True):
+                    study_design = gr.Textbox(label="Study design", lines=2, placeholder="Design, setting, timeline, and whether it is prospective, retrospective, randomized, observational, qualitative, etc.")
+                    participants = gr.Textbox(label="Population or sample", lines=2, placeholder="Who or what will be studied, expected sample, and important demographics.")
+                    recruitment = gr.Textbox(label="Recruitment source and study period", lines=2, placeholder="Where participants/data come from, how they are approached, and when data will be collected.")
+                    eligibility = gr.Textbox(label="Inclusion and exclusion criteria", lines=2)
+                with gr.Accordion("Measures and bias controls", open=True):
+                    intervention_or_exposure = gr.Textbox(label="Intervention, exposure, or focus", lines=2)
+                    comparator = gr.Textbox(label="Comparator or control", lines=2, placeholder="Placebo, usual care, matched controls, pre/post comparison, or why none is appropriate.")
+                    outcomes = gr.Textbox(label="Primary and secondary outcomes", lines=2, placeholder="Name primary outcomes before data collection when possible.")
+                    sample_size = gr.Textbox(label="Sample size or power rationale", lines=2)
+                    bias_controls = gr.Textbox(label="Bias controls", lines=3, placeholder="Randomization, blinding, allocation concealment, validated measures, training, calibration, reflexivity, or confounder controls.")
+                with gr.Accordion("Ethics, analysis, and transparency", open=True):
+                    ethics_plan = gr.Textbox(label="Ethics approval and oversight", lines=2, placeholder="IRB/ethics committee, exemption rationale, animal-care approval, or oversight plan.")
+                    consent_privacy = gr.Textbox(label="Consent, privacy, and safety safeguards", lines=2)
+                    analysis_plan = gr.Textbox(label="Statistical or qualitative analysis plan", lines=3)
+                    missing_data_plan = gr.Textbox(label="Missing data, attrition, or follow-up plan", lines=2)
+                    transparency_plan = gr.Textbox(label="Data, code, materials, and preregistration plan", lines=2)
+                    funding_conflicts = gr.Textbox(label="Funding, sponsor role, and conflicts of interest", lines=2)
+                    project_notes = gr.Textbox(label="Additional notes", lines=2)
 
-        with gr.Tab("My research projects"):
-            gr.Markdown(
-                """
-Add a study idea, protocol, or active project to review whether the planned conduct follows the benchmarks readers and reviewers will expect.
-
-Project data is kept in this browser session only. Download the report or portfolio export if you want to keep it.
-"""
-            )
-            projects_state = gr.State([])
-            project_file = gr.File(
-                label="Upload project, protocol, benchmark plan, or preregistration",
-                file_types=[".pdf", ".docx", ".txt", ".md", ".json", ".csv", ".tsv"],
-                type="filepath",
-            )
-            with gr.Row():
-                project_title = gr.Textbox(label="Project title", placeholder="Example: Community sleep intervention pilot")
-                project_team = gr.Textbox(label="Team or owner", placeholder="Lab, PI, student group, or organization")
-            with gr.Row():
-                project_status = gr.Dropdown(
-                    label="Project status",
-                    choices=["Idea", "Protocol drafting", "Ethics review", "Recruiting", "Data collection", "Analysis", "Manuscript drafting", "Completed"],
-                    value="Protocol drafting",
+                add_project_button = gr.Button("Add project and review plan", variant="primary", elem_classes=["os-action"])
+                project_status_text = gr.Markdown()
+                project_table = gr.Dataframe(
+                    headers=["#", "Project", "Detected/review type", "Status", "Score", "Risk level", "Key gaps"],
+                    datatype=["number", "str", "str", "str", "str", "str", "str"],
+                    interactive=False,
+                    wrap=True,
                 )
-                project_type = gr.Dropdown(label="Study type", choices=STUDY_TYPE_CHOICES, value="Auto-detect")
+                with gr.Row():
+                    project_select = gr.Dropdown(label="Select a saved project from this session", choices=[], interactive=True)
+                    review_project_button = gr.Button("Review selected project", variant="secondary")
+                    export_projects_button = gr.Button("Download project portfolio JSON")
+                projects_file = gr.File(label="Project portfolio export")
 
-            research_question = gr.Textbox(label="Research question or hypothesis", lines=2)
-            with gr.Accordion("Design and participants", open=True):
-                study_design = gr.Textbox(label="Study design", lines=2, placeholder="Design, setting, timeline, and whether it is prospective, retrospective, randomized, observational, qualitative, etc.")
-                participants = gr.Textbox(label="Population or sample", lines=2, placeholder="Who or what will be studied, expected sample, and important demographics.")
-                recruitment = gr.Textbox(label="Recruitment source and study period", lines=2, placeholder="Where participants/data come from, how they are approached, and when data will be collected.")
-                eligibility = gr.Textbox(label="Inclusion and exclusion criteria", lines=2)
-            with gr.Accordion("Measures and bias controls", open=True):
-                intervention_or_exposure = gr.Textbox(label="Intervention, exposure, or focus", lines=2)
-                comparator = gr.Textbox(label="Comparator or control", lines=2, placeholder="Placebo, usual care, matched controls, pre/post comparison, or why none is appropriate.")
-                outcomes = gr.Textbox(label="Primary and secondary outcomes", lines=2, placeholder="Name primary outcomes before data collection when possible.")
-                sample_size = gr.Textbox(label="Sample size or power rationale", lines=2)
-                bias_controls = gr.Textbox(label="Bias controls", lines=3, placeholder="Randomization, blinding, allocation concealment, validated measures, training, calibration, reflexivity, or confounder controls.")
-            with gr.Accordion("Ethics, analysis, and transparency", open=True):
-                ethics_plan = gr.Textbox(label="Ethics approval and oversight", lines=2, placeholder="IRB/ethics committee, exemption rationale, animal-care approval, or oversight plan.")
-                consent_privacy = gr.Textbox(label="Consent, privacy, and safety safeguards", lines=2)
-                analysis_plan = gr.Textbox(label="Statistical or qualitative analysis plan", lines=3)
-                missing_data_plan = gr.Textbox(label="Missing data, attrition, or follow-up plan", lines=2)
-                transparency_plan = gr.Textbox(label="Data, code, materials, and preregistration plan", lines=2)
-                funding_conflicts = gr.Textbox(label="Funding, sponsor role, and conflicts of interest", lines=2)
-                project_notes = gr.Textbox(label="Additional notes", lines=2)
+                with gr.Accordion(f"Qwen agent benchmark review ({QWEN_MODEL_ID} only)", open=False):
+                    gr.Markdown(
+                        f"""
+    The AI reviewer is constrained to `{QWEN_MODEL_ID}`. OpenStudy will not fall back to another model.
 
-            add_project_button = gr.Button("Add project and review plan", variant="primary")
-            project_status_text = gr.Markdown()
-            project_table = gr.Dataframe(
-                headers=["#", "Project", "Detected/review type", "Status", "Score", "Risk level", "Key gaps"],
-                datatype=["number", "str", "str", "str", "str", "str", "str"],
-                interactive=False,
-                wrap=True,
-            )
-            with gr.Row():
-                project_select = gr.Dropdown(label="Select a saved project from this session", choices=[], interactive=True)
-                review_project_button = gr.Button("Review selected project", variant="secondary")
-                export_projects_button = gr.Button("Download project portfolio JSON")
-            projects_file = gr.File(label="Project portfolio export")
+    For Hugging Face Spaces, set a secret named `HF_TOKEN`, or paste a temporary Hugging Face token below for this session.
+    """
+                    )
+                    qwen_token = gr.Textbox(label="Hugging Face token (optional)", type="password")
+                    qwen_instruction = gr.Textbox(
+                        label="Extra Qwen review focus (optional)",
+                        lines=2,
+                        placeholder="Example: Focus on recruitment fairness and IRB readiness.",
+                    )
+                    qwen_button = gr.Button("Run Qwen benchmark agent", variant="secondary", elem_classes=["os-action"])
+                    qwen_output = gr.Markdown()
 
-            with gr.Accordion(f"Qwen agent benchmark review ({QWEN_MODEL_ID} only)", open=False):
-                gr.Markdown(
-                    f"""
-The AI reviewer is constrained to `{QWEN_MODEL_ID}`. OpenStudy will not fall back to another model.
-
-For Hugging Face Spaces, set a secret named `HF_TOKEN`, or paste a temporary Hugging Face token below for this session.
-"""
+                with gr.Row():
+                    project_summary = gr.Markdown()
+                    project_plot = gr.Plot(label="Category scores", show_label=False)
+                project_conduct = gr.Markdown()
+                project_benchmarks = gr.Dataframe(
+                    headers=["Benchmark", "Status", "Score", "Description", "Evidence", "Required action"],
+                    interactive=False,
+                    wrap=True,
                 )
-                qwen_token = gr.Textbox(label="Hugging Face token (optional)", type="password")
-                qwen_instruction = gr.Textbox(
-                    label="Extra Qwen review focus (optional)",
-                    lines=2,
-                    placeholder="Example: Focus on recruitment fairness and IRB readiness.",
+                project_bias = gr.Dataframe(
+                    headers=["Signal", "Status", "Evidence from project plan", "Suggested next check"],
+                    interactive=False,
+                    wrap=True,
                 )
-                qwen_button = gr.Button("Run Qwen benchmark agent", variant="secondary")
-                qwen_output = gr.Markdown()
+                project_checklist = gr.Dataframe(
+                    headers=["Category", "Criterion", "Status", "Evidence", "Recommendation"],
+                    interactive=False,
+                    wrap=True,
+                )
+                project_report_file = gr.File(label="Download project review report")
 
-            with gr.Row():
-                project_summary = gr.Markdown()
-                project_plot = gr.Plot(label="Category scores", show_label=False)
-            project_conduct = gr.Markdown()
-            project_benchmarks = gr.Dataframe(
-                headers=["Benchmark", "Status", "Score", "Description", "Evidence", "Required action"],
-                interactive=False,
-                wrap=True,
-            )
-            project_bias = gr.Dataframe(
-                headers=["Signal", "Status", "Evidence from project plan", "Suggested next check"],
-                interactive=False,
-                wrap=True,
-            )
-            project_checklist = gr.Dataframe(
-                headers=["Category", "Criterion", "Status", "Evidence", "Recommendation"],
-                interactive=False,
-                wrap=True,
-            )
-            project_report_file = gr.File(label="Download project review report")
-
-            project_inputs = [
-                project_file,
-                project_title,
-                project_team,
-                project_status,
-                project_type,
-                research_question,
-                study_design,
-                participants,
-                recruitment,
-                eligibility,
-                intervention_or_exposure,
-                comparator,
-                outcomes,
-                sample_size,
-                bias_controls,
-                ethics_plan,
-                consent_privacy,
-                analysis_plan,
-                missing_data_plan,
-                transparency_plan,
-                funding_conflicts,
-                project_notes,
-                projects_state,
-            ]
-            add_project_button.click(
-                add_project_ui,
-                inputs=project_inputs,
-                outputs=[
-                    project_table,
-                    project_select,
+                project_inputs = [
+                    project_file,
+                    project_title,
+                    project_team,
+                    project_status,
+                    project_type,
+                    research_question,
+                    study_design,
+                    participants,
+                    recruitment,
+                    eligibility,
+                    intervention_or_exposure,
+                    comparator,
+                    outcomes,
+                    sample_size,
+                    bias_controls,
+                    ethics_plan,
+                    consent_privacy,
+                    analysis_plan,
+                    missing_data_plan,
+                    transparency_plan,
+                    funding_conflicts,
+                    project_notes,
                     projects_state,
-                    project_status_text,
-                    project_summary,
-                    project_plot,
-                    project_conduct,
-                    project_benchmarks,
-                    project_bias,
-                    project_checklist,
-                    project_report_file,
-                ],
-            )
-            review_project_button.click(
-                review_project_ui,
-                inputs=[project_select, projects_state],
-                outputs=[project_summary, project_plot, project_conduct, project_benchmarks, project_bias, project_checklist, project_report_file],
-            )
-            export_projects_button.click(download_projects_ui, inputs=[projects_state], outputs=[projects_file])
-            qwen_button.click(
-                qwen_agent_review_ui,
-                inputs=[project_select, projects_state, qwen_token, qwen_instruction],
-                outputs=[qwen_output],
-            )
+                ]
+                add_project_button.click(
+                    add_project_ui,
+                    inputs=project_inputs,
+                    outputs=[
+                        project_table,
+                        project_select,
+                        projects_state,
+                        project_status_text,
+                        project_summary,
+                        project_plot,
+                        project_conduct,
+                        project_benchmarks,
+                        project_bias,
+                        project_checklist,
+                        project_report_file,
+                    ],
+                )
+                review_project_button.click(
+                    review_project_ui,
+                    inputs=[project_select, projects_state],
+                    outputs=[project_summary, project_plot, project_conduct, project_benchmarks, project_bias, project_checklist, project_report_file],
+                )
+                export_projects_button.click(download_projects_ui, inputs=[projects_state], outputs=[projects_file])
+                qwen_button.click(
+                    qwen_agent_review_ui,
+                    inputs=[project_select, projects_state, qwen_token, qwen_instruction],
+                    outputs=[qwen_output],
+                )
 
-        with gr.Tab("Method"):
-            gr.Markdown(
-                """
-## How the screen works
+            with gr.Tab("Method", id="method"):
+                gr.Markdown(
+                    """
+    ## How the screen works
 
-OpenStudy uses rule-based, transparent benchmark checks inspired by common reporting safeguards across trials, observational studies, reviews, qualitative research, animal studies, and model studies.
+    OpenStudy uses rule-based, transparent benchmark checks inspired by common reporting safeguards across trials, observational studies, reviews, qualitative research, animal studies, and model studies.
 
-The score is a **reported-or-planned safeguard score**, not a truth score. A low score can mean the study is poorly reported, the public abstract is too short, the uploaded text did not include the methods, ethics, funding, and limitations sections, or a project plan still needs those safeguards added.
+    The score is a **reported-or-planned safeguard score**, not a truth score. A low score can mean the study is poorly reported, the public abstract is too short, the uploaded text did not include the methods, ethics, funding, and limitations sections, or a project plan still needs those safeguards added.
 
-The optional AI review uses **`Qwen/Qwen3.6-27B` only** through Hugging Face inference. If that model is not available with the configured token/provider, OpenStudy does not switch to another model.
+    The optional AI review uses **`Qwen/Qwen3.6-27B` only** through Hugging Face inference. If that model is not available with the configured token/provider, OpenStudy does not switch to another model.
 
-Recommended human follow-up:
+    Recommended human follow-up:
 
-- Read the full methods, supplement, protocol, registry entry, and conflict-of-interest statements.
-- Compare outcomes in the manuscript with the protocol or registration.
-- Ask domain experts to judge whether the design and analysis fit the research question.
-- Treat ethics and participant-protection findings as prompts for review, not legal or IRB determinations.
-- For unpublished projects, use the project report as a protocol-improvement checklist before recruitment or data collection.
-- Upload protocol, benchmark, or preregistration files in the project tab to check whether planned safeguards are present.
-"""
-            )
+    - Read the full methods, supplement, protocol, registry entry, and conflict-of-interest statements.
+    - Compare outcomes in the manuscript with the protocol or registration.
+    - Ask domain experts to judge whether the design and analysis fit the research question.
+    - Treat ethics and participant-protection findings as prompts for review, not legal or IRB determinations.
+    - For unpublished projects, use the project report as a protocol-improvement checklist before recruitment or data collection.
+    - Upload protocol, benchmark, or preregistration files in the project tab to check whether planned safeguards are present.
+    """
+                )
+
+        cta_lookup.click(lambda: gr.Tabs(selected="lookup"), outputs=[main_tabs])
+        cta_add.click(lambda: gr.Tabs(selected="add"), outputs=[main_tabs])
 
         gr.HTML(
             f"""
