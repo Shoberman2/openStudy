@@ -27,6 +27,9 @@ QWEN_MODEL_ID = "Qwen/Qwen3.6-27B"
 MAX_ANALYSIS_CHARS = 180_000
 MAX_QWEN_CONTEXT_CHARS = 18_000
 REQUEST_TIMEOUT = 12
+MIN_TOPIC_PAPERS = 15
+DEFAULT_TOPIC_PAPERS = 15
+MAX_TOPIC_PAPERS = 100
 HEADERS = {
     "User-Agent": "OpenStudy/0.1 (open-source research-bias-screening; https://huggingface.co/spaces)"
 }
@@ -1208,26 +1211,28 @@ def search_studies(query: str, rows: int) -> list[dict[str, Any]]:
     query = normalize_space(query)
     if not query:
         return []
-    rows = max(1, min(int(rows), 100))
+    requested_rows = max(1, min(int(rows), MAX_TOPIC_PAPERS))
     records: list[dict[str, Any]] = []
     doi = normalize_doi(query)
 
     if doi:
         records.extend(record for record in (crossref_by_doi(doi), openalex_by_doi(doi)) if record)
         if records:
-            return merge_records(records, rows)
+            return merge_records(records, requested_rows)
 
     if is_url(query) and not records:
         page_record = extract_page_record(query)
         if page_record:
             records.append(page_record)
-            return merge_records(records, rows)
+            return merge_records(records, requested_rows)
 
-    if not records or len(records) < rows:
-        records.extend(crossref_search(query, rows))
-        records.extend(openalex_search(query, rows))
+    target_rows = max(requested_rows, MIN_TOPIC_PAPERS)
+    api_rows = min(max(target_rows * 2, MIN_TOPIC_PAPERS), MAX_TOPIC_PAPERS)
+    if not records or len(records) < target_rows:
+        records.extend(crossref_search(query, api_rows))
+        records.extend(openalex_search(query, api_rows))
 
-    return merge_records(records, rows)
+    return merge_records(records, target_rows)
 
 
 def detect_study_type(text: str) -> tuple[str, str]:
@@ -1801,7 +1806,7 @@ def format_choice(index: int, record: dict[str, Any]) -> str:
 
 
 def search_studies_ui(query: str, rows: int):
-    records = search_studies(query, int(rows or 5))
+    records = search_studies(query, int(rows or DEFAULT_TOPIC_PAPERS))
     table = []
     for index, record in enumerate(records, start=1):
         table.append(
@@ -1816,11 +1821,18 @@ def search_studies_ui(query: str, rows: int):
             ]
         )
     choices = [format_choice(index, record) for index, record in enumerate(records)]
+    doi = normalize_doi(query)
+    exact_lookup = bool(doi or is_url(query))
+    expected_count = MIN_TOPIC_PAPERS if not exact_lookup else 1
     status = (
         f"Found {len(records)} candidate studies. **Click a row** to evaluate it against your standards."
         if records
         else "No candidate studies found. Try a DOI, a more exact title, or paste an abstract in the Add your study tab."
     )
+    if records and not exact_lookup and len(records) < expected_count:
+        status += f" Public metadata sources returned fewer than the {MIN_TOPIC_PAPERS}-paper minimum for this topic."
+    elif records and not exact_lookup:
+        status += f" Topic searches return at least {MIN_TOPIC_PAPERS} papers when available."
     return table, gr.update(choices=choices, value=choices[0] if choices else None), records, status
 
 
@@ -2484,8 +2496,11 @@ itself prove poor conduct.
                 )
                 with gr.Accordion("Search options", open=False):
                     rows = gr.Slider(
-                        5, 100, value=50, step=5,
-                        label="Number of results (search up to 100 studies on a topic)",
+                        MIN_TOPIC_PAPERS,
+                        MAX_TOPIC_PAPERS,
+                        value=DEFAULT_TOPIC_PAPERS,
+                        step=5,
+                        label=f"Papers per topic (minimum {MIN_TOPIC_PAPERS})",
                     )
                 search_status = gr.Markdown()
                 studies_state = gr.State([])
