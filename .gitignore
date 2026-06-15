@@ -6,3 +6,6 @@ venv/
 .env
 *.egg-info/
 .gstack/
+
+# video build artifacts
+video_build/
