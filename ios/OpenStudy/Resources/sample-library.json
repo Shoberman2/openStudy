@@ -1,0 +1,1051 @@
+{
+ "version": 1,
+ "projects": [
+  {
+   "id": "smpcarnegi",
+   "title": "How to Win Friends and Influence People",
+   "author": "Dale Carnegie",
+   "color": "blue",
+   "createdAt": "2026-10-01T09:00:00.000Z",
+   "focus": "ideas+quotes",
+   "quotesAsked": true,
+   "sample": true,
+   "type": "book"
+  },
+  {
+   "id": "smpaurelis",
+   "title": "Meditations",
+   "author": "Marcus Aurelius",
+   "color": "red",
+   "createdAt": "2026-10-02T09:00:00.000Z",
+   "focus": "ideas+quotes",
+   "quotesAsked": true,
+   "sample": true,
+   "type": "book"
+  },
+  {
+   "id": "smpbio101",
+   "title": "BIO 101: Cell Biology",
+   "author": "Fall semester",
+   "color": "green",
+   "createdAt": "2026-10-03T09:00:00.000Z",
+   "focus": "ideas",
+   "quotesAsked": true,
+   "sample": true,
+   "type": "class"
+  }
+ ],
+ "pages": [
+  {
+   "id": "pgc1",
+   "projectId": "smpcarnegi",
+   "kind": "screenshot",
+   "header": "Fundamental Techniques in Handling People",
+   "createdAt": "2026-10-01T09:00:00.000Z",
+   "text": "Criticism is futile because it puts a person on the defensive and usually makes him strive to justify himself. Criticism is dangerous, because it wounds a person's precious pride, hurts his sense of importance, and arouses resentment. Any fool can criticize, condemn and complain, and most fools do. Instead of condemning people, let's try to understand them. Let's try to figure out why they do what they do."
+  },
+  {
+   "id": "pgc2",
+   "projectId": "smpcarnegi",
+   "kind": "screenshot",
+   "header": "Fundamental Techniques in Handling People",
+   "createdAt": "2026-10-01T09:01:00.000Z",
+   "text": "The deepest urge in human nature is the desire to be important. Give honest, sincere appreciation. Flattery is counterfeit; appreciation is sincere. The only way on earth to influence other people is to talk about what they want and show them how to get it. Arouse in the other person an eager want."
+  },
+  {
+   "id": "pgc3",
+   "projectId": "smpcarnegi",
+   "kind": "screenshot",
+   "header": "Six Ways to Make People Like You",
+   "createdAt": "2026-10-01T09:02:00.000Z",
+   "text": "You can make more friends in two months by becoming interested in other people than you can in two years by trying to get other people interested in you. Smile. Remember that a person's name is to that person the sweetest and most important sound in any language. Be a good listener and encourage others to talk about themselves."
+  },
+  {
+   "id": "pgc4",
+   "projectId": "smpcarnegi",
+   "kind": "screenshot",
+   "header": "Six Ways to Make People Like You",
+   "createdAt": "2026-10-01T09:03:00.000Z",
+   "text": "Talk in terms of the other person's interests. The royal road to a person's heart is to talk about the things he or she treasures most. Make the other person feel important, and do it sincerely."
+  },
+  {
+   "id": "pgc5",
+   "projectId": "smpcarnegi",
+   "kind": "note",
+   "suggestedTitle": "How to Win Friends and Influence People",
+   "suggestedAuthor": "Dale Carnegie",
+   "createdAt": "2026-10-01T09:04:00.000Z",
+   "text": "The only way to get the best of an argument is to avoid it. Show respect for the other person's opinions. Never say, \"You're wrong.\" If you are wrong, admit it quickly and emphatically. Begin in a friendly way. Get the other person saying \"yes, yes\" immediately."
+  },
+  {
+   "id": "pgc6",
+   "projectId": "smpcarnegi",
+   "kind": "note",
+   "suggestedTitle": "How to Win Friends and Influence People",
+   "suggestedAuthor": "Dale Carnegie",
+   "createdAt": "2026-10-01T09:05:00.000Z",
+   "text": "Begin with praise and honest appreciation. Call attention to people's mistakes indirectly. Talk about your own mistakes before criticizing the other person. Ask questions instead of giving direct orders. Let the other person save face. Praise the slightest improvement and praise every improvement. Be hearty in your approbation and lavish in your praise."
+  },
+  {
+   "id": "pga1",
+   "projectId": "smpaurelis",
+   "kind": "note",
+   "suggestedTitle": "Meditations",
+   "suggestedAuthor": "Marcus Aurelius",
+   "createdAt": "2026-10-02T09:00:00.000Z",
+   "text": "You have power over your mind, not outside events. Realize this, and you will find strength. If you are distressed by anything external, the pain is not due to the thing itself, but to your estimate of it; and this you have the power to revoke at any moment."
+  },
+  {
+   "id": "pga2",
+   "projectId": "smpaurelis",
+   "kind": "note",
+   "suggestedTitle": "Meditations",
+   "suggestedAuthor": "Marcus Aurelius",
+   "createdAt": "2026-10-02T09:01:00.000Z",
+   "text": "Waste no more time arguing about what a good man should be. Be one. The impediment to action advances action. What stands in the way becomes the way. Very little is needed to make a happy life; it is all within yourself, in your way of thinking."
+  },
+  {
+   "id": "pga3",
+   "projectId": "smpaurelis",
+   "kind": "note",
+   "suggestedTitle": "Meditations",
+   "suggestedAuthor": "Marcus Aurelius",
+   "createdAt": "2026-10-02T09:02:00.000Z",
+   "text": "Loss is nothing else but change, and change is Nature's delight. Time is a sort of river of passing events, and strong is its current. Think of yourself as dead; you have lived your life. Now take what's left and live it properly."
+  },
+  {
+   "id": "pgb1",
+   "projectId": "smpbio101",
+   "kind": "slides",
+   "sourceName": "Lecture 1 - The Cell.pptx",
+   "sourceIndex": 1,
+   "heading": "Cell Theory",
+   "text": "All living things are made of one or more cells. The cell is the basic unit of life. All cells come from pre-existing cells.",
+   "createdAt": "2026-10-03T09:00:00.000Z"
+  },
+  {
+   "id": "pgb2",
+   "projectId": "smpbio101",
+   "kind": "slides",
+   "sourceName": "Lecture 1 - The Cell.pptx",
+   "sourceIndex": 2,
+   "heading": "Prokaryotes vs Eukaryotes",
+   "text": "Prokaryote: a cell without a nucleus or membrane-bound organelles, such as bacteria. Eukaryote: a cell with a nucleus and membrane-bound organelles, such as plant and animal cells.",
+   "createdAt": "2026-10-03T09:01:00.000Z"
+  },
+  {
+   "id": "pgb3",
+   "projectId": "smpbio101",
+   "kind": "photo",
+   "sourceName": "Whiteboard Oct 9.jpg",
+   "sourceIndex": 1,
+   "heading": "Organelles",
+   "text": "Mitochondria: the organelle that produces most of the cell's ATP. Ribosome: the structure that builds proteins from amino acids. Nucleus: holds the cell's DNA and controls its activity.",
+   "createdAt": "2026-10-03T09:02:00.000Z"
+  },
+  {
+   "id": "pgb4",
+   "projectId": "smpbio101",
+   "kind": "pdf",
+   "sourceName": "Lecture 2 - Membranes.pdf",
+   "sourceIndex": 1,
+   "heading": "The Cell Membrane",
+   "text": "Cell membrane: a phospholipid bilayer that controls what enters and leaves the cell. Diffusion is the movement of molecules from high to low concentration. Osmosis: diffusion of water across a selectively permeable membrane.",
+   "createdAt": "2026-10-03T09:03:00.000Z"
+  },
+  {
+   "id": "pgb5",
+   "projectId": "smpbio101",
+   "kind": "pdf",
+   "sourceName": "Lecture 2 - Membranes.pdf",
+   "sourceIndex": 2,
+   "heading": "Transport",
+   "text": "Active transport moves molecules against their concentration gradient and requires ATP. Passive transport needs no energy from the cell.",
+   "createdAt": "2026-10-03T09:04:00.000Z"
+  }
+ ],
+ "lessons": [
+  {
+   "id": "lc1",
+   "projectId": "smpcarnegi",
+   "title": "Handling People",
+   "summary": "Criticism backfires. Appreciation and the other person's wants move people.",
+   "kind": "theme",
+   "order": 0,
+   "level": 0,
+   "sessions": 0
+  },
+  {
+   "id": "lcq",
+   "projectId": "smpcarnegi",
+   "title": "Quotes",
+   "summary": "The lines worth knowing word for word.",
+   "kind": "quotes",
+   "order": 1,
+   "level": 0,
+   "sessions": 0
+  },
+  {
+   "id": "lc2",
+   "projectId": "smpcarnegi",
+   "title": "Being Liked",
+   "summary": "Interest, smiles, names, listening, and making people feel important.",
+   "kind": "theme",
+   "order": 2,
+   "level": 0,
+   "sessions": 0
+  },
+  {
+   "id": "lc3",
+   "projectId": "smpcarnegi",
+   "title": "Winning Agreement",
+   "summary": "Avoid arguments, respect opinions, admit mistakes, start friendly.",
+   "kind": "theme",
+   "order": 3,
+   "level": 0,
+   "sessions": 0
+  },
+  {
+   "id": "lc4",
+   "projectId": "smpcarnegi",
+   "title": "Leading Without Resentment",
+   "summary": "Change behavior with praise, questions, and saved face.",
+   "kind": "theme",
+   "order": 4,
+   "level": 0,
+   "sessions": 0
+  },
+  {
+   "id": "la1",
+   "projectId": "smpaurelis",
+   "title": "What You Control",
+   "summary": "Your judgments are yours. Outside events are not.",
+   "kind": "theme",
+   "order": 0,
+   "level": 0,
+   "sessions": 0
+  },
+  {
+   "id": "laq",
+   "projectId": "smpaurelis",
+   "title": "Quotes",
+   "summary": "Lines from the notebook of an emperor.",
+   "kind": "quotes",
+   "order": 1,
+   "level": 0,
+   "sessions": 0
+  },
+  {
+   "id": "la2",
+   "projectId": "smpaurelis",
+   "title": "Change & Action",
+   "summary": "Obstacles become the path, and change is natural.",
+   "kind": "theme",
+   "order": 2,
+   "level": 0,
+   "sessions": 0
+  },
+  {
+   "id": "lb1",
+   "projectId": "smpbio101",
+   "title": "The Cell",
+   "summary": "Cell theory, prokaryotes and eukaryotes, and the main organelles.",
+   "kind": "theme",
+   "order": 0,
+   "level": 0,
+   "sessions": 0
+  },
+  {
+   "id": "lb2",
+   "projectId": "smpbio101",
+   "title": "Membranes",
+   "summary": "The cell membrane and how molecules move across it.",
+   "kind": "theme",
+   "order": 1,
+   "level": 0,
+   "sessions": 0
+  }
+ ],
+ "cards": [
+  {
+   "id": "c01",
+   "lessonId": "lc1",
+   "projectId": "smpcarnegi",
+   "pageId": "pgc1",
+   "kind": "fact",
+   "statement": "Criticism is futile because it puts a person on the defensive.",
+   "cloze": "defensive",
+   "question": "Why is criticism futile, according to Carnegie?",
+   "answer": "It puts people on the defensive",
+   "distractors": [
+    "It is usually inaccurate",
+    "People forget it quickly",
+    "It costs you authority"
+   ],
+   "falseStatement": "Criticism works because it puts a person on the defensive."
+  },
+  {
+   "id": "c02",
+   "lessonId": "lc1",
+   "projectId": "smpcarnegi",
+   "pageId": "pgc1",
+   "kind": "fact",
+   "statement": "Criticism wounds a person's pride and arouses resentment.",
+   "cloze": "resentment",
+   "question": "What does criticism arouse in people?",
+   "answer": "Resentment",
+   "distractors": [
+    "Motivation",
+    "Gratitude",
+    "Curiosity"
+   ],
+   "falseStatement": "Criticism wounds a person's pride and arouses gratitude."
+  },
+  {
+   "id": "c03",
+   "lessonId": "lc1",
+   "projectId": "smpcarnegi",
+   "pageId": "pgc1",
+   "kind": "fact",
+   "statement": "Instead of condemning people, try to understand why they do what they do.",
+   "cloze": "understand",
+   "question": "What should you do instead of condemning people?",
+   "answer": "Try to understand them",
+   "distractors": [
+    "Ignore them",
+    "Correct them in private",
+    "Set clear rules"
+   ],
+   "falseStatement": "Instead of condemning people, try to correct them in public."
+  },
+  {
+   "id": "c04",
+   "lessonId": "lc1",
+   "projectId": "smpcarnegi",
+   "pageId": "pgc2",
+   "kind": "fact",
+   "statement": "The deepest urge in human nature is the desire to be important.",
+   "cloze": "important",
+   "question": "What is the deepest urge in human nature?",
+   "answer": "The desire to be important",
+   "distractors": [
+    "The desire to be safe",
+    "The desire to be rich",
+    "The desire to be right"
+   ],
+   "falseStatement": "The deepest urge in human nature is the desire to be rich."
+  },
+  {
+   "id": "c05",
+   "lessonId": "lc1",
+   "projectId": "smpcarnegi",
+   "pageId": "pgc2",
+   "kind": "fact",
+   "statement": "Flattery is counterfeit; appreciation is sincere.",
+   "cloze": "counterfeit",
+   "question": "How does Carnegie describe flattery?",
+   "answer": "Counterfeit",
+   "distractors": [
+    "Harmless",
+    "Necessary",
+    "Sincere"
+   ],
+   "falseStatement": "Flattery is sincere; appreciation is counterfeit."
+  },
+  {
+   "id": "c06",
+   "lessonId": "lc1",
+   "projectId": "smpcarnegi",
+   "pageId": "pgc2",
+   "kind": "fact",
+   "statement": "To influence people, talk about what they want and show them how to get it.",
+   "cloze": "want",
+   "question": "What is the only way to influence other people?",
+   "answer": "Talk about what they want",
+   "distractors": [
+    "Talk about what you need",
+    "Offer them money",
+    "Appeal to logic"
+   ],
+   "falseStatement": "To influence people, talk about what you need and show them why."
+  },
+  {
+   "id": "c07",
+   "lessonId": "lc2",
+   "projectId": "smpcarnegi",
+   "pageId": "pgc3",
+   "kind": "fact",
+   "statement": "You make more friends by becoming interested in other people than by trying to get them interested in you.",
+   "cloze": "interested",
+   "question": "What makes more friends: being interesting or being interested?",
+   "answer": "Being interested",
+   "distractors": [
+    "Being interesting",
+    "Being funny",
+    "Being available"
+   ],
+   "falseStatement": "You make more friends by trying to get people interested in you."
+  },
+  {
+   "id": "c08",
+   "lessonId": "lc2",
+   "projectId": "smpcarnegi",
+   "pageId": "pgc3",
+   "kind": "fact",
+   "statement": "A person's name is to that person the sweetest sound in any language.",
+   "cloze": "name",
+   "question": "What is the sweetest sound to any person?",
+   "answer": "Their own name",
+   "distractors": [
+    "A compliment",
+    "Laughter",
+    "Their native language"
+   ],
+   "falseStatement": "A compliment is to a person the sweetest sound in any language."
+  },
+  {
+   "id": "c09",
+   "lessonId": "lc2",
+   "projectId": "smpcarnegi",
+   "pageId": "pgc3",
+   "kind": "fact",
+   "statement": "Be a good listener and encourage others to talk about themselves.",
+   "cloze": "listener",
+   "question": "What kind of conversation partner should you be?",
+   "answer": "A good listener",
+   "distractors": [
+    "A good storyteller",
+    "A fast talker",
+    "A careful debater"
+   ],
+   "falseStatement": "Be a good storyteller and encourage others to listen to you."
+  },
+  {
+   "id": "c10",
+   "lessonId": "lc2",
+   "projectId": "smpcarnegi",
+   "pageId": "pgc4",
+   "kind": "fact",
+   "statement": "The royal road to a person's heart is to talk about the things they treasure most.",
+   "cloze": "treasure",
+   "question": "What is the royal road to a person's heart?",
+   "answer": "Talking about what they treasure",
+   "distractors": [
+    "Giving them gifts",
+    "Agreeing with them",
+    "Asking for advice"
+   ],
+   "falseStatement": "The royal road to a person's heart is to give them gifts."
+  },
+  {
+   "id": "c11",
+   "lessonId": "lc2",
+   "projectId": "smpcarnegi",
+   "pageId": "pgc4",
+   "kind": "fact",
+   "statement": "Make the other person feel important, and do it sincerely.",
+   "cloze": "sincerely",
+   "question": "How should you make people feel important?",
+   "answer": "Sincerely",
+   "distractors": [
+    "Quickly",
+    "Publicly",
+    "Often"
+   ],
+   "falseStatement": "Make the other person feel important, even if you do it insincerely."
+  },
+  {
+   "id": "c12",
+   "lessonId": "lc3",
+   "projectId": "smpcarnegi",
+   "pageId": "pgc5",
+   "kind": "fact",
+   "statement": "The only way to get the best of an argument is to avoid it.",
+   "cloze": "avoid",
+   "question": "What is the only way to win an argument?",
+   "answer": "Avoid it",
+   "distractors": [
+    "Prepare better",
+    "Stay calm",
+    "Use facts"
+   ],
+   "falseStatement": "The only way to get the best of an argument is to prepare for it."
+  },
+  {
+   "id": "c13",
+   "lessonId": "lc3",
+   "projectId": "smpcarnegi",
+   "pageId": "pgc5",
+   "kind": "fact",
+   "statement": "Never tell someone \"You're wrong.\" Show respect for their opinions.",
+   "cloze": "respect",
+   "question": "What should you show for the other person's opinions?",
+   "answer": "Respect",
+   "distractors": [
+    "Curiosity",
+    "Patience",
+    "Doubt"
+   ],
+   "falseStatement": "Tell someone \"You're wrong\" early so the discussion moves faster."
+  },
+  {
+   "id": "c14",
+   "lessonId": "lc3",
+   "projectId": "smpcarnegi",
+   "pageId": "pgc5",
+   "kind": "fact",
+   "statement": "If you are wrong, admit it quickly and emphatically.",
+   "cloze": "quickly",
+   "question": "How should you admit when you are wrong?",
+   "answer": "Quickly and emphatically",
+   "distractors": [
+    "Privately and briefly",
+    "Only when asked",
+    "After explaining yourself"
+   ],
+   "falseStatement": "If you are wrong, admit it only when someone asks."
+  },
+  {
+   "id": "c15",
+   "lessonId": "lc3",
+   "projectId": "smpcarnegi",
+   "pageId": "pgc5",
+   "kind": "fact",
+   "statement": "Get the other person saying \"yes, yes\" immediately.",
+   "cloze": "yes",
+   "question": "What should you get the other person saying right away?",
+   "answer": "Yes, yes",
+   "distractors": [
+    "Maybe",
+    "Tell me more",
+    "I agree with you"
+   ],
+   "falseStatement": "Get the other person saying \"no\" early so objections come out."
+  },
+  {
+   "id": "c16",
+   "lessonId": "lc4",
+   "projectId": "smpcarnegi",
+   "pageId": "pgc6",
+   "kind": "fact",
+   "statement": "Call attention to people's mistakes indirectly.",
+   "cloze": "indirectly",
+   "question": "How should you point out someone's mistakes?",
+   "answer": "Indirectly",
+   "distractors": [
+    "Immediately",
+    "In writing",
+    "In front of the team"
+   ],
+   "falseStatement": "Call attention to people's mistakes directly and in public."
+  },
+  {
+   "id": "c17",
+   "lessonId": "lc4",
+   "projectId": "smpcarnegi",
+   "pageId": "pgc6",
+   "kind": "fact",
+   "statement": "Talk about your own mistakes before criticizing the other person.",
+   "cloze": "own",
+   "question": "What should you talk about before criticizing someone?",
+   "answer": "Your own mistakes",
+   "distractors": [
+    "Their strengths",
+    "The deadline",
+    "The rules"
+   ],
+   "falseStatement": "Talk about their past mistakes before criticizing the other person."
+  },
+  {
+   "id": "c18",
+   "lessonId": "lc4",
+   "projectId": "smpcarnegi",
+   "pageId": "pgc6",
+   "kind": "fact",
+   "statement": "Ask questions instead of giving direct orders.",
+   "cloze": "questions",
+   "question": "What should you use instead of direct orders?",
+   "answer": "Questions",
+   "distractors": [
+    "Deadlines",
+    "Rewards",
+    "Examples"
+   ],
+   "falseStatement": "Give direct orders instead of asking questions."
+  },
+  {
+   "id": "c19",
+   "lessonId": "lc4",
+   "projectId": "smpcarnegi",
+   "pageId": "pgc6",
+   "kind": "fact",
+   "statement": "Let the other person save face.",
+   "cloze": "face",
+   "question": "What should you always let the other person save?",
+   "answer": "Face",
+   "distractors": [
+    "Time",
+    "Money",
+    "Energy"
+   ],
+   "falseStatement": "Make sure the other person admits they lost face."
+  },
+  {
+   "id": "c20",
+   "lessonId": "lc4",
+   "projectId": "smpcarnegi",
+   "pageId": "pgc6",
+   "kind": "fact",
+   "statement": "Praise the slightest improvement and praise every improvement.",
+   "cloze": "improvement",
+   "question": "Which improvements deserve praise?",
+   "answer": "Every improvement",
+   "distractors": [
+    "Only big ones",
+    "Only finished work",
+    "Only lasting ones"
+   ],
+   "falseStatement": "Praise only the biggest improvement and ignore small ones."
+  },
+  {
+   "id": "q01",
+   "lessonId": "lcq",
+   "projectId": "smpcarnegi",
+   "pageId": "pgc1",
+   "kind": "quote",
+   "statement": "Any fool can criticize, condemn and complain, and most fools do.",
+   "attribution": "Dale Carnegie"
+  },
+  {
+   "id": "q02",
+   "lessonId": "lcq",
+   "projectId": "smpcarnegi",
+   "pageId": "pgc3",
+   "kind": "quote",
+   "statement": "Remember that a person's name is to that person the sweetest and most important sound in any language.",
+   "attribution": "Dale Carnegie"
+  },
+  {
+   "id": "q03",
+   "lessonId": "lcq",
+   "projectId": "smpcarnegi",
+   "pageId": "pgc3",
+   "kind": "quote",
+   "statement": "You can make more friends in two months by becoming interested in other people than you can in two years by trying to get other people interested in you.",
+   "attribution": "Dale Carnegie"
+  },
+  {
+   "id": "q04",
+   "lessonId": "lcq",
+   "projectId": "smpcarnegi",
+   "pageId": "pgc5",
+   "kind": "quote",
+   "statement": "The only way to get the best of an argument is to avoid it.",
+   "attribution": "Dale Carnegie"
+  },
+  {
+   "id": "q05",
+   "lessonId": "lcq",
+   "projectId": "smpcarnegi",
+   "pageId": "pgc6",
+   "kind": "quote",
+   "statement": "Be hearty in your approbation and lavish in your praise.",
+   "attribution": "Charles Schwab, quoted by Carnegie"
+  },
+  {
+   "id": "q06",
+   "lessonId": "lcq",
+   "projectId": "smpcarnegi",
+   "pageId": "pgc2",
+   "kind": "quote",
+   "statement": "Flattery is counterfeit; appreciation is sincere.",
+   "attribution": "Dale Carnegie"
+  },
+  {
+   "id": "c31",
+   "lessonId": "la1",
+   "projectId": "smpaurelis",
+   "pageId": "pga1",
+   "kind": "fact",
+   "statement": "You have power over your mind, not outside events.",
+   "cloze": "mind",
+   "question": "What do you have power over, according to Marcus Aurelius?",
+   "answer": "Your mind",
+   "distractors": [
+    "Outside events",
+    "Other people",
+    "Your fortune"
+   ],
+   "falseStatement": "You have power over outside events, not your mind."
+  },
+  {
+   "id": "c32",
+   "lessonId": "la1",
+   "projectId": "smpaurelis",
+   "pageId": "pga1",
+   "kind": "fact",
+   "statement": "Distress comes not from the thing itself but from your estimate of it.",
+   "cloze": "estimate",
+   "question": "Where does distress over external things come from?",
+   "answer": "Your estimate of them",
+   "distractors": [
+    "The thing itself",
+    "Other people",
+    "Bad luck"
+   ],
+   "falseStatement": "Distress comes from the thing itself, not from your estimate of it."
+  },
+  {
+   "id": "c33",
+   "lessonId": "la1",
+   "projectId": "smpaurelis",
+   "pageId": "pga2",
+   "kind": "fact",
+   "statement": "Very little is needed to make a happy life; it is all within your way of thinking.",
+   "cloze": "thinking",
+   "question": "Where does a happy life come from?",
+   "answer": "Your way of thinking",
+   "distractors": [
+    "Your circumstances",
+    "Your possessions",
+    "Your reputation"
+   ],
+   "falseStatement": "A great deal is needed to make a happy life."
+  },
+  {
+   "id": "c34",
+   "lessonId": "la1",
+   "projectId": "smpaurelis",
+   "pageId": "pga2",
+   "kind": "fact",
+   "statement": "Stop arguing about what a good man should be and be one.",
+   "cloze": "arguing",
+   "question": "What should you stop wasting time on?",
+   "answer": "Arguing about what a good man is",
+   "distractors": [
+    "Reading philosophy",
+    "Worrying about death",
+    "Seeking praise"
+   ],
+   "falseStatement": "Spend more time arguing about what a good man should be."
+  },
+  {
+   "id": "c35",
+   "lessonId": "la2",
+   "projectId": "smpaurelis",
+   "pageId": "pga2",
+   "kind": "fact",
+   "statement": "The impediment to action advances action; what stands in the way becomes the way.",
+   "cloze": "impediment",
+   "question": "What becomes the way?",
+   "answer": "What stands in the way",
+   "distractors": [
+    "The easiest path",
+    "Whatever others choose",
+    "The oldest road"
+   ],
+   "falseStatement": "What stands in the way should always be avoided."
+  },
+  {
+   "id": "c36",
+   "lessonId": "la2",
+   "projectId": "smpaurelis",
+   "pageId": "pga3",
+   "kind": "fact",
+   "statement": "Loss is nothing else but change, and change is Nature's delight.",
+   "cloze": "change",
+   "question": "What is loss, according to Marcus Aurelius?",
+   "answer": "Change",
+   "distractors": [
+    "Punishment",
+    "Failure",
+    "Chance"
+   ],
+   "falseStatement": "Loss is punishment, and change is Nature's cruelty."
+  },
+  {
+   "id": "c37",
+   "lessonId": "la2",
+   "projectId": "smpaurelis",
+   "pageId": "pga3",
+   "kind": "fact",
+   "statement": "Time is a river of passing events, and strong is its current.",
+   "cloze": "river",
+   "question": "What does Marcus Aurelius compare time to?",
+   "answer": "A river",
+   "distractors": [
+    "A wheel",
+    "A mountain",
+    "A flame"
+   ],
+   "falseStatement": "Time is a still lake, and calm is its surface."
+  },
+  {
+   "id": "c38",
+   "lessonId": "la2",
+   "projectId": "smpaurelis",
+   "pageId": "pga3",
+   "kind": "fact",
+   "statement": "Think of yourself as dead; take what's left and live it properly.",
+   "cloze": "properly",
+   "question": "How should you live the time that's left?",
+   "answer": "Properly",
+   "distractors": [
+    "Cautiously",
+    "Quickly",
+    "Quietly"
+   ],
+   "falseStatement": "Think of yourself as immortal and take your time."
+  },
+  {
+   "id": "q31",
+   "lessonId": "laq",
+   "projectId": "smpaurelis",
+   "pageId": "pga1",
+   "kind": "quote",
+   "statement": "You have power over your mind, not outside events. Realize this, and you will find strength.",
+   "attribution": "Marcus Aurelius"
+  },
+  {
+   "id": "q32",
+   "lessonId": "laq",
+   "projectId": "smpaurelis",
+   "pageId": "pga2",
+   "kind": "quote",
+   "statement": "Waste no more time arguing about what a good man should be. Be one.",
+   "attribution": "Marcus Aurelius"
+  },
+  {
+   "id": "q33",
+   "lessonId": "laq",
+   "projectId": "smpaurelis",
+   "pageId": "pga2",
+   "kind": "quote",
+   "statement": "The impediment to action advances action. What stands in the way becomes the way.",
+   "attribution": "Marcus Aurelius"
+  },
+  {
+   "id": "q34",
+   "lessonId": "laq",
+   "projectId": "smpaurelis",
+   "pageId": "pga3",
+   "kind": "quote",
+   "statement": "Loss is nothing else but change, and change is Nature's delight.",
+   "attribution": "Marcus Aurelius"
+  },
+  {
+   "id": "b01",
+   "lessonId": "lb1",
+   "projectId": "smpbio101",
+   "pageId": "pgb2",
+   "kind": "fact",
+   "term": "Prokaryote",
+   "definition": "A cell without a nucleus or membrane-bound organelles, such as bacteria",
+   "statement": "Prokaryote: a cell without a nucleus or membrane-bound organelles, such as bacteria.",
+   "cloze": "Prokaryote",
+   "question": "What is prokaryote?",
+   "answer": "Prokaryote",
+   "distractors": [
+    "Eukaryote",
+    "Mitochondria",
+    "Ribosome"
+   ]
+  },
+  {
+   "id": "b02",
+   "lessonId": "lb1",
+   "projectId": "smpbio101",
+   "pageId": "pgb2",
+   "kind": "fact",
+   "term": "Eukaryote",
+   "definition": "A cell with a nucleus and membrane-bound organelles",
+   "statement": "Eukaryote: a cell with a nucleus and membrane-bound organelles.",
+   "cloze": "Eukaryote",
+   "question": "What is eukaryote?",
+   "answer": "Eukaryote",
+   "distractors": [
+    "Prokaryote",
+    "Mitochondria",
+    "Ribosome"
+   ]
+  },
+  {
+   "id": "b03",
+   "lessonId": "lb1",
+   "projectId": "smpbio101",
+   "pageId": "pgb3",
+   "kind": "fact",
+   "term": "Mitochondria",
+   "definition": "The organelle that produces most of the cell's ATP",
+   "statement": "Mitochondria: the organelle that produces most of the cell's ATP.",
+   "cloze": "Mitochondria",
+   "question": "What is the mitochondria?",
+   "answer": "Mitochondria",
+   "distractors": [
+    "Prokaryote",
+    "Eukaryote",
+    "Ribosome"
+   ]
+  },
+  {
+   "id": "b04",
+   "lessonId": "lb1",
+   "projectId": "smpbio101",
+   "pageId": "pgb3",
+   "kind": "fact",
+   "term": "Ribosome",
+   "definition": "The structure that builds proteins from amino acids",
+   "statement": "Ribosome: the structure that builds proteins from amino acids.",
+   "cloze": "Ribosome",
+   "question": "What is ribosome?",
+   "answer": "Ribosome",
+   "distractors": [
+    "Prokaryote",
+    "Eukaryote",
+    "Mitochondria"
+   ]
+  },
+  {
+   "id": "b05",
+   "lessonId": "lb1",
+   "projectId": "smpbio101",
+   "pageId": "pgb3",
+   "kind": "fact",
+   "term": "Nucleus",
+   "definition": "Holds the cell's DNA and controls its activity",
+   "statement": "Nucleus: holds the cell's DNA and controls its activity.",
+   "cloze": "Nucleus",
+   "question": "What is nucleus?",
+   "answer": "Nucleus",
+   "distractors": [
+    "Prokaryote",
+    "Eukaryote",
+    "Mitochondria"
+   ]
+  },
+  {
+   "id": "b06",
+   "lessonId": "lb2",
+   "projectId": "smpbio101",
+   "pageId": "pgb4",
+   "kind": "fact",
+   "term": "Cell membrane",
+   "definition": "A phospholipid bilayer that controls what enters and leaves the cell",
+   "statement": "Cell membrane: a phospholipid bilayer that controls what enters and leaves the cell.",
+   "cloze": "Cell membrane",
+   "question": "What is cell membrane?",
+   "answer": "Cell membrane",
+   "distractors": [
+    "Diffusion",
+    "Osmosis",
+    "Active transport"
+   ]
+  },
+  {
+   "id": "b07",
+   "lessonId": "lb2",
+   "projectId": "smpbio101",
+   "pageId": "pgb4",
+   "kind": "fact",
+   "term": "Diffusion",
+   "definition": "The movement of molecules from high to low concentration",
+   "statement": "Diffusion: the movement of molecules from high to low concentration.",
+   "cloze": "Diffusion",
+   "question": "What is diffusion?",
+   "answer": "Diffusion",
+   "distractors": [
+    "Cell membrane",
+    "Osmosis",
+    "Active transport"
+   ]
+  },
+  {
+   "id": "b08",
+   "lessonId": "lb2",
+   "projectId": "smpbio101",
+   "pageId": "pgb4",
+   "kind": "fact",
+   "term": "Osmosis",
+   "definition": "Diffusion of water across a selectively permeable membrane",
+   "statement": "Osmosis: diffusion of water across a selectively permeable membrane.",
+   "cloze": "Osmosis",
+   "question": "What is osmosis?",
+   "answer": "Osmosis",
+   "distractors": [
+    "Cell membrane",
+    "Diffusion",
+    "Active transport"
+   ]
+  },
+  {
+   "id": "b09",
+   "lessonId": "lb2",
+   "projectId": "smpbio101",
+   "pageId": "pgb5",
+   "kind": "fact",
+   "term": "Active transport",
+   "definition": "Movement of molecules against their concentration gradient that requires ATP",
+   "statement": "Active transport: movement of molecules against their concentration gradient that requires ATP.",
+   "cloze": "Active transport",
+   "question": "What is active transport?",
+   "answer": "Active transport",
+   "distractors": [
+    "Cell membrane",
+    "Diffusion",
+    "Osmosis"
+   ]
+  },
+  {
+   "id": "b10",
+   "lessonId": "lb2",
+   "projectId": "smpbio101",
+   "pageId": "pgb5",
+   "kind": "fact",
+   "term": "Passive transport",
+   "definition": "Movement of molecules that needs no energy from the cell",
+   "statement": "Passive transport: movement of molecules that needs no energy from the cell.",
+   "cloze": "Passive transport",
+   "question": "What is passive transport?",
+   "answer": "Passive transport",
+   "distractors": [
+    "Cell membrane",
+    "Diffusion",
+    "Osmosis"
+   ]
+  },
+  {
+   "id": "b11",
+   "lessonId": "lb1",
+   "projectId": "smpbio101",
+   "pageId": "pgb1",
+   "kind": "fact",
+   "statement": "All cells come from pre-existing cells.",
+   "cloze": "pre-existing",
+   "question": "Where do all cells come from?",
+   "answer": "Pre-existing cells",
+   "distractors": [
+    "Nonliving matter",
+    "Viruses",
+    "Proteins"
+   ],
+   "falseStatement": "Cells can arise from nonliving matter."
+  },
+  {
+   "id": "b12",
+   "lessonId": "lb2",
+   "projectId": "smpbio101",
+   "pageId": "pgb5",
+   "kind": "fact",
+   "statement": "Active transport requires ATP; passive transport does not.",
+   "cloze": "ATP",
+   "question": "What does active transport require?",
+   "answer": "ATP",
+   "distractors": [
+    "Water",
+    "Light",
+    "Glucose"
+   ],
+   "falseStatement": "Passive transport requires ATP; active transport does not."
+  }
+ ]
+}
