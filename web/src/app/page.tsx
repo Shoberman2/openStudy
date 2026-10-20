@@ -51,7 +51,7 @@ export default function Landing() {
                 Start studying
               </Link>
               <a href="#ios" className="btn btn-secondary btn-block">
-                <Smartphone size={20} strokeWidth={2.5} /> Get the iPhone app
+                <Smartphone size={20} strokeWidth={2.5} /> iPhone app
               </a>
             </div>
           </div>
@@ -64,7 +64,7 @@ export default function Landing() {
               </div>
               <div className="flex flex-col items-center">
                 <IPhoneFrame src={home} alt="OpenStudy home screen on iPhone" width={264} />
-                <p className="mt-4 text-[14px] font-bold text-muted">The same library on iPhone</p>
+                <p className="mt-4 text-[14px] font-bold text-muted">OpenStudy on iPhone</p>
               </div>
             </div>
           </div>
@@ -115,24 +115,22 @@ export default function Landing() {
           <div className="rounded-[32px] border-2 border-line px-5 py-10 sm:px-10 sm:py-12">
             <div className="grid items-center gap-10 lg:grid-cols-[1fr_auto]">
               <div className="max-w-[520px]">
-                <h2 className="text-[30px] font-black leading-tight tracking-tight sm:text-[36px]">Get the iPhone app</h2>
+                <h2 className="text-[30px] font-black leading-tight tracking-tight sm:text-[36px]">OpenStudy for iPhone</h2>
                 <p className="mt-3 text-[18px] leading-relaxed text-muted">
-                  The iPhone app lives in this project under <code className="rounded-[6px] bg-shelf px-1.5 py-0.5 text-[16px] font-bold text-ink">ios/</code>. It is not on the App Store yet.
+                  Coming soon to the App Store. One account works on both, so a subscription on the web carries over to your iPhone.
                 </p>
                 <ul className="mt-5 grid grid-cols-1 gap-3 text-[17px]">
                   <li className="flex gap-3">
                     <span className="mt-2 h-2 w-2 flex-none rounded-full bg-blue" />
-                    <span>
-                      Open the Xcode project in <code className="font-bold">ios/</code>, pick your iPhone, and press Run.
-                    </span>
+                    <span>Finds the notes already in your Photos: book screenshots, whiteboards, handwritten pages.</span>
                   </li>
                   <li className="flex gap-3">
                     <span className="mt-2 h-2 w-2 flex-none rounded-full bg-blue" />
-                    <span>It scans your Screenshots album, photos of notes and whiteboards, and reads them on device.</span>
+                    <span>Brings in your Apple Notes with a one-tap Shortcut.</span>
                   </li>
                   <li className="flex gap-3">
                     <span className="mt-2 h-2 w-2 flex-none rounded-full bg-blue" />
-                    <span>Move your library between web and iPhone with Export and Import in Settings.</span>
+                    <span>Reads your pages right on the iPhone, with no upload needed.</span>
                   </li>
                 </ul>
               </div>
@@ -148,7 +146,7 @@ export default function Landing() {
 
         <section className="mx-auto w-full max-w-[1120px] px-4 py-24 text-center sm:px-6 sm:py-32">
           <h2 className="mx-auto max-w-[640px] text-[32px] font-black leading-tight tracking-tight sm:text-[40px]">Start with what you already saved.</h2>
-          <p className="mt-3 text-muted">No account. Your library stays on this device.</p>
+          <p className="mx-auto mt-3 max-w-[520px] text-muted">Importing and sorting your notes is free. Lessons and your study plan come with OpenStudy Plus: 7 days free, then $10 a month.</p>
           <Link href="/app" className="btn mt-8 min-w-[220px]">
             Start studying
           </Link>
@@ -159,6 +157,14 @@ export default function Landing() {
         <div className="mx-auto flex w-full max-w-[1120px] flex-col items-center justify-between gap-3 px-4 py-8 text-[14px] font-bold text-muted sm:flex-row sm:px-6">
           <Logo />
           <p>Made for the things you actually want to learn.</p>
+          <nav className="flex gap-4">
+            <Link href="/terms" className="hover:text-ink">
+              Terms
+            </Link>
+            <Link href="/privacy" className="hover:text-ink">
+              Privacy
+            </Link>
+          </nav>
         </div>
       </footer>
     </div>
