@@ -1,0 +1,650 @@
+{
+ "wordLists": [
+  {
+   "title": null,
+   "text": "Words I didn't know\nserendipity\nephemeral - lasting a very short time\n• laconic: using very few words\n1. obsequious – too eager to please",
+   "isWordList": true,
+   "words": [
+    {
+     "term": "serendipity"
+    },
+    {
+     "term": "ephemeral",
+     "definition": "lasting a very short time"
+    },
+    {
+     "term": "laconic",
+     "definition": "using very few words"
+    },
+    {
+     "term": "obsequious",
+     "definition": "too eager to please"
+    }
+   ]
+  },
+  {
+   "title": null,
+   "text": "Grocery list:\nmilk\neggs\nbread",
+   "isWordList": false
+  },
+  {
+   "title": "Vocab",
+   "text": "sonder\nlimerence\npetrichor",
+   "isWordList": true,
+   "words": [
+    {
+     "term": "sonder"
+    },
+    {
+     "term": "limerence"
+    },
+    {
+     "term": "petrichor"
+    }
+   ]
+  },
+  {
+   "title": null,
+   "text": "sonder\nlimerence",
+   "isWordList": false
+  },
+  {
+   "title": "BIO 101 glossary",
+   "text": "Mitochondria: the organelle that makes ATP\nRibosome: makes proteins from amino acids",
+   "isWordList": false
+  },
+  {
+   "title": null,
+   "text": "The Krebs cycle runs inside the mitochondria.\nIt makes ATP and NADH for the cell.",
+   "isWordList": false
+  },
+  {
+   "title": null,
+   "text": "ephemeral - lasting a very short time\nEphemeral\nlaconic: brief",
+   "isWordList": true,
+   "words": [
+    {
+     "term": "ephemeral",
+     "definition": "lasting a very short time"
+    },
+    {
+     "term": "laconic",
+     "definition": "brief"
+    }
+   ]
+  },
+  {
+   "title": null,
+   "text": "Vocab\nephemeral - lasting a very\nshort time\nlaconic - using very few words\nobsequious - too eager to\nplease\nsonder - realizing others have\nfull lives\npetrichor - the smell of rain\non dry earth",
+   "isWordList": true,
+   "words": [
+    {
+     "term": "ephemeral",
+     "definition": "lasting a very short time"
+    },
+    {
+     "term": "laconic",
+     "definition": "using very few words"
+    },
+    {
+     "term": "obsequious",
+     "definition": "too eager to please"
+    },
+    {
+     "term": "sonder",
+     "definition": "realizing others have full lives"
+    },
+    {
+     "term": "petrichor",
+     "definition": "the smell of rain on dry earth"
+    }
+   ]
+  }
+ ],
+ "titlesMatch": [
+  [
+   "Sapiens",
+   "Sapiens: A Brief History of Humankind",
+   true
+  ],
+  [
+   "The Obstacle Is the Way",
+   "Obstacle is the Way",
+   true
+  ],
+  [
+   "Atomic Habits",
+   "Atomic Habjts",
+   true
+  ],
+  [
+   "Atomic Habits",
+   "Deep Work",
+   false
+  ],
+  [
+   "BIO 101",
+   "BIO 102",
+   false
+  ],
+  [
+   "Harry Potter 1",
+   "Harry Potter 2",
+   false
+  ],
+  [
+   "Dune",
+   "Dune Messiah",
+   false
+  ],
+  [
+   "Meditations",
+   "Meditations (Penguin Classics)",
+   true
+  ],
+  [
+   "Thinking, Fast and Slow",
+   "Thinking Fast & Slow",
+   true
+  ],
+  [
+   "How to Win Friends",
+   "How to Win Friends and Influence People",
+   true
+  ]
+ ],
+ "sameAuthor": [
+  [
+   "James Clear",
+   "Clear, James",
+   true
+  ],
+  [
+   "J. Clear",
+   "James Clear",
+   true
+  ],
+  [
+   "by Ryan Holiday",
+   "Ryan Holiday",
+   true
+  ],
+  [
+   "Marcus Aurelius",
+   "Seneca",
+   false
+  ]
+ ],
+ "pageNumber": [
+  {
+   "footer": [
+    "Page 12 of 280"
+   ],
+   "header": [],
+   "n": 12
+  },
+  {
+   "footer": [
+    "12 of 280"
+   ],
+   "header": [],
+   "n": 12
+  },
+  {
+   "footer": [
+    "5 pages left in chapter"
+   ],
+   "header": [],
+   "n": null
+  },
+  {
+   "footer": [
+    "47"
+   ],
+   "header": [],
+   "n": 47
+  },
+  {
+   "footer": [
+    "p. 9"
+   ],
+   "header": [],
+   "n": 9
+  },
+  {
+   "footer": [
+    "43%"
+   ],
+   "header": [],
+   "n": null
+  },
+  {
+   "footer": [
+    "0"
+   ],
+   "header": [],
+   "n": null
+  },
+  {
+   "footer": [
+    "5 pages left in chapter",
+    "88"
+   ],
+   "header": [
+    "Chapter 3"
+   ],
+   "n": 88
+  },
+  {
+   "footer": [],
+   "header": [
+    "214"
+   ],
+   "n": 214
+  }
+ ],
+ "dHash": [
+  {
+   "pixels": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+   ],
+   "hash": "0000000000000000"
+  },
+  {
+   "pixels": [
+    8,
+    7,
+    6,
+    5,
+    4,
+    3,
+    2,
+    1,
+    0,
+    8,
+    7,
+    6,
+    5,
+    4,
+    3,
+    2,
+    1,
+    0,
+    8,
+    7,
+    6,
+    5,
+    4,
+    3,
+    2,
+    1,
+    0,
+    8,
+    7,
+    6,
+    5,
+    4,
+    3,
+    2,
+    1,
+    0,
+    8,
+    7,
+    6,
+    5,
+    4,
+    3,
+    2,
+    1,
+    0,
+    8,
+    7,
+    6,
+    5,
+    4,
+    3,
+    2,
+    1,
+    0,
+    8,
+    7,
+    6,
+    5,
+    4,
+    3,
+    2,
+    1,
+    0,
+    8,
+    7,
+    6,
+    5,
+    4,
+    3,
+    2,
+    1,
+    0
+   ],
+   "hash": "ffffffffffffffff"
+  },
+  {
+   "pixels": [
+    9,
+    0,
+    9,
+    0,
+    9,
+    0,
+    9,
+    0,
+    9,
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+   ],
+   "hash": "aa00000000000000"
+  }
+ ],
+ "hamming": [
+  [
+   "aa00000000000000",
+   "0000000000000000",
+   4
+  ],
+  [
+   "ffffffffffffffff",
+   "0000000000000000",
+   64
+  ],
+  [
+   "aa",
+   "aa00",
+   null
+  ]
+ ],
+ "detectionSummary": [
+  {
+   "groups": [
+    {
+     "title": "Atomic Habits",
+     "type": "book",
+     "pages": 3
+    },
+    {
+     "title": "Meditations",
+     "type": "book",
+     "pages": 2
+    },
+    {
+     "title": "BIO 101",
+     "type": "class",
+     "pages": 5
+    },
+    {
+     "title": "Words",
+     "type": "other",
+     "pages": 1
+    },
+    {
+     "title": "Work",
+     "type": "other",
+     "pages": 2
+    },
+    {
+     "title": "Loose notes",
+     "type": "other",
+     "pages": 1
+    },
+    {
+     "title": "Unsorted",
+     "type": "other",
+     "pages": 2
+    }
+   ],
+   "line": "Looks like 2 books, 1 class, 1 topic and 1 word list. 3 pages still need a home."
+  },
+  {
+   "groups": [
+    {
+     "title": "Unsorted",
+     "type": "other",
+     "pages": 1
+    }
+   ],
+   "line": "1 page still needs a home."
+  },
+  {
+   "groups": [],
+   "line": "Nothing to sort yet."
+  },
+  {
+   "groups": [
+    {
+     "title": "Dune",
+     "type": "book",
+     "pages": 4
+    }
+   ],
+   "line": "Looks like 1 book."
+  }
+ ],
+ "isVerbatim": [
+  [
+   "you do not rise",
+   "You do not rise to the level of your goals.",
+   false
+  ],
+  [
+   "do not  rise",
+   "You do not\nrise to the level",
+   true
+  ],
+  [
+   "“Hi” there",
+   "\"Hi\" there, friend",
+   true
+  ],
+  [
+   "ab",
+   "ab c",
+   false
+  ]
+ ],
+ "retrieve": {
+  "pages": [
+   {
+    "id": "a",
+    "text": "The Krebs cycle runs in the mitochondria and makes ATP."
+   },
+   {
+    "id": "b",
+    "text": "Stoics say virtue is the only good."
+   },
+   {
+    "id": "c",
+    "text": "Habits compound over time like interest."
+   }
+  ],
+  "question": "Where does the Krebs cycle happen?",
+  "top": [
+   "a"
+  ]
+ },
+ "connections": {
+  "lessons": [
+   {
+    "id": "L1",
+    "projectId": "P1",
+    "title": "Habits",
+    "statements": [
+     "Small habits compound into remarkable results over years.",
+     "Identity based habits start with who you want to become."
+    ]
+   },
+   {
+    "id": "L2",
+    "projectId": "P2",
+    "title": "Discipline",
+    "statements": [
+     "The Stoics built daily habits of reflection and discipline.",
+     "Discipline and habits shape the character of a person."
+    ]
+   },
+   {
+    "id": "L3",
+    "projectId": "P3",
+    "title": "Cells",
+    "statements": [
+     "The mitochondria produce ATP for the cell.",
+     "Ribosomes build proteins from amino acids."
+    ]
+   }
+  ],
+  "expect": [
+   {
+    "projects": [
+     "P1",
+     "P2"
+    ],
+    "lessons": [
+     "L1",
+     "L2"
+    ],
+    "terms": [
+     "habits"
+    ]
+   }
+  ]
+ }
+}

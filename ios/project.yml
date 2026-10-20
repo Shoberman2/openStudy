@@ -1,0 +1,112 @@
+name: OpenStudy
+options:
+  bundleIdPrefix: com.openstudy
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    SWIFT_STRICT_CONCURRENCY: minimal
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    DEVELOPMENT_TEAM: ""
+targets:
+  OpenStudy:
+    type: application
+    platform: iOS
+    sources:
+      - path: OpenStudy
+        excludes:
+          - Config/OpenStudy.storekit
+    settings:
+      configs:
+        # Accounts and billing server (spec 11.4). The simulator reaches the Mac's `next dev` on
+        # localhost; set the deployed URL for Release before shipping. Empty turns billing off.
+        Debug:
+          OPENSTUDY_SERVER: "http://localhost:3000"
+        Release:
+          OPENSTUDY_SERVER: ""
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.openstudy.shelf
+        PRODUCT_NAME: OpenStudy
+        INFOPLIST_FILE: OpenStudy/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_PREVIEWS: YES
+  OpenStudyTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: OpenStudyTests
+      - path: OpenStudy/Engine
+      - path: OpenStudy/Resources/sample-library.json
+        buildPhase: resources
+      - path: OpenStudy/Resources/categories.json
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.openstudy.shelf.tests
+        GENERATE_INFOPLIST_FILE: YES
+  OpenStudyAppTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: OpenStudyAppTests
+        excludes:
+          - Media/make.py
+      - path: OpenStudyTests/Fixtures/apple-notes.json
+        buildPhase: resources
+    dependencies:
+      - target: OpenStudy
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.openstudy.shelf.apptests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/OpenStudy.app/OpenStudy"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+  OpenStudyBillingTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: OpenStudyBillingTests
+      - path: OpenStudy/Config/OpenStudy.storekit
+        buildPhase: resources
+    dependencies:
+      - target: OpenStudy
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.openstudy.shelf.billingtests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/OpenStudy.app/OpenStudy"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+  OpenStudyUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: OpenStudyUITests
+    dependencies:
+      - target: OpenStudy
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.openstudy.shelf.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: OpenStudy
+schemes:
+  OpenStudy:
+    build:
+      targets:
+        OpenStudy: all
+        OpenStudyTests: [test]
+        OpenStudyAppTests: [test]
+        OpenStudyUITests: [test]
+        OpenStudyBillingTests: [test]
+    run:
+      storeKitConfiguration: OpenStudy/Config/OpenStudy.storekit
+    test:
+      targets:
+        - OpenStudyTests
+        - OpenStudyAppTests
+        - OpenStudyUITests
+        - OpenStudyBillingTests

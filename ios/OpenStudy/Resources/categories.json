@@ -1,0 +1,40 @@
+{
+ "genericFolders": ["notes", "note", "recently deleted", "quick notes", "icloud", "on my iphone", "on my mac", "general", "misc", "miscellaneous", "inbox", "untitled", "new folder", "all icloud", "shared"],
+ "coursePrefixes": {
+  "BIO": "Biology", "BIOL": "Biology", "MCB": "Biology",
+  "CHEM": "Chemistry", "CHE": "Chemistry", "CHM": "Chemistry",
+  "PHYS": "Physics", "PHY": "Physics", "ASTR": "Physics",
+  "MATH": "Math", "MAT": "Math", "STAT": "Math", "STATS": "Math",
+  "CS": "Computer Science", "CSE": "Computer Science", "COMP": "Computer Science", "CPSC": "Computer Science", "COS": "Computer Science", "EECS": "Computer Science",
+  "MED": "Medicine & Health", "NURS": "Medicine & Health", "ANAT": "Medicine & Health", "PHAR": "Medicine & Health", "KIN": "Medicine & Health",
+  "PSY": "Psychology", "PSYC": "Psychology", "PSYCH": "Psychology",
+  "PHIL": "Philosophy",
+  "HIST": "History", "HIS": "History",
+  "POL": "Politics & Law", "POLS": "Politics & Law", "POLI": "Politics & Law", "LAW": "Politics & Law", "GOV": "Politics & Law",
+  "ECON": "Economics & Business", "ECO": "Economics & Business", "BUS": "Economics & Business", "MGMT": "Economics & Business", "FIN": "Economics & Business", "ACCT": "Economics & Business", "MKTG": "Economics & Business",
+  "ENG": "Literature & Writing", "ENGL": "Literature & Writing", "LIT": "Literature & Writing", "WRIT": "Literature & Writing",
+  "SPAN": "Languages", "FREN": "Languages", "GER": "Languages", "LING": "Languages", "JPN": "Languages", "CHIN": "Languages", "LAT": "Languages",
+  "REL": "Religion & Spirituality", "RELS": "Religion & Spirituality", "THEO": "Religion & Spirituality",
+  "ART": "Art & Music", "ARTH": "Art & Music", "MUS": "Art & Music", "MUSC": "Art & Music",
+  "GEO": "Earth & Environment", "GEOL": "Earth & Environment", "ENVS": "Earth & Environment", "ENV": "Earth & Environment"
+ },
+ "categories": [
+  { "name": "Biology", "words": ["cell", "cells", "organelle", "mitochondria", "membrane", "protein", "enzyme", "gene", "genes", "genetic", "dna", "rna", "chromosome", "mitosis", "meiosis", "evolution", "species", "organism", "ribosome", "nucleus", "photosynthesis", "metabolism", "bacteria", "virus", "tissue", "cytoplasm", "allele", "mutation", "ecosystem", "biology", "atp"] },
+  { "name": "Chemistry", "words": ["molecule", "atom", "atomic", "electron", "proton", "neutron", "bond", "covalent", "ionic", "reaction", "compound", "element", "periodic", "acid", "base", "solution", "molar", "mole", "oxidation", "reduction", "catalyst", "equilibrium", "isotope", "chemical", "chemistry", "organic", "valence", "titration"] },
+  { "name": "Physics", "words": ["force", "mass", "velocity", "acceleration", "momentum", "gravity", "gravitational", "newton", "quantum", "particle", "wave", "frequency", "wavelength", "photon", "relativity", "electric", "magnetic", "field", "circuit", "voltage", "thermodynamics", "entropy", "kinetic", "potential", "friction", "physics", "joule", "orbit"] },
+  { "name": "Math", "words": ["equation", "theorem", "proof", "function", "derivative", "integral", "calculus", "algebra", "matrix", "vector", "polynomial", "probability", "statistics", "variable", "graph", "limit", "linear", "geometry", "triangle", "angle", "prime", "integer", "fraction", "variance", "mean", "median", "lemma", "math", "mathematics"] },
+  { "name": "Computer Science", "words": ["algorithm", "code", "coding", "program", "programming", "software", "computer", "data", "database", "function", "variable", "array", "loop", "compiler", "runtime", "server", "api", "network", "binary", "recursion", "complexity", "javascript", "python", "swift", "query", "debug", "frontend", "backend", "neural", "model", "training"] },
+  { "name": "Medicine & Health", "words": ["patient", "disease", "symptom", "diagnosis", "treatment", "drug", "dose", "clinical", "blood", "heart", "brain", "muscle", "bone", "nutrition", "diet", "protein", "sleep", "exercise", "workout", "health", "healthy", "immune", "infection", "anatomy", "hormone", "insulin", "calorie", "fitness", "medicine"] },
+  { "name": "Psychology", "words": ["psychology", "cognitive", "behavior", "behaviour", "emotion", "emotional", "memory", "perception", "bias", "brain", "anxiety", "depression", "personality", "motivation", "conditioning", "stimulus", "response", "therapy", "unconscious", "attachment", "self", "mind", "mental", "trauma", "freud", "habit", "dopamine"] },
+  { "name": "Philosophy", "words": ["philosophy", "virtue", "reason", "soul", "ethics", "ethical", "moral", "morality", "truth", "existence", "metaphysics", "epistemology", "stoic", "stoicism", "nature", "wisdom", "justice", "plato", "aristotle", "socrates", "kant", "nietzsche", "seneca", "death", "fate", "universe", "logos"] },
+  { "name": "History", "words": ["war", "empire", "century", "king", "queen", "revolution", "dynasty", "ancient", "medieval", "colonial", "battle", "treaty", "civilization", "roman", "rome", "greek", "history", "historical", "monarchy", "republic", "independence", "slavery", "army", "conquest", "reign", "era"] },
+  { "name": "Politics & Law", "words": ["government", "law", "legal", "court", "constitution", "rights", "democracy", "election", "vote", "policy", "political", "politics", "congress", "parliament", "president", "senate", "justice", "contract", "statute", "liability", "tort", "regulation", "citizen", "state", "federal"] },
+  { "name": "Economics & Business", "words": ["market", "price", "demand", "supply", "economy", "economic", "inflation", "interest", "money", "investment", "invest", "investor", "stock", "capital", "business", "company", "customer", "revenue", "profit", "startup", "marketing", "sales", "growth", "product", "strategy", "management", "finance", "wealth", "trade", "cost"] },
+  { "name": "Self-improvement", "words": ["habit", "habits", "goal", "goals", "success", "successful", "productivity", "focus", "discipline", "confidence", "mindset", "routine", "motivation", "leadership", "relationship", "friend", "friends", "conversation", "smile", "appreciation", "praise", "criticism", "listen", "influence", "happiness", "happy", "change", "improve"] },
+  { "name": "Literature & Writing", "words": ["novel", "poem", "poetry", "poet", "story", "character", "narrator", "plot", "theme", "metaphor", "author", "writing", "writer", "chapter", "prose", "verse", "fiction", "literary", "literature", "tragedy", "comedy", "shakespeare", "sentence", "essay", "rhetoric"] },
+  { "name": "Languages", "words": ["verb", "noun", "adjective", "tense", "conjugation", "vocabulary", "grammar", "pronunciation", "translation", "spanish", "french", "german", "japanese", "chinese", "italian", "korean", "latin", "phrase", "fluent", "language", "plural", "masculine", "feminine", "subjunctive"] },
+  { "name": "Religion & Spirituality", "words": ["god", "faith", "prayer", "spiritual", "spirit", "church", "bible", "scripture", "jesus", "christ", "buddha", "buddhism", "meditation", "religion", "religious", "sacred", "divine", "heaven", "sin", "grace", "karma", "torah", "quran", "worship"] },
+  { "name": "Art & Music", "words": ["art", "artist", "painting", "paint", "drawing", "color", "colour", "composition", "design", "sculpture", "museum", "music", "musical", "chord", "melody", "rhythm", "harmony", "scale", "note", "song", "piano", "guitar", "film", "photography", "aesthetic"] },
+  { "name": "Earth & Environment", "words": ["climate", "carbon", "emission", "environment", "environmental", "ocean", "atmosphere", "weather", "rock", "mineral", "plate", "tectonic", "volcano", "earthquake", "soil", "water", "river", "forest", "biodiversity", "pollution", "renewable", "sustainability", "geology", "glacier"] }
+ ]
+}

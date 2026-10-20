@@ -1,0 +1,38 @@
+// Reads every Apple Note on this Mac as an OpenStudy NotesExport (shared/SPEC.md 9.2).
+// Run: osascript -l JavaScript scripts/apple-notes.jxa
+// Properties are fetched per folder in bulk (one Apple Event each), which is much faster than per note.
+function run() {
+  const Notes = Application("Notes");
+  const seen = {};
+  const out = [];
+  const iso = (d) => (d && d.toISOString ? d.toISOString() : undefined);
+
+  function readFolder(f) {
+    let name = "";
+    try { name = f.name(); } catch (e) { return; }
+    if (name === "Recently Deleted") return;
+    const ns = f.notes;
+    let ids = [], titles = [], bodies = [], created = [], modified = [];
+    try {
+      ids = ns.id(); titles = ns.name(); bodies = ns.body(); created = ns.creationDate(); modified = ns.modificationDate();
+    } catch (e) {
+      // A locked note can fail the bulk read; fall back to one note at a time and skip the ones that fail.
+      ids = []; titles = []; bodies = []; created = []; modified = [];
+      for (const n of ns()) {
+        try {
+          const id = n.id(), t = n.name(), b = n.body(), c = n.creationDate(), m = n.modificationDate();
+          ids.push(id); titles.push(t); bodies.push(b); created.push(c); modified.push(m);
+        } catch (e2) { /* locked or unreadable */ }
+      }
+    }
+    for (let i = 0; i < ids.length; i++) {
+      if (seen[ids[i]]) continue;
+      seen[ids[i]] = true;
+      out.push({ id: ids[i], title: titles[i], folder: name, created: iso(created[i]), modified: iso(modified[i]), html: bodies[i] });
+    }
+    try { for (const sub of f.folders()) readFolder(sub); } catch (e) { /* no subfolders */ }
+  }
+
+  for (const acc of Notes.accounts()) for (const f of acc.folders()) readFolder(f);
+  return JSON.stringify({ openstudyNotes: 1, exportedAt: new Date().toISOString(), notes: out });
+}
