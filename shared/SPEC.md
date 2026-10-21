@@ -313,6 +313,8 @@ Goal: one tap finds the notes a person already has (Photos, Apple Notes) and tur
   , End Repeat, Combine Text with New Lines, Copy to Clipboard, Open URL `openstudy://import-notes`. "Paste from Notes" also accepts this text.
 - **Bridge text parsing**: split on lines that are exactly `=== OpenStudy note ===`; within a chunk, optional leading `Title:` and `Folder:` lines; the rest is the body; drop the body's first line if it equals the title. `noteId = "sc:" + fnv1a32hex(title + "\n" + body.slice(0, 200))`.
 
+- Reading speed (iOS): images are read in batches of up to 4 at once (Vision runs each on its own thread) and added in their original order. The progress screen shows the moment photos are picked or the Photos sweep starts, before photo access, library listing or iCloud downloads finish.
+
 ### 9.3 Notes to pages
 For each note (skip folder "Recently Deleted", skip notes whose `noteId` is already in the library, skip bodies < 8 words):
 1. Body text: `text` if present, else `html` stripped (block tags and `<br>` become newlines, `<h1-3>` become `#` headings). The note title is the first non-empty line when `title` is missing; drop the body's first line if it equals the title.
@@ -440,7 +442,7 @@ Ported from the sibling project `~/BookSaver` (web `src/lib/words.ts`, `hash.ts`
 - Shows: name (editable, stored in `profile.name?: string`, default from the account or empty), email when signed in, member since (first event date), stats (total XP, current and longest streak, projects, cards learned = cards with reps >= 1, sessions done), subscription status line ("Free trial: 5 days left", "OpenStudy Plus, renews Nov 20", "Free for you" for comped accounts, "Not subscribed"), buttons: Manage subscription (iOS: `AppStore.showManageSubscriptions`; web: Stripe customer portal), Restore purchases (iOS), Sign in / Sign out, Delete account (confirm; deletes the server account, keeps the local library).
 
 ### 11.4 Accounts
-- Provider: Supabase Auth (one project for web and iOS). Methods: Sign in with Apple (iOS native, web via OAuth) and email magic link. The library stays local (no sync in this version); the account exists for the subscription.
+- Provider: Supabase Auth (one project for web and iOS). Methods: Sign in with Apple (iOS native, web via OAuth) and email magic link. The email holds only a link: Supabase's free plan with its built-in mailer can't change the email template, so there is no code to type. The iOS link redirects to `openstudy://auth-callback` (PKCE), the web link to `/auth/callback`; both are in the project's redirect allow list, and the site URL is the production domain. Adding a code needs a custom SMTP provider. The library stays local (no sync in this version); the account exists for the subscription.
 - Server table `entitlements (user_id uuid pk references auth.users, status text /* trialing|active|past_due|canceled|expired|comp */, source text /* apple|stripe|comp */, product text, renews_at timestamptz, trial_ends_at timestamptz, original_transaction_id text, stripe_customer_id text, updated_at timestamptz)`. Row level security: a user can read only their own row; only the server (service role) writes.
 - `GET /api/me` (Supabase JWT in `Authorization: Bearer`) -> `{user: {id, email}, entitlement: {active: boolean, status, source, renewsAt?, trialEndsAt?}}`. `active` = status in (trialing, active, comp) and not past its end date.
 - **Comp (free for the owner)**: env `OPENSTUDY_COMP_EMAILS` (comma separated, case-insensitive). `/api/me` returns `status: "comp", active: true` for those emails, with no purchase. The owner's emails go there (ancientbest@gmail.com, shoberman@icloud.com).
@@ -454,3 +456,41 @@ Ported from the sibling project `~/BookSaver` (web `src/lib/words.ts`, `hash.ts`
 - Offline grace: the last known entitlement is cached locally with its end date; when the server cannot be reached the cached state is used until that date + 3 days.
 - Events: `paywall_view {from}`, `trial_start {source}`, `subscribe {source}`, `paywall_close {}`, `restore {ok}`. Cohort metric: trial starts by week, and the share converting to paid at day 8.
 - Without Supabase/Stripe/Apple configured (env vars missing) the server routes return 503 `{error: "billing_off"}` and clients treat everything as unlocked (development builds only; a release build with billing off shows the paywall's "Not available yet" state).
+
+## 12. v6: password accounts, welcome email, usage data and the OpenStudy MCP (OVERRIDES 11.4 where they conflict)
+
+### 12.1 Email and password
+- Sign-in is email + password on both platforms. No codes, no sign-in links, no confirmation email: the Supabase project has `mailer_autoconfirm` on, so sign-up returns a session at once. (The built-in mailer allows only a few emails an hour, which caused "too many emails".)
+- One screen with two modes: "Create account" (email, password of 8+ characters) and "Sign in". Errors: "That email already has an account. Sign in instead." / "Wrong email or password." / "Use at least 8 characters." / "Could not reach OpenStudy. Check your connection."
+- iOS: Supabase REST `POST /auth/v1/signup {email,password}` and `POST /auth/v1/token?grant_type=password {email,password}`. Web: `supabase.auth.signUp` / `signInWithPassword`.
+- Forgot password: `POST /api/auth/reset {email}` always answers `{ok:true}`; when the account exists and email is set up, the server makes a recovery link (`auth.admin.generateLink({type:"recovery"})`, redirect `/auth/reset`) and sends it through Resend. `/auth/reset` (web page, works from the iPhone's browser too) sets the new password. Without email set up the client says "Password reset by email is not set up yet. Write to support."
+- After a successful sign-up the client calls `POST /api/welcome` (Bearer token). The server sends the welcome email once per user (`app_metadata.welcomed_at`), logs a `signup` event, and answers `{sent: boolean}`. A failed welcome never blocks sign-up.
+
+### 12.2 Welcome email (Resend)
+- From `OpenStudy <hello@${OPENSTUDY_MAIL_DOMAIN}>` when that env var is set, else `OpenStudy <onboarding@resend.dev>` (Resend only delivers that to the Resend account's own address until a domain is verified).
+- Subject "Welcome to OpenStudy". Body: one short paragraph (what OpenStudy does), three steps (add your notes, sort them into books and classes, study a few minutes a day), the trial line "Lessons and your study plan come with OpenStudy Plus: 7 days free, then $10 a month.", and a button to open the app (`https://openstudy-psi.vercel.app/app`). Plain HTML, no images.
+
+### 12.3 Usage data
+- Every client already keeps `library.events` (`{t, name, props}`). Those events are also sent to the server, so the owner can see how OpenStudy is used. Never sent: page text, titles, authors, file names, word lists, answers, emails typed into the library. Props are categories and counts only.
+- Client: an `installId` (random UUID, made once, kept in localStorage / UserDefaults) and a cursor (the `t` of the last event sent). Events after the cursor go in batches of at most 200 to `POST /api/events` `{installId, platform: "web"|"ios", appVersion, events:[{t,name,props}]}`, with the Supabase Bearer token when signed in. Sent 3 seconds after an event is logged (debounced), on app start and when the app goes to the background. A failed send keeps the cursor, so it retries later.
+- Opt out: Profile has "Share usage data" (on by default). Off means nothing is sent and the cursor jumps to now when it is turned back on (past events stay private).
+- Server sanitizes before storing: `name` matches `^[a-z_]{2,40}$`; props keep only allowlisted keys: kind, source, scope, from, type, category, types, categories, lessonKind, level, goal, practice, bringing, dailyGoalXP, count, pages, lessons, projects, files, skipped, duplicates, checked, found, accuracy, seconds, xp, questions, yes, ok, smart, grounded, groups, books, classes, others, words. Values: numbers, booleans, or strings up to 60 characters (strings only for: kind, source, scope, from, type, category, types, categories, lessonKind, goal, practice, bringing). Unknown keys are dropped. Max 200 events per request, `t` must be within the last 30 days and not more than 1 day ahead. Table `events (id bigserial, t timestamptz, received_at, install_id uuid, user_id uuid null, platform text, app_version text, name text, props jsonb)`, service-role only (RLS on, no policies).
+- New or richer events, same names on both platforms:
+  - `import`: `kind` (photo, scan, camera, screenshot, files, note, words, notes_app, paste), `count`, `skipped`, `duplicates`, and for files `types` like `"pdf:2,image:5,pptx:1"` (by extension group: pdf, image, pptx, docx, text, json, other).
+  - `sort_done` when the Sort screen first groups a set of new pages: `pages`, `groups`, `books`, `classes`, `others`, `categories` (comma list of group categories, e.g. "Biology,Reading,Work").
+  - `project_created`: `type` (book, class, other), `category`, `pages`, `lessons`.
+  - `category_changed`: `category` (the new one).
+  - `signup` (server), `sign_in` (client, after a password sign-in), `app_open` (client, once per launch).
+- The privacy page lists this.
+
+### 12.4 OpenStudy MCP (owner analytics)
+- Remote MCP server at `/api/mcp` (Streamable HTTP, stateless), for Claude Code, Claude Desktop/claude.ai custom connectors and Codex. Auth: `Authorization: Bearer ${OPENSTUDY_MCP_TOKEN}`; without the env var the route answers 503, with a wrong token 401. Read-only.
+- Tools (all take `days`, default 30, max 365, except where noted):
+  - `overview`: accounts (total, new in window), installs active in window by platform, Plus (trialing, active, comp, canceled), events in window, top 10 event names.
+  - `uploads`: `import` events grouped by kind and by file type (`types`), with pages added, skipped and duplicates; split by platform; per-day series.
+  - `sorting`: `project_created` by type and by category, `sort_done` group mix, `category_changed` targets, and the share of pages that end up in projects.
+  - `funnel`: weekly install cohorts (`weeks`, default 8): installs, then % with an import, % with a project, % with a finished session, % signed up, % on Plus. Each step counts installs, not events.
+  - `study`: sessions and reviews finished, average accuracy, minutes, XP, by lesson kind.
+  - `events`: raw recent events, optional `name`, `platform`, `limit` (default 50, max 500).
+  - `users`: accounts with created date, Plus status, last event time and event count; optional `email` substring; `limit` default 50.
+- Connect: Claude Code `claude mcp add --transport http openstudy https://openstudy-psi.vercel.app/api/mcp --header "Authorization: Bearer <token>"`; Codex `~/.codex/config.toml` `[mcp_servers.openstudy] url = ".../api/mcp"`, `bearer_token_env_var = "OPENSTUDY_MCP_TOKEN"`.

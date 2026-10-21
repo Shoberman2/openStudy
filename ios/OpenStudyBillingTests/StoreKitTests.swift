@@ -64,15 +64,23 @@ final class StoreKitTests: XCTestCase {
         XCTAssertEqual(r, .unavailable)
     }
 
-    func testPKCEChallengeMatchesRFC7636() {
-        XCTAssertEqual(SupabaseAuth.challenge(for: "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"), "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM")
-        XCTAssertGreaterThanOrEqual(SupabaseAuth.randomVerifier().count, 43)
+    /// Supabase Auth error bodies map to the sign-in screen's copy (spec 12.1).
+    func testPasswordAuthErrors() {
+        func err(_ status: Int, _ json: String) -> SupabaseAuth.AuthError { SupabaseAuth.error(status: status, body: Data(json.utf8)) }
+        XCTAssertEqual(err(422, #"{"code":422,"error_code":"user_already_exists","msg":"User already registered"}"#), .alreadyExists)
+        XCTAssertEqual(err(400, #"{"code":400,"error_code":"invalid_credentials","msg":"Invalid login credentials"}"#), .wrongCredentials)
+        XCTAssertEqual(err(422, #"{"error_code":"weak_password","msg":"Password should be at least 8 characters."}"#), .weakPassword)
+        XCTAssertEqual(err(429, #"{"error_code":"over_request_rate_limit"}"#), .rateLimited)
+        XCTAssertEqual(err(500, "oops"), .server)
+        XCTAssertEqual(AccountController.message(for: .alreadyExists), "That email already has an account. Sign in instead.")
+        XCTAssertEqual(AccountController.message(for: .wrongCredentials), "Wrong email or password.")
+        XCTAssertEqual(AccountController.message(for: .network), "Could not reach OpenStudy. Check your connection.")
     }
 
-    func testSignInLinkParsing() {
-        XCTAssertEqual(SupabaseAuth.callbackCode(URL(string: "openstudy://auth-callback?code=abc-123")!), "abc-123")
-        XCTAssertNil(SupabaseAuth.callbackCode(URL(string: "openstudy://import-notes")!))
-        XCTAssertNil(SupabaseAuth.callbackCode(URL(string: "https://evil.example/auth-callback?code=x")!))
+    func testPasswordFormCheck() {
+        XCTAssertEqual(AccountController.check(email: "me", password: "longenough"), "Enter your email address.")
+        XCTAssertEqual(AccountController.check(email: "me@x.com", password: "short"), "Use at least 8 characters.")
+        XCTAssertNil(AccountController.check(email: " me@x.com ", password: "12345678"))
     }
 }
 

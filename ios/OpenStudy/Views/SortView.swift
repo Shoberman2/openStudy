@@ -108,7 +108,10 @@ struct SortView: View {
         let known = Set(groups.flatMap(\.pageIds))
         let fresh = store.library.inbox.filter { !known.contains($0.id) }
         guard !fresh.isEmpty else { return }
-        for g in Grouper.group(fresh) {
+        let found = Grouper.group(fresh)
+        // What people sort their pages into, as counts and categories only (spec 12.3).
+        store.library.log("sort_done", Usage.sortProps(found.map { ($0.type, $0.category, $0.pageIds.count) }))
+        for g in found {
             if let i = groups.firstIndex(where: { $0.title.lowercased() == g.title.lowercased() }) { groups[i].pageIds += g.pageIds }
             else { groups.append(g) }
         }

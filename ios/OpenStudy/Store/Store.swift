@@ -177,7 +177,8 @@ final class Store: ObservableObject {
             UserDefaults.standard.removeObject(forKey: Self.pendingExamKey)
         }
         let p = library.createProject(title: title, author: author, pageIds: pageIds, build: build, focus: focus, quotes: quotes, type: type, goalDate: goal, category: category)
-        library.log("project_created", ["pages": .number(Double(pageIds.count)), "lessons": .number(Double(library.lessons(of: p.id).count))])
+        library.log("project_created", ["type": .string(type), "category": .string(p.category ?? category ?? "General"),
+                                        "pages": .number(Double(pageIds.count)), "lessons": .number(Double(library.lessons(of: p.id).count))])
         if asked { library.log("quotes_answer", ["yes": .bool(!(quotes ?? []).isEmpty)]) }
         return p
     }
@@ -285,7 +286,7 @@ final class Store: ObservableObject {
         let c = category.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !c.isEmpty, let i = library.projects.firstIndex(where: { $0.id == id }), library.projects[i].category != c else { return }
         library.projects[i].category = c
-        library.log("category_changed", ["projectId": .string(id)])
+        library.log("category_changed", ["category": .string(c)])
     }
 
     /// Category names on the shelf, then the built-in ones, for suggestions.

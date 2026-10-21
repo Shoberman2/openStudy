@@ -103,7 +103,7 @@ export default function ProjectPage() {
               logEvent(
                 { ...l, projects: l.projects.map((x) => (x.id === project.id ? { ...x, category } : x)) },
                 "category_changed",
-                { projectId: project.id },
+                { projectId: project.id, category },
               ),
             )
           }

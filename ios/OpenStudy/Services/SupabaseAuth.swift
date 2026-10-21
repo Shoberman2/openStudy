@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 import Security
 
@@ -42,16 +41,17 @@ struct AuthSession: Codable, Equatable {
     var email: String?
 }
 
-/// Supabase Auth over its REST API (spec 11.4): email sign-in link (PKCE) and the 6-digit code,
-/// refresh and sign out. A small direct client instead of supabase-swift: the app needs five
-/// endpoints, and this keeps the project free of third-party packages like the rest of it.
-/// Apple sign-in can be added later as one more grant (`id_token`) on the same token endpoint.
+/// Supabase Auth over its REST API (spec 12.1): email + password sign-up and sign-in, refresh and
+/// sign out. A small direct client instead of supabase-swift: the app needs four endpoints, and
+/// this keeps the project free of third-party packages like the rest of it. The project has email
+/// confirmation off, so sign-up returns a session at once.
 struct SupabaseAuth {
     let url: URL
     let key: String
-    static let redirect = "openstudy://auth-callback"
 
-    enum AuthError: Error, Equatable { case network, rateLimited, invalid, server }
+    enum AuthError: Error, Equatable { case network, rateLimited, invalid, alreadyExists, wrongCredentials, weakPassword, server }
+
+    static let minPassword = 8
 
     private func request(_ path: String, query: [URLQueryItem] = [], body: [String: Any]?, token: String? = nil) -> URLRequest {
         var c = URLComponents(url: url.appendingPathComponent("auth/v1/" + path), resolvingAgainstBaseURL: false)!
@@ -71,29 +71,30 @@ struct SupabaseAuth {
         do { (data, resp) = try await URLSession.shared.data(for: r) } catch { throw AuthError.network }
         let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
         if (200..<300).contains(code) { return data }
-        if code == 429 { throw AuthError.rateLimited }
-        if (400..<500).contains(code) { throw AuthError.invalid }
-        throw AuthError.server
+        throw Self.error(status: code, body: data)
     }
 
-    /// Sends the sign-in email. Returns the PKCE verifier to keep until the link comes back.
-    func sendSignInEmail(_ email: String) async throws -> String {
-        let verifier = Self.randomVerifier()
-        let challenge = Self.challenge(for: verifier)
-        _ = try await send(request("otp", query: [URLQueryItem(name: "redirect_to", value: Self.redirect)], body: [
-            "email": email, "create_user": true, "code_challenge": challenge, "code_challenge_method": "s256",
-        ]))
-        return verifier
+    /// Maps a Supabase Auth error response to what the screen says.
+    static func error(status: Int, body: Data) -> AuthError {
+        // `code` is a number in some responses and a string in others, so read loosely.
+        let b = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any] ?? [:]
+        let code = ((b["error_code"] ?? b["code"] ?? b["error"]) as? String ?? "").lowercased()
+        let text = ((b["msg"] ?? b["message"] ?? b["error_description"]) as? String ?? "").lowercased()
+        if status == 429 || code.contains("rate_limit") { return .rateLimited }
+        if code == "user_already_exists" || code == "email_exists" || text.contains("already registered") { return .alreadyExists }
+        if code == "invalid_credentials" || code == "invalid_grant" || text.contains("invalid login") { return .wrongCredentials }
+        if code == "weak_password" || text.contains("password should") { return .weakPassword }
+        if (400..<500).contains(status) { return .invalid }
+        return .server
     }
 
-    func verifyCode(email: String, code: String) async throws -> AuthSession {
-        try decodeSession(try await send(request("verify", body: ["type": "email", "email": email, "token": code])))
+    func signUp(email: String, password: String) async throws -> AuthSession {
+        try decodeSession(try await send(request("signup", body: ["email": email, "password": password])))
     }
 
-    /// Finishes the sign-in link: `openstudy://auth-callback?code=...`.
-    func exchange(code: String, verifier: String) async throws -> AuthSession {
-        try decodeSession(try await send(request("token", query: [URLQueryItem(name: "grant_type", value: "pkce")],
-                                                  body: ["auth_code": code, "code_verifier": verifier])))
+    func signIn(email: String, password: String) async throws -> AuthSession {
+        try decodeSession(try await send(request("token", query: [URLQueryItem(name: "grant_type", value: "password")],
+                                                  body: ["email": email, "password": password])))
     }
 
     func refresh(_ s: AuthSession) async throws -> AuthSession {
@@ -112,31 +113,9 @@ struct SupabaseAuth {
         return AuthSession(accessToken: t.access_token, refreshToken: t.refresh_token,
                            expiresAt: Date().addingTimeInterval(t.expires_in), userId: t.user.id, email: t.user.email)
     }
-
-    static func randomVerifier() -> String {
-        var bytes = [UInt8](repeating: 0, count: 48)
-        _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
-        return base64url(Data(bytes))
-    }
-
-    static func challenge(for verifier: String) -> String {
-        base64url(Data(SHA256.hash(data: Data(verifier.utf8))))
-    }
-
-    static func base64url(_ d: Data) -> String {
-        d.base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
-            .replacingOccurrences(of: "=", with: "")
-    }
-
-    /// The `code` from a sign-in link, if this URL is one.
-    static func callbackCode(_ url: URL) -> String? {
-        guard url.scheme == "openstudy", url.host == "auth-callback",
-              let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems else { return nil }
-        return items.first(where: { $0.name == "code" })?.value
-    }
 }
 
-/// Keychain storage for the session and the pending PKCE verifier.
+/// Keychain storage for the session.
 enum Keychain {
     private static let service = "com.openstudy.shelf.auth"
 
@@ -160,10 +139,5 @@ enum Keychain {
     static var session: AuthSession? {
         get { get("session").flatMap { try? JSONDecoder().decode(AuthSession.self, from: $0) } }
         set { set(newValue.flatMap { try? JSONEncoder().encode($0) }, for: "session") }
-    }
-
-    static var pendingVerifier: String? {
-        get { get("pkce").flatMap { String(data: $0, encoding: .utf8) } }
-        set { set(newValue.map { Data($0.utf8) }, for: "pkce") }
     }
 }

@@ -1,5 +1,6 @@
 import Foundation
 import PDFKit
+import PhotosUI
 import Photos
 import ImageIO
 import SwiftUI
@@ -115,9 +116,11 @@ final class Importer: ObservableObject {
         self.total = total; self.stage = stage
     }
 
-    private func finish(kind: String) {
+    /// Ends an import and logs it (spec 12.3): `kind` is the source, `extra` adds category props such as file `types`.
+    private func finish(kind: String, extra: [String: JSONValue] = [:]) {
         running = false
-        store?.library.log("import", ["kind": .string(kind), "count": .number(Double(imported)), "skipped": .number(Double(skipped)), "duplicates": .number(Double(duplicates))])
+        let props: [String: JSONValue] = ["kind": .string(kind), "count": .number(Double(imported)), "skipped": .number(Double(skipped)), "duplicates": .number(Double(duplicates))]
+        store?.library.log("import", props.merging(extra) { $1 })
         var m = "Added \(imported) \(imported == 1 ? "page" : "pages")"
         if files > 1 { m += " from \(files) files" }
         m += "."
@@ -146,10 +149,20 @@ final class Importer: ObservableObject {
         return r >= 1.9 && r <= 2.35
     }
 
-    /// Reads one image. Smart organize (Claude vision via /api/read) first when available, else Vision.
+    /// A read page waiting to be added, with the image it came from.
+    struct ReadPage { var page: Page; var image: UIImage }
+
+    /// Reads and adds one image.
     @discardableResult
     func ingest(_ input: ImageInput) async -> Bool {
-        guard let store else { return false }
+        guard let r = await read(input) else { return false }
+        return commit(r)
+    }
+
+    /// Reads one image. Smart organize (Claude vision via /api/read) first when available, else Vision.
+    /// Nothing is added yet, so several reads can run at once and still land in order.
+    func read(_ input: ImageInput) async -> ReadPage? {
+        guard let store else { return nil }
         let img = input.image
         var text = ""
         var heading: String?
@@ -175,7 +188,7 @@ final class Importer: ObservableObject {
             }
         }
         // Photos are never skipped as "not a book page"; only when there is (almost) no text.
-        guard TextKit.wordCount(text) >= 5 else { skipped += 1; return false }
+        guard TextKit.wordCount(text) >= 5 else { skipped += 1; return nil }
         let id = IDGen.make()
         var page = Page(id: id, kind: kind, text: text, header: header, assetId: input.assetId,
                         createdAt: ISO.string(input.date ?? Date()), sourceName: input.sourceName, heading: kind == "photo" ? heading : nil,
@@ -184,11 +197,52 @@ final class Importer: ObservableObject {
         let source = rawLines ?? text
         let list = WordList.parse(source, title: input.sourceName)
         if list.isWordList { page.text = WordList.pageText(source); page.words = list.words; page.heading = Grouper.words }
+        return ReadPage(page: page, image: img)
+    }
+
+    /// Adds a read page unless it duplicates one already here (spec 10.3).
+    @discardableResult
+    func commit(_ r: ReadPage) -> Bool {
+        guard let store else { return false }
+        var page = r.page
         if dupIndex.isDuplicate(page) { duplicates += 1; return false }
-        page.image = store.saveImage(img, id: id)
+        page.image = store.saveImage(r.image, id: page.id)
         store.library.pages.append(page)
         imported += 1
         return true
+    }
+
+    /// Images read at once. Vision runs each read on its own thread, so this is most of the speedup.
+    static let readWidth = min(4, max(2, ProcessInfo.processInfo.activeProcessorCount / 2))
+
+    /// Loads and reads a batch at once, returning reads in input order. `load` returns nil when
+    /// there is nothing to read (an unreadable file, or a photo with no notes).
+    private func readBatch<T>(_ items: ArraySlice<T>, load: @escaping (T) async -> ImageInput?) async -> [ReadPage?] {
+        await withTaskGroup(of: (Int, ReadPage?).self) { group in
+            for (i, item) in items.enumerated() {
+                group.addTask {
+                    guard let input = await load(item) else { return (i, nil) }
+                    return (i, await self.read(input))
+                }
+            }
+            var out = [ReadPage?](repeating: nil, count: items.count)
+            for await (i, r) in group { out[i] = r }
+            return out
+        }
+    }
+
+    /// Reads `items` a batch at a time, adding each page in order and counting progress.
+    private func readAll<T>(_ items: [T], load: @escaping (T) async -> ImageInput?, added: (T, Bool) -> Void = { _, _ in }) async {
+        var start = 0
+        while start < items.count, !cancelled {
+            let batch = items[start..<min(start + Self.readWidth, items.count)]
+            let reads = await readBatch(batch, load: load)
+            for (item, r) in zip(batch, reads) {
+                added(item, r.map(commit) ?? false)
+                done += 1
+            }
+            start += batch.count
+        }
     }
 
     func importImages(_ inputs: [ImageInput], kind: String = "photo") async {
@@ -196,23 +250,28 @@ final class Importer: ObservableObject {
         let known = store.knownAssetIds
         let fresh = inputs.filter { $0.assetId.map { !known.contains($0) } ?? true }
         begin(total: fresh.count)
-        for item in fresh {
-            if cancelled { break }
-            await ingest(item)
-            done += 1
-        }
+        await readAll(fresh) { $0 }
         finish(kind: kind)
     }
 
-    /// PhotosPicker results (any photo or screenshot).
-    func importPicked(_ items: [(data: Data, assetId: String?)]) async {
-        let inputs = items.compactMap { item -> ImageInput? in
-            guard let img = UIImage(data: item.data) else { return nil }
-            return ImageInput(image: img, assetId: item.assetId, date: Self.exifDate(item.data))
+    /// PhotosPicker results (any photo or screenshot). The progress screen shows right away;
+    /// photos load from the library (or iCloud) inside the reading batches.
+    func importPicked(_ items: [PhotosPickerItem]) async {
+        guard let store else { return }
+        let known = store.knownAssetIds
+        let fresh = items.filter { $0.itemIdentifier.map { !known.contains($0) } ?? true }
+        begin(total: fresh.count, stage: "Reading your photos")
+        await readAll(fresh) { item in
+            guard let data = try? await item.loadTransferable(type: Data.self), let img = UIImage(data: data) else {
+                await self.noteUnreadable()
+                return nil
+            }
+            return ImageInput(image: img, assetId: item.itemIdentifier, date: Self.exifDate(data))
         }
-        skipped += items.count - inputs.count
-        await importImages(inputs, kind: "photo")
+        finish(kind: "photo")
     }
+
+    private func noteUnreadable() { skipped += 1 }
 
     /// VisionKit document camera pages (perspective corrected).
     func importScans(_ images: [UIImage]) async {
@@ -254,8 +313,11 @@ final class Importer: ObservableObject {
     /// A fast pass on a small image finds photos with >= 25 words; only those are read fully.
     func findNotesInPhotos() async {
         guard let store else { return }
+        // Show the progress screen at once: asking for access and listing a big library take a moment.
+        begin(total: 0, stage: "Opening your photos")
         let status = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
         guard status == .authorized || status == .limited else {
+            running = false
             message = "Photo access is off. Turn it on in Settings to find notes in your photos."
             return
         }
@@ -266,36 +328,35 @@ final class Importer: ObservableObject {
         let known = store.knownAssetIds.union(checked)
         var assets: [PHAsset] = []
         result.enumerateObjects { a, _, _ in if !known.contains(a.localIdentifier) { assets.append(a) } }
-        guard !assets.isEmpty else { message = "No new photos to check."; return }
-        begin(total: assets.count, stage: "Finding notes in your photos")
+        guard !assets.isEmpty else { running = false; message = "No new photos to check."; return }
+        total = assets.count
+        stage = "Finding notes in your photos"
         sweeping = true
         defer { sweeping = false }
-        for a in assets {
-            if cancelled { break }
-            if let small = await Self.requestImage(a, size: CGSize(width: Self.detectSide, height: Self.detectSide), fast: true),
-               await OCR.quickWordCount(small) >= 25,
-               let full = await Self.requestImage(a, size: CGSize(width: 1400, height: 3000), fast: false) {
-                let screenshot = a.mediaSubtypes.contains(.photoScreenshot)
-                if await ingest(ImageInput(image: full, assetId: a.localIdentifier, date: a.creationDate, isScreenshotAsset: screenshot)) { found += 1 }
-            }
+        await readAll(assets, load: { a in
+            guard let small = await Self.requestImage(a, size: CGSize(width: Self.detectSide, height: Self.detectSide), fast: true),
+                  await OCR.quickWordCount(small) >= 25,
+                  let full = await Self.requestImage(a, size: CGSize(width: 1400, height: 3000), fast: false) else { return nil }
+            return ImageInput(image: full, assetId: a.localIdentifier, date: a.creationDate, isScreenshotAsset: a.mediaSubtypes.contains(.photoScreenshot))
+        }, added: { a, added in
+            if added { found += 1 }
             checked.insert(a.localIdentifier)
-            done += 1
-            if done % 50 == 0 { store.saveScannedAssetIds(checked) }
-        }
+            if (done + 1) % 50 == 0 { store.saveScannedAssetIds(checked) }
+        })
         store.saveScannedAssetIds(checked)
         store.library.log("library_scan", ["source": "photos", "checked": .number(Double(done)), "found": .number(Double(found))])
         let summary = sweepText
-        finish(kind: "photos")
+        finish(kind: "photo", extra: ["source": .string("sweep")])
         message = summary + (cancelled ? " Stopped early. Run it again to pick up where you left off." : "")
     }
 
     // MARK: Text
 
-    func importText(_ text: String, kind: String = "note") -> Int {
+    func importText(_ text: String, kind: String = "paste") -> Int {
         guard let store else { return 0 }
-        if AppleNotes.hasBridgeMarker(text) { return importNotes(AppleNotes.parseBridgeText(text), kind: "shortcut") }
+        if AppleNotes.hasBridgeMarker(text) { return importNotes(AppleNotes.parseBridgeText(text), kind: "notes_app") }
         let pages = NotesParser.pages(from: text)
-        let added = store.addPages(pages, kind: kind, skipped: 0)
+        let added = store.addPages(pages, kind: pages.contains { $0.words != nil } ? "words" : kind, skipped: 0)
         let dup = pages.count - added
         message = "Added \(added) \(added == 1 ? "page" : "pages")." + (dup > 0 ? " \(dup) \(dup == 1 ? "was a duplicate" : "were duplicates")." : "")
         return added
@@ -321,7 +382,7 @@ final class Importer: ObservableObject {
             message = "No notes on the clipboard. Run the OpenStudy Shortcut again."
             return
         }
-        importNotes(AppleNotes.parseBridgeText(text), kind: "shortcut")
+        importNotes(AppleNotes.parseBridgeText(text), kind: "notes_app")
     }
 
     // MARK: Files (pdf, pptx, docx, txt, md, html, images, Apple Notes export)
@@ -361,7 +422,7 @@ final class Importer: ObservableObject {
             if imported > before { files += 1 } else if !unsupported.contains(name) && !Self.imageExts.contains(ext) && ext != "json" { skipped += 1 }
             done += 1
         }
-        finish(kind: "file")
+        finish(kind: "files", extra: ["types": .string(Usage.types(urls.map(\.pathExtension)))])
         if !unsupported.isEmpty {
             message = (message ?? "") + " Not supported: \(unsupported.joined(separator: ", ")). Export Keynote or Google Slides to .pptx or .pdf."
         }

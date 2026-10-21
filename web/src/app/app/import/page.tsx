@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { hasBridgeMarker, importNotes, isNotesExport, notesSummary, parseBridgeText, type AppleNote } from "@/engine/applenotes";
+import { typesSummary } from "@/engine/events";
 import { inboxPages, logEvent } from "@/engine/library";
 import { parseNotes, stripHtml } from "@/engine/notes";
 import { dropDuplicates } from "@/engine/dedupe";
@@ -33,7 +34,7 @@ function addNotes(lib: Library, notes: AppleNote[], source: string): { lib: Libr
   const known = new Set(lib.pages.map((p) => p.noteId).filter((x): x is string => !!x));
   const r = importNotes(notes, known);
   const added = addPages(lib, r.pages);
-  let next = logEvent(added.lib, "import", { kind: "note", count: added.added, skipped: r.empty + r.already, duplicates: added.duplicates });
+  let next = logEvent(added.lib, "import", { kind: "notes_app", count: added.added, skipped: r.empty + r.already, duplicates: added.duplicates });
   next = logEvent(next, "library_scan", { source, checked: notes.length, found: r.notes });
   return { lib: next, summary: notesSummary({ ...r, pages: r.pages.slice(0, added.added) }) + dupLine(added.duplicates) };
 }
@@ -146,7 +147,7 @@ function Files({ update }: { update: (fn: (l: Library) => Library) => void }) {
   const [dragging, setDragging] = useState(false);
   const importer = useRef<Importer | null>(null);
   const logged = useRef(new Set<string>());
-  const batch = useRef({ files: 0, pages: 0, empty: 0, skipped: 0, finished: 0, duplicates: 0 });
+  const batch = useRef({ files: 0, pages: 0, empty: 0, skipped: 0, finished: 0, duplicates: 0, names: [] as string[] });
   const [dupes, setDupes] = useState(0);
 
   const onStatus = useCallback(
@@ -160,7 +161,7 @@ function Files({ update }: { update: (fn: (l: Library) => Library) => void }) {
       if (st.status === "empty" || st.status === "error") b.empty++;
       if (st.status === "skipped") b.skipped++;
       if (b.finished === b.files) {
-        update((l) => logEvent(l, "import", { kind: "files", count: b.pages, skipped: b.empty + b.skipped, files: b.files, duplicates: b.duplicates }));
+        update((l) => logEvent(l, "import", { kind: "files", count: b.pages, skipped: b.empty + b.skipped, files: b.files, duplicates: b.duplicates, types: typesSummary(b.names) }));
       }
     },
     [update],
@@ -209,10 +210,11 @@ function Files({ update }: { update: (fn: (l: Library) => Library) => void }) {
       importer.current = new Importer({ onStatus, onPages, onWorker: setWorker });
     }
     if (batch.current.finished === batch.current.files) {
-      batch.current = { files: 0, pages: 0, empty: 0, skipped: 0, finished: 0, duplicates: 0 };
+      batch.current = { files: 0, pages: 0, empty: 0, skipped: 0, finished: 0, duplicates: 0, names: [] };
       setDupes(0);
     }
     batch.current.files += files.length;
+    batch.current.names.push(...files.map((f) => f.name));
     const added = importer.current.add(files);
     setOrder((o) => [...o, ...added.map((a) => a.id)]);
   };
@@ -369,7 +371,7 @@ function Notes({ update }: { update: (fn: (l: Library) => Library) => void }) {
       const r = addPages(l, pages);
       count = r.added;
       duplicates = r.duplicates;
-      return logEvent(r.lib, "import", { kind: wordList ? "words" : "note", count: r.added, skipped: pages.length - r.added, duplicates: r.duplicates });
+      return logEvent(r.lib, "import", { kind: wordList ? "words" : "paste", count: r.added, skipped: pages.length - r.added, duplicates: r.duplicates });
     });
     setAdded({ count, books, words: wordList?.length, duplicates });
     setText("");

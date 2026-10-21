@@ -2,11 +2,12 @@
 
 import { Download, RotateCcw, Sparkles, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { emptyLibrary, exportLibrary, mergeLibrary, normalizeLibrary, weekStats } from "@/engine/library";
 import type { Bringing, DailyGoal, Goal, PracticePref } from "@/engine/types";
 import { localDay } from "@/engine/util";
 import { smartOrganizeOn } from "@/lib/ai";
+import { setSharingUsage, sharingUsage } from "@/lib/events";
 import { useLibrary } from "@/lib/store";
 import { BackHeader, Loading, Page } from "@/components/app/AppChrome";
 
@@ -51,11 +52,17 @@ function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; chi
   );
 }
 
+const noSubscribe = () => () => {};
+
 export default function SettingsPage() {
   const { lib, ready, update, replace } = useLibrary();
   const router = useRouter();
   const [smart, setSmart] = useState<boolean | null>(null);
   const [msg, setMsg] = useState("");
+  // Read after hydration: the server can't see this device's choice.
+  const stored = useSyncExternalStore(noSubscribe, sharingUsage, () => null);
+  const [chosen, setShare] = useState<boolean | null>(null);
+  const share = chosen ?? stored;
   useEffect(() => {
     void smartOrganizeOn().then(setSmart);
   }, []);
@@ -158,6 +165,27 @@ export default function SettingsPage() {
                   : "Everything runs offline on this device. Set ANTHROPIC_API_KEY on the server to turn it on."}
               </p>
             </div>
+          </div>
+        </Section>
+
+        <Section title="Usage data">
+          <div className="card flex items-start justify-between gap-4 p-4">
+            <div>
+              <p className="font-extrabold">Share usage data</p>
+              <p className="text-[15px] text-muted">Counts and categories only, never your notes. It shows us what to build next.</p>
+            </div>
+            <button
+              role="switch"
+              aria-checked={!!share}
+              aria-label="Share usage data"
+              className={`relative mt-1 h-8 w-14 shrink-0 rounded-full transition-colors ${share ? "bg-blue" : "bg-line"}`}
+              onClick={() => {
+                setSharingUsage(!share);
+                setShare(!share);
+              }}
+            >
+              <span className={`absolute top-1 h-6 w-6 rounded-full bg-paper shadow transition-all ${share ? "left-7" : "left-1"}`} />
+            </button>
           </div>
         </Section>
 

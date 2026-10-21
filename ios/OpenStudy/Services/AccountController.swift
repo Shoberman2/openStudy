@@ -7,8 +7,6 @@ final class AccountController: ObservableObject {
     static let shared = AccountController()
 
     @Published private(set) var state: AccountState = .billingOff
-    /// The email a sign-in link or code was sent to, while we wait for it.
-    @Published var pendingEmail: String?
     @Published private(set) var loaded = false
 
     private var remote: ServerConfig.Remote?
@@ -84,50 +82,78 @@ final class AccountController: ObservableObject {
         return AccountState(billingOn: true, signedIn: true, userId: me.user.id, email: me.user.email ?? s.email, entitlement: me.entitlement.entitlement)
     }
 
-    // MARK: Sign in
+    // MARK: Sign in (spec 12.1)
 
-    /// Sends the sign-in email. Returns a message to show, or nil when it was sent.
-    func sendSignIn(email: String) async -> String? {
+    enum Mode { case create, signIn }
+
+    /// What the sign-in screen says for an error.
+    static func message(for error: SupabaseAuth.AuthError) -> String {
+        switch error {
+        case .alreadyExists: return "That email already has an account. Sign in instead."
+        case .wrongCredentials, .invalid: return "Wrong email or password."
+        case .weakPassword: return "Use at least 8 characters."
+        case .rateLimited: return "Too many tries. Wait a minute and try again."
+        case .network, .server: return "Could not reach OpenStudy. Check your connection."
+        }
+    }
+
+    /// Checks the form before it goes to the server. Returns a message, or nil when it can be sent.
+    static func check(email: String, password: String) -> String? {
         let e = email.trimmingCharacters(in: .whitespacesAndNewlines)
         guard e.contains("@"), e.contains(".") else { return "Enter your email address." }
-        if remote == nil, let server { remote = await ServerConfig.fetch(server) }
-        guard let auth else { return "Accounts are not available right now. Try again later." }
-        do {
-            Keychain.pendingVerifier = try await auth.sendSignInEmail(e)
-            pendingEmail = e
-            return nil
-        } catch SupabaseAuth.AuthError.rateLimited {
-            return "Too many emails. Wait a minute and try again."
-        } catch {
-            return "We could not send the email. Check the address and your connection."
-        }
+        guard password.count >= SupabaseAuth.minPassword else { return "Use at least 8 characters." }
+        return nil
     }
 
-    func verify(code: String) async -> String? {
-        guard let auth, let email = pendingEmail else { return "Ask for a new email first." }
+    /// Creates the account or signs in. Returns a message to show, or nil when signed in.
+    func submit(_ mode: Mode, email: String, password: String) async -> String? {
+        if let problem = Self.check(email: email, password: password) { return problem }
+        let e = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        if remote == nil, let server { remote = await ServerConfig.fetch(server) }
+        guard let auth else { return "Could not reach OpenStudy. Check your connection." }
         do {
-            Keychain.session = try await auth.verifyCode(email: email, code: code.filter(\.isNumber))
-            pendingEmail = nil
+            let s = mode == .create ? try await auth.signUp(email: e, password: password) : try await auth.signIn(email: e, password: password)
+            Keychain.session = s
+            if mode == .create { welcome(s) }
             await reload()
             return nil
+        } catch let error as SupabaseAuth.AuthError {
+            return Self.message(for: error)
         } catch {
-            return "That code did not work. Check it, or open the link in the email."
+            return Self.message(for: .server)
         }
     }
 
-    /// Handles `openstudy://auth-callback?code=...`. Returns true when the URL was a sign-in link.
-    func handle(url: URL) async -> Bool {
-        guard let code = SupabaseAuth.callbackCode(url) else { return false }
-        if remote == nil, let server { remote = await ServerConfig.fetch(server) }
-        guard let auth, let verifier = Keychain.pendingVerifier else { return true }
-        if let s = try? await auth.exchange(code: code, verifier: verifier) {
-            Keychain.session = s
-            Keychain.pendingVerifier = nil
-            pendingEmail = nil
-        }
-        await reload()
-        return true
+    /// `POST /api/welcome`: the server sends the welcome email once. Never blocks sign-up.
+    private func welcome(_ s: AuthSession) {
+        guard let server else { return }
+        var r = URLRequest(url: server.appendingPathComponent("api/welcome"))
+        r.httpMethod = "POST"
+        r.timeoutInterval = 20
+        r.setValue("Bearer \(s.accessToken)", forHTTPHeaderField: "Authorization")
+        Task.detached { _ = try? await URLSession.shared.data(for: r) }
     }
+
+    /// `POST /api/auth/reset`. Returns what to show.
+    func resetPassword(email: String) async -> String {
+        let e = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard e.contains("@"), e.contains(".") else { return "Enter your email address first." }
+        guard let server else { return "Could not reach OpenStudy. Check your connection." }
+        var r = URLRequest(url: server.appendingPathComponent("api/auth/reset"))
+        r.httpMethod = "POST"
+        r.timeoutInterval = 20
+        r.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        r.httpBody = try? JSONEncoder().encode(["email": e])
+        guard let (_, resp) = try? await URLSession.shared.data(for: r), let http = resp as? HTTPURLResponse else {
+            return "Could not reach OpenStudy. Check your connection."
+        }
+        if http.statusCode == 503 { return "Password reset by email is not set up yet. Write to support." }
+        if http.statusCode == 200 { return "If that email has an account, we sent a link to reset the password." }
+        return "Could not reach OpenStudy. Check your connection."
+    }
+
+    /// The current access token (refreshed when needed), for calls that work signed in or out.
+    func accessToken() async -> String? { await validSession()?.accessToken }
 
     func signOut() async {
         if let s = Keychain.session { await auth?.signOut(s) }

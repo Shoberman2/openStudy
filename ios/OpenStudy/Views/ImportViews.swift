@@ -30,9 +30,11 @@ struct ImportSheet: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Text(importer.stage).font(Typo.headline).foregroundStyle(Palette.ink).lineLimit(2)
                     ProgressBar(value: importer.progress)
-                    Text(importer.sweeping ? importer.sweepText : "\(importer.done) of \(importer.total) done, \(importer.imported) pages added")
-                        .font(Typo.small).foregroundStyle(Palette.muted)
-                        .monospacedDigit()
+                    if importer.total > 0 {
+                        Text(importer.sweeping ? importer.sweepText : "\(importer.done) of \(importer.total) done, \(importer.imported) \(importer.imported == 1 ? "page" : "pages") added")
+                            .font(Typo.small).foregroundStyle(Palette.muted)
+                            .monospacedDigit()
+                    }
                     Button("Stop") { importer.cancel() }.buttonStyle(.chunky(.secondary))
                 }
                 .padding(.top, 6)
@@ -96,14 +98,8 @@ struct ImportSheet: View {
         .onAppear { importer.message = nil }
         .onChange(of: picked) { _, items in
             guard !items.isEmpty else { return }
-            Task {
-                var loaded: [(data: Data, assetId: String?)] = []
-                for item in items {
-                    if let d = try? await item.loadTransferable(type: Data.self) { loaded.append((d, item.itemIdentifier)) }
-                }
-                picked = []
-                await importer.importPicked(loaded)
-            }
+            picked = []
+            Task { await importer.importPicked(items) }
         }
         .sheet(isPresented: $pasting) { PasteNotesSheet() }
         .sheet(isPresented: $appleNotes) { AppleNotesSheet(onOpenFile: { appleNotes = false; DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { files = true } }) }
@@ -117,7 +113,7 @@ struct ImportSheet: View {
         .fullScreenCover(isPresented: $camera) {
             CameraPicker { image in
                 camera = false
-                if let image { Task { await importer.importImages([ImageInput(image: image, date: Date())]) } }
+                if let image { Task { await importer.importImages([ImageInput(image: image, date: Date())], kind: "camera") } }
             }
             .ignoresSafeArea()
         }

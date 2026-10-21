@@ -25,9 +25,13 @@ struct OpenStudyApp: App {
                     #if DEBUG
                     DebugLaunch.apply(store: store, importer: importer)
                     #endif
+                    EventUploader.shared.start(store: store)
                 }
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
                     store.saveNow()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+                    EventUploader.shared.flushInBackground()
                 }
         }
     }
@@ -81,11 +85,6 @@ struct RootView: View {
         }
         // openstudy://import-notes: the Apple Notes Shortcut put every note on the clipboard (spec 9.2).
         .onOpenURL { url in
-            // openstudy://auth-callback?code=...: the sign-in email link (spec 11.4).
-            if SupabaseAuth.callbackCode(url) != nil {
-                Task { _ = await AccountController.shared.handle(url: url) }
-                return
-            }
             guard url.scheme == "openstudy", url.host == "import-notes" else { return }
             importer.store = store
             store.showImport = true

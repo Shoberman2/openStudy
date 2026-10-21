@@ -19,7 +19,13 @@ export default function PrivacyPage() {
       <h2>Sent to our server</h2>
       <ul>
         <li>
-          <strong>Your account:</strong> your email address, used to sign you in and to connect your subscription across the iPhone app and the website.
+          <strong>Your account:</strong> your email address and a password (stored only as a secure hash), used to sign you in and to connect your subscription across the iPhone app and the
+          website. We send a welcome email when you make an account, and a reset link if you ask for one.
+        </li>
+        <li>
+          <strong>Usage data, unless you turn it off in Settings:</strong> what kinds of things you do in the app, as categories and counts. For example: you imported 5 pages from 2 PDFs and 3
+          photos, sorted them into a Biology class and a book under Reading, and finished a 4 minute lesson. It is tied to a random ID made by the app, and to your account when you are signed
+          in. It never includes the text of your notes, titles, file names, images or answers. We use it to see what people study and what to improve.
         </li>
         <li>
           <strong>Your subscription status:</strong> whether you are subscribed or in a trial and when it renews. App Store purchases are confirmed with Apple; web payments are processed by
@@ -48,7 +54,7 @@ export default function PrivacyPage() {
 
       <h2>Deleting your data</h2>
       <p>
-        Delete your account from your profile to remove your email and subscription record from our server. To remove your library, use Settings, then Reset everything, or delete the app. Contact us
+        Delete your account from your profile to remove your email and subscription record from our server; usage data is then no longer linked to you. To remove your library, use Settings, then Reset everything, or delete the app. Contact us
         for anything else.
       </p>
 

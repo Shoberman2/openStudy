@@ -10,6 +10,7 @@ import { LOOSE_NOTES, UNSORTED } from "@/engine/grouping";
 import { matchingProject } from "@/engine/identity";
 import { detectionSummary } from "@/engine/summary";
 import { wordEntries } from "@/engine/classbuilder";
+import { sortDoneProps } from "@/engine/events";
 import { createProject, extendProject, inboxPages, logEvent, materialize } from "@/engine/library";
 import type { Library, Page as LibPage, Project, ProjectType } from "@/engine/types";
 import { newId } from "@/engine/util";
@@ -83,8 +84,9 @@ export default function SortPage() {
     void suggestGroups(inbox, shelf).then(({ groups: g, smart: s }) => {
       setGroups(g.map((x) => ({ key: x.key, title: x.title, author: x.author ?? "", pageIds: x.pageIds, type: x.type ?? "book", category: x.category ?? "" })));
       setSmart(s);
+      if (g.length) update((l) => logEvent(l, "sort_done", sortDoneProps(g)));
     });
-  }, [ready, inbox, lib.projects]);
+  }, [ready, inbox, lib.projects, update]);
 
   // Newly imported pages that are not in any group yet go to Unsorted.
   useEffect(() => {

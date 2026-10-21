@@ -1,8 +1,8 @@
 "use client";
 
-// Supabase Auth on the web and the account's entitlement (spec 11.4, 11.5). Sign in is by email:
-// a sign-in link (always) and a 6-digit code when the project's email template includes one.
-// The library itself stays local; the account exists for the subscription.
+// Supabase Auth on the web and the account's entitlement (spec 11.4, 11.5, 12.1). Sign in is by
+// email and password, with no emails to wait for. The library itself stays local; the account
+// exists for the subscription.
 import { createBrowserClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { offlineEntitlement, type CachedEntitlement } from "@/engine/billing";
@@ -78,30 +78,64 @@ export async function fetchMe(): Promise<MeResult> {
   }
 }
 
-/** Sends the sign-in email. `next` is the in-app path to return to after the link is opened. */
-export async function sendSignInEmail(email: string, next = "/app/profile"): Promise<string | null> {
+export type AuthMode = "create" | "signin";
+
+/** Creates an account or signs in. Returns an error message, or null when signed in. */
+export async function passwordAuth(mode: AuthMode, email: string, password: string): Promise<string | null> {
   const sb = supabase();
   if (!sb) return "Accounts are not set up on this server yet.";
-  const redirect = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
-  const { error } = await sb.auth.signInWithOtp({ email: email.trim(), options: { emailRedirectTo: redirect, shouldCreateUser: true } });
-  if (!error) return null;
-  if (error.status === 429) return "Too many emails. Wait a minute and try again.";
-  return "We could not send the email. Check the address and try again.";
+  if (mode === "create" && password.length < 8) return "Use at least 8 characters.";
+  try {
+    if (mode === "create") {
+      const { data, error } = await sb.auth.signUp({ email: email.trim(), password });
+      if (error) return /already|registered|exists/i.test(error.message) ? "That email already has an account. Sign in instead." : authError(error);
+      // With email confirmation off Supabase returns a session; an existing address comes back without identities.
+      if (!data.session || data.user?.identities?.length === 0) return "That email already has an account. Sign in instead.";
+      void welcome(data.session.access_token);
+      return null;
+    }
+    const { error } = await sb.auth.signInWithPassword({ email: email.trim(), password });
+    return error ? authError(error) : null;
+  } catch {
+    return "Could not reach OpenStudy. Check your connection.";
+  }
 }
 
-export async function verifyEmailCode(email: string, code: string): Promise<string | null> {
+function authError(error: { status?: number; message: string }): string {
+  if (/password/i.test(error.message) && /characters|short|weak/i.test(error.message)) return "Use at least 8 characters.";
+  if (error.status === 429) return "Too many tries. Wait a minute and try again.";
+  if (!error.status || error.status >= 500) return "Could not reach OpenStudy. Check your connection.";
+  return "Wrong email or password.";
+}
+
+async function welcome(token: string) {
+  const { installId } = await import("./events");
+  await fetch("/api/welcome", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ installId: installId(), platform: "web" }),
+  }).catch(() => undefined);
+}
+
+/** "sent", "off" when email is not set up on the server, or "failed". */
+export async function requestPasswordReset(email: string): Promise<"sent" | "off" | "failed"> {
+  try {
+    const r = await fetch("/api/auth/reset", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: email.trim() }) });
+    return r.ok ? "sent" : r.status === 503 ? "off" : "failed";
+  } catch {
+    return "failed";
+  }
+}
+
+/** Finishes a reset link: signs in with its token, then sets the new password. */
+export async function setNewPassword(tokenHash: string, password: string): Promise<string | null> {
   const sb = supabase();
   if (!sb) return "Accounts are not set up on this server yet.";
-  const { error } = await sb.auth.verifyOtp({ email: email.trim(), token: code.replace(/\s/g, ""), type: "email" });
-  return error ? "That code did not work. Check it, or use the link in the email." : null;
-}
-
-/** Finishes a sign-in link (PKCE): `code` from the callback URL. */
-export async function exchangeSignInCode(code: string): Promise<boolean> {
-  const sb = supabase();
-  if (!sb) return false;
-  const { error } = await sb.auth.exchangeCodeForSession(code);
-  return !error;
+  if (password.length < 8) return "Use at least 8 characters.";
+  const { error } = await sb.auth.verifyOtp({ type: "recovery", token_hash: tokenHash });
+  if (error) return "That link did not work. Ask for a new one.";
+  const r = await sb.auth.updateUser({ password });
+  return r.error ? "Could not save the new password. Try again." : null;
 }
 
 export async function signOut(): Promise<void> {

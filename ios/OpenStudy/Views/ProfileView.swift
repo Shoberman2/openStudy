@@ -20,6 +20,7 @@ struct AvatarCircle: View {
 
 /// Profile (spec 11.3): name, progress, and the subscription status.
 struct ProfileView: View {
+    @ObservedObject var usage = EventUploader.shared
     @EnvironmentObject var store: Store
     @Environment(\.dismiss) var dismiss
     @StateObject private var account = AccountService()
@@ -87,6 +88,20 @@ struct ProfileView: View {
                                 Text("Accounts and subscriptions are not set up in this version yet. Everything is unlocked.")
                                     .font(Typo.body).foregroundStyle(Palette.muted)
                                     .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+
+                    if usage.enabled {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Privacy").font(Typo.headline).foregroundStyle(Palette.ink)
+                            Panel {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Toggle(isOn: $usage.share) { Text("Share usage data").font(Typo.bodyBold).foregroundStyle(Palette.ink) }
+                                        .tint(Palette.green)
+                                    Text("Counts and categories only, never your notes.")
+                                        .font(Typo.small).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
+                                }
                             }
                         }
                     }
