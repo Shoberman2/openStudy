@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 63;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -141,7 +141,7 @@
 		20C9B77255DBCBC2EDB5F450 /* AppleNotes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleNotes.swift; sourceTree = "<group>"; };
 		23564707E37378201B1BBEB7 /* Account.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Account.swift; sourceTree = "<group>"; };
 		23E711E2ECF7313806B7185F /* SortView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SortView.swift; sourceTree = "<group>"; };
-		2A9B05B8FEE09D61F11B75A5 /* OpenStudy.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = OpenStudy.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2A9B05B8FEE09D61F11B75A5 /* OpenStudy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OpenStudy.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2A9E72117C4CB8596676B921 /* Ask.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ask.swift; sourceTree = "<group>"; };
 		2C855FE8C1422251AF5A0729 /* TestResultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestResultView.swift; sourceTree = "<group>"; };
 		2F37A68CF41E1147CFB58300 /* V3Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = V3Tests.swift; sourceTree = "<group>"; };
@@ -197,7 +197,7 @@
 		D5E9C441AE5C14C561A10CE6 /* Grouping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Grouping.swift; sourceTree = "<group>"; };
 		D5FA62D2CAB1A6C37B9A8F40 /* Plan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plan.swift; sourceTree = "<group>"; };
 		D766752F7C12056B359E0311 /* AccountController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountController.swift; sourceTree = "<group>"; };
-		DC62C77B59A02CFB26B8EA31 /* OpenStudy.storekit */ = {isa = PBXFileReference; path = OpenStudy.storekit; sourceTree = "<group>"; };
+		DC62C77B59A02CFB26B8EA31 /* OpenStudy.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = OpenStudy.storekit; sourceTree = "<group>"; };
 		DE3CA3418488F304A3D04C76 /* SweepDetectTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SweepDetectTests.swift; sourceTree = "<group>"; };
 		E157B2ABA56AC597DEF32852 /* Words.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Words.swift; sourceTree = "<group>"; };
 		E4B9C422936D92E9F3658B20 /* StoreService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreService.swift; sourceTree = "<group>"; };
@@ -551,7 +551,6 @@
 						DevelopmentTeam = "";
 					};
 					9370631493A436ACE5494336 = {
-						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 					F72162266F857D1EF9A21B6B = {
@@ -569,7 +568,6 @@
 			);
 			mainGroup = A667EA2AB13DB9C7310A4B98;
 			minimizedProjectReferenceProxies = 1;
-			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -850,13 +848,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 949X7NN6NT;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = OpenStudy/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				OPENSTUDY_SERVER = "";
+				OPENSTUDY_SERVER = "https://openstudy-psi.vercel.app";
 				PRODUCT_BUNDLE_IDENTIFIER = com.openstudy.shelf;
 				PRODUCT_NAME = OpenStudy;
 				SDKROOT = iphoneos;
@@ -904,6 +903,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 949X7NN6NT;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = OpenStudy/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -911,6 +911,7 @@
 					"@executable_path/Frameworks",
 				);
 				OPENSTUDY_SERVER = "http://localhost:3000";
+				"OPENSTUDY_SERVER[sdk=iphoneos*]" = "https://openstudy-psi.vercel.app";
 				PRODUCT_BUNDLE_IDENTIFIER = com.openstudy.shelf;
 				PRODUCT_NAME = OpenStudy;
 				SDKROOT = iphoneos;

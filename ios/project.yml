@@ -22,11 +22,12 @@ targets:
     settings:
       configs:
         # Accounts and billing server (spec 11.4). The simulator reaches the Mac's `next dev` on
-        # localhost; set the deployed URL for Release before shipping. Empty turns billing off.
+        # localhost; a real iPhone can't, so device builds use the deployed site.
         Debug:
           OPENSTUDY_SERVER: "http://localhost:3000"
+          OPENSTUDY_SERVER[sdk=iphoneos*]: "https://openstudy-psi.vercel.app"
         Release:
-          OPENSTUDY_SERVER: ""
+          OPENSTUDY_SERVER: "https://openstudy-psi.vercel.app"
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.openstudy.shelf
         PRODUCT_NAME: OpenStudy
@@ -34,6 +35,7 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: WRLL777P3U
         ENABLE_PREVIEWS: YES
   OpenStudyTests:
     type: bundle.unit-test

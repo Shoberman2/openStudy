@@ -23,7 +23,7 @@
 	<key>NSPhotoLibraryUsageDescription</key><string>OpenStudy looks through your photos for notes, book pages and slides, and reads the ones you pick, so it can turn them into lessons. Images stay on this iPhone.</string>
 	<key>NSCameraUsageDescription</key><string>OpenStudy uses the camera to scan notes, slides and whiteboards so it can turn them into lessons.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key><string>OpenStudy does not add photos to your library.</string>
-	<key>UILaunchScreen</key><dict><key>UIColorName</key><string>LaunchBackground</string></dict>
+	<key>UILaunchScreen</key><dict><key>UIColorName</key><string>LaunchBackground</string><key>UIImageName</key><string>LaunchLogo</string><key>UIImageRespectsSafeAreaInsets</key><true/></dict>
 	<key>UIApplicationSceneManifest</key>
 	<dict><key>UIApplicationSupportsMultipleScenes</key><false/></dict>
 	<key>UISupportedInterfaceOrientations</key>
