@@ -137,6 +137,8 @@ public struct BuiltCard: Equatable {
     public var falseStatement: String
     public var term: String? = nil
     public var definition: String? = nil
+    /// Set on concept cards (spec 13.1).
+    public var concept: String? = nil
 }
 
 public struct BuiltLesson: Equatable {

@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Exercise } from "@/engine/exercises";
 import { logEvent } from "@/engine/library";
-import { buildSession } from "@/engine/session";
+import { buildSession, conceptExercises } from "@/engine/session";
 import type { Grade } from "@/engine/types";
 import { localDay } from "@/engine/util";
 import { displayStreak } from "@/engine/xp";
@@ -32,7 +32,7 @@ function LearnPageSession() {
     const projectType = lib.projects.find((p) => p.id === lesson.projectId)?.type;
     const ex = buildSession(lesson, lib.cards, lib.profile, new Date(), Math.random, lib.cards.filter((c) => c.projectId === lesson.projectId), { projectType });
     setExercises(ex);
-    update((l) => logEvent(l, "session_start", { lessonKind: lesson.kind, level: lesson.level, projectId: lesson.projectId, lessonId: lesson.id }));
+    update((l) => logEvent(l, "session_start", { lessonKind: lesson.kind, level: lesson.level, concepts: conceptExercises(ex, lib.cards), projectId: lesson.projectId, lessonId: lesson.id }));
   }, [ready, lesson, lib.cards, lib.profile, lib.projects, update]);
 
   const sourceFor = useCallback(

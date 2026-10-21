@@ -1,5 +1,4 @@
 import XCTest
-@testable import OpenStudy
 
 /// Usage data (spec 12.3): the upload cursor and category-only props.
 final class V6Tests: XCTestCase {

@@ -494,3 +494,44 @@ Ported from the sibling project `~/BookSaver` (web `src/lib/words.ts`, `hash.ts`
   - `events`: raw recent events, optional `name`, `platform`, `limit` (default 50, max 500).
   - `users`: accounts with created date, Plus status, last event time and event count; optional `email` substring; `limit` default 50.
 - Connect: Claude Code `claude mcp add --transport http openstudy https://openstudy-psi.vercel.app/api/mcp --header "Authorization: Bearer <token>"`; Codex `~/.codex/config.toml` `[mcp_servers.openstudy] url = ".../api/mcp"`, `bearer_token_env_var = "OPENSTUDY_MCP_TOKEN"`.
+
+## 13. v7: concept questions and choosing a focus (OVERRIDES 3.4, 5.2 and 8.5 where they conflict)
+
+Goal: questions test ideas, not one missing word, and stay short and plain. Right after a set is built, the learner picks which concepts to study first.
+
+### 13.1 Concept cards
+- Card gains optional `concept?: string`: a 1..5 word label for the idea it tests. Still `version: 1`.
+- A **concept card** has `concept`, `question` and `answer`, and is not a definition card (no `term`). Its question asks about an idea: why something happens, what it leads to, how two things differ, what an example shows, or what the main point is. Question at most 15 words, answer at most 8 words, everyday words. Its `cloze` and `falseStatement` stay, so word bank and true/false still work.
+
+### 13.2 Smart build (`POST /api/build`)
+- Every card in the schema adds `concept`. The system prompt asks for concept questions only (never "which word is missing"), questions under 15 words, answers under 8 words, plain words a 12 year old knows, 3 wrong answers of the same length and shape as the right one, and `falseStatement` written as a common misunderstanding of the idea. Lesson titles name the concept (1..4 words). The request may carry `project.type`.
+- Server: drops distractors equal to the answer (normalized). Everything else as 3.4 and 10.9.
+- Model access: `ANTHROPIC_API_KEY` (direct), or Vercel AI Gateway when `OPENSTUDY_AI_GATEWAY=1` (Anthropic SDK with `baseURL: "https://ai-gateway.vercel.sh"`, auth `AI_GATEWAY_API_KEY` or the deployment's `VERCEL_OIDC_TOKEN`, model `anthropic/claude-opus-5.5`, no `betas`/`fallbacks`). `/api/health` reports `ai: true` in either case.
+
+### 13.3 Offline concept questions `conceptCards(result)` (both platforms, deterministic)
+Runs on the result of `buildProject` (books, classes, other) before pictures are added, over theme lessons, skipping definition cards (with `term`). For each fact card in order, clean its statement (trim, strip trailing characters from `. ! ? " ” ’ ' ) ] ,`, trim) and try these rules in order; the first rule whose checks all pass gives the question and answer. `answer(X)` = X cut at the first `;` or `, and ` / `, but ` / `, which `, trimmed, trailing commas dropped, first letter upper-cased. Word counts are on whitespace. "Pronoun start" = first word (lowercase) in: it, this, that, these, those, they, he, she, which, who, what.
+1. **Why**: `^(.+?),? (because|so that|in order to) (.+)$` (case-insensitive). A = g1, B = answer(g3). A not pronoun start, no `:` in A, A 3..16 words, B 2..14 words. Question `"<A>. Why?"`.
+2. **Instead (first)**: `^Instead of ([^,]+), (.+)$` (ci). X = g1 (1..8 words), B = answer(g2) (2..10). Question `"What should you do instead of <X>?"`.
+3. **Instead**: `^(.+?) instead of (.+)$` (ci). B = answer(g1) (2..10 words, not pronoun start, first word not the/a/an), X = g2 (1..8). Same question as 2.
+4. **If / when**: `^(If|When|Whenever) ([^,]+), (.+)$` (ci). C = g2 (2..12 words), B = answer(g3) (2..12). Question `"<If|When|Whenever> <C>, then what?"` (the first word capitalized as If / When / Whenever).
+5. **The X is**: `^(The [^,]+?) (is|are) (.+)$` (case-sensitive "The"). A = g1 (2..10 words, no `:`), B = answer(g3) (2..12) whose first word (lowercase) is one of: a, an, the, to, one, that, what, how, when, where, why, your, our, their, his, her, its, my. Question `"What <is|are> <lowerFirst(A)>?"`.
+6. **Effect**: `^(.+?) (leads to|lead to|causes|cause|results in|result in|prevents|prevent|reduces|reduce|increases|increase|improves|improve|depends on|depend on|protects|protect|controls|control) (.+)$` (ci). A = g1 (1..8 words, no comma, no `:`, not pronoun start), B = answer(g3) (2..12). v = g2 lowercase: if its first word ends in `s`, aux `does` and the base drops that `s` ("causes" to "cause", "leads to" to "lead to"); else aux `do`, base = v. Question `"What <aux> <lowerFirst(A)> <base>?"`.
+7. **Define**: `^(\p{Lu}[\p{L}'-]*(?: [\p{L}'-]+){0,2}) (is|are) (.+)$` (case-sensitive). A = g1 (1..3 words, first word not a stopword), B = answer(g3) (2..12) whose first word is one of: a, an, the, one, nothing, your, our, their. Question `"What <is|are> <lowerFirst(A)>?"`.
+- `lowerFirst` lowercases the first letter unless the first word's letters are all capitals (2+ letters) or it has a capital after its first letter.
+- If the whole project has at least 4 matches, each matched card gets `question`, `answer`, `concept` = its lesson title, and `distractors` = 3 other match answers closest in word count to its own (ties: earlier match first), skipping answers equal to its own (normalized, 5.3), answers found in its statement (word-bounded, case-insensitive) and repeats. A card with fewer than 3 such distractors stays unchanged. Fewer than 4 matches: nothing changes.
+- Parity check: the sample "How to Win Friends" project builds 7 concept cards, among them "What is the deepest urge in human nature?" / "The desire to be important" and "If you are wrong, then what?" / "Admit it quickly and emphatically".
+
+### 13.4 Session mix (replaces the theme mix in 5.2 and the class mix in 8.5)
+- Theme: 0: mc, tf, mc, bank. 1: mc, tf, bank. 2: mc, tf, type. 3: mc, type, explain. 4+: mc, type, tf, explain, apply (apply only with the "apply" goal; explain and apply share the 1 per session limit).
+- Class: 0: def-mc, mc, tf. 1: def-mc, mc, bank. 2: term-type, mc, tf. 3: term-type, mc, explain. 4+: term-type, type, mc, explain.
+- Card pick: for an `mc` or `flash` slot, take the next concept card not yet used in this session (priority order) first, then any card as before. Other slots unchanged.
+- `tf` on a concept card (with distractors): one `rand()` draw, truth = draw < 0.5; statement = `"<question> <answer>."` when true, `"<question> <distractors[0]>."` when false (trailing periods and spaces of the answer dropped first); the solution shows `"<question> <answer>."`. Its cloze swap `falseStatement` is not used.
+- `session_start` gains `concepts` (number of exercises built from concept cards).
+
+### 13.5 Choose a focus
+- Project gains `focusLessons?: string[]` (lesson ids) and `focusAsked?: boolean`.
+- When the project screen opens for a project with `focusAsked` not true, not a sample, and with 2 or more theme lessons, a sheet opens: kicker "<N> concepts found", title **"What do you want to focus on?"**, sub "Pick what matters most. We'll start there." Each theme lesson is a toggle row: its summary (the key idea, up to 2 lines) as the main text with the lesson title small above it, since offline titles are only keywords. Primary **"Start with these"** (disabled until one is picked), secondary **"Everything"**. Closing the sheet counts as Everything.
+- `setFocus(lib, projectId, lessonIds, now)`: `focusLessons` = ids (empty means everything), `focusAsked = true`; theme lessons reorder with the focused ones first (each group keeps its current relative order), orders renumbered from 0, and the Quotes lesson (if any) goes right after the first theme lesson. Logs `focus_set {offered, chosen}` (chosen 0 = everything).
+- Since unlocking, Continue and the plan all follow `order`, focused lessons come first everywhere.
+- Project screen: a row under the type picker, "Focus: <titles, comma joined>" or "Focus: everything", with a "Change" button that opens the same sheet. Path nodes of focused lessons show a small "Focus" tag under the title.
+- Usage allowlist (12.3) adds number keys `offered`, `chosen`, `concepts`. MCP `study` adds `focus: {set, everything, avgChosen, avgOffered}` from `focus_set` events, and `avgConceptQuestions` (mean `concepts` over `session_start`).

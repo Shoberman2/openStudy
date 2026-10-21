@@ -67,24 +67,25 @@ public struct Exercise: Identifiable, Equatable {
 // MARK: - Session builder (spec 5.2)
 
 public enum SessionBuilder {
-    /// Class lessons by level (spec 8.5).
+    /// Class lessons by level (spec 13.4, replaces 8.5).
     public static func classMix(level: Int) -> [ExerciseKind] {
         switch level {
-        case ...0: return [.defMc, .mc, .match]
-        case 1: return [.defMc, .bank, .tf]
-        case 2: return [.termType, .bank, .mc]
-        case 3: return [.termType, .type, .explain]
+        case ...0: return [.defMc, .mc, .tf]
+        case 1: return [.defMc, .mc, .bank]
+        case 2: return [.termType, .mc, .tf]
+        case 3: return [.termType, .mc, .explain]
         default: return [.termType, .type, .mc, .explain]
         }
     }
 
+    /// Theme lessons by level (spec 13.4, replaces 5.2). Concept questions lead; one missing word is the minority.
     public static func themeMix(level: Int) -> [ExerciseKind] {
         switch level {
-        case ...0: return [.mc, .tf, .match, .bank]
-        case 1: return [.mc, .bank, .tf]
-        case 2: return [.bank, .type, .mc]
-        case 3: return [.type, .bank, .tf]
-        default: return [.type, .type, .mc, .apply]
+        case ...0: return [.mc, .tf, .mc, .bank]
+        case 1: return [.mc, .tf, .bank]
+        case 2: return [.mc, .tf, .type]
+        case 3: return [.mc, .type, .explain]
+        default: return [.mc, .type, .tf, .explain, .apply]
         }
     }
 
@@ -132,12 +133,13 @@ public enum SessionBuilder {
         let mix = lesson.isQuotes ? quoteMix(level: lesson.level) : isClass ? classMix(level: lesson.level) : themeMix(level: lesson.level)
         let extraWords = (projectCards.isEmpty ? cards : projectCards).filter { !$0.isPicture }.flatMap { longWords($0.statement) }
         let defs = (projectCards.isEmpty ? cards : projectCards).filter(\.isDefinition)
-        var explained = 0
 
         var sequence = pool.map(\.id) + pool.map(\.id) // each card at most twice
         let byId = Dictionary(uniqueKeysWithValues: own.map { ($0.id, $0) })
         var out: [Exercise] = []
-        var applied = false
+        // Explain and apply share one slot per session (spec 13.4).
+        var deepUsed = false
+        var usedIds = Set<String>()
         let flashSlot = profile.practice.contains("flash") && !lesson.isQuotes ? min(3, length - 1) : -1
 
         while out.count < length, !sequence.isEmpty {
@@ -145,15 +147,19 @@ public enum SessionBuilder {
             if out.count == flashSlot { kind = .flash }
             else { kind = weightedPick(mix, profile.practice, &rng) }
             if (kind == .type || kind == .termType || kind == .explain) && out.isEmpty { kind = lesson.isQuotes ? .qBank1 : (isClass ? .defMc : .mc) }
-            if kind == .explain { if explained >= 2 { kind = .termType } else { explained += 1 } }
+            if kind == .explain && deepUsed { kind = .termType }
             if kind == .match && out.last?.kind == .match { kind = .mc }
-            if kind == .apply && (applied || !profile.goals.contains("apply")) { kind = .type }
+            if kind == .apply && (deepUsed || !profile.goals.contains("apply")) { kind = .type }
             if kind == .qRecall && out.isEmpty { kind = .qLetters }
 
             // Pick the next card, avoiding an immediate repeat when possible.
             var idx = 0
-            if let last = out.last?.cardIds.last, sequence.count > 1, sequence[0] == last,
+            let last = out.last?.cardIds.last
+            if let last, sequence.count > 1, sequence[0] == last,
                let alt = sequence.firstIndex(where: { $0 != last }) { idx = alt }
+            // mc and flash slots take the next concept card not yet used in this session first (spec 13.4).
+            if kind == .mc || kind == .flash,
+               let ci = sequence.firstIndex(where: { !usedIds.contains($0) && byId[$0]!.isConcept }) { idx = ci }
             let card = byId[sequence[idx]]!
             sequence.remove(at: idx)
 
@@ -165,7 +171,7 @@ public enum SessionBuilder {
                 for c in pool where chosen.count < 4 && c.isDefinition {
                     if !chosen.contains(where: { $0.id == c.id || $0.term?.lowercased() == c.term?.lowercased() }) { chosen.append(c) }
                 }
-                if chosen.count == 4 { out.append(makeMatch(chosen, rng: &rng)); continue }
+                if chosen.count == 4 { usedIds.formUnion(chosen.map(\.id)); out.append(makeMatch(chosen, rng: &rng)); continue }
                 if !card.isDefinition { sequence.removeFirst() }
             }
             if kind == .match {
@@ -178,20 +184,28 @@ public enum SessionBuilder {
                     }
                 }
                 if others.count == 3, card.cloze?.isEmpty == false {
+                    usedIds.formUnion(([card] + others).map(\.id))
                     out.append(makeMatch([card] + others, rng: &rng))
                     continue
                 }
                 kind = .mc
             }
-            if kind == .apply { applied = true }
             var e = make(kind, card: card, extraWords: extraWords, defs: defs, rng: &rng)
             if e.kind == .explain && (e.hint ?? "").isEmpty {
                 e.hint = lesson.title
                 e.body = "Explain \(lesson.title) in your own words like you're teaching a friend."
             }
+            if e.kind == .explain || e.kind == .apply { deepUsed = true }
+            usedIds.formUnion(e.cardIds)
             out.append(e)
         }
         return insertPictures(out, Array(pictures.prefix(nPictures)), rng: &rng)
+    }
+
+    /// Exercises built from concept cards, for the `concepts` prop of `session_start` (spec 13.4).
+    public static func conceptCount(_ exercises: [Exercise], cards: [Card]) -> Int {
+        let ids = Set(cards.filter(\.isConcept).map(\.id))
+        return exercises.filter { $0.cardIds.contains(where: ids.contains) }.count
     }
 
     static func picture(_ c: Card) -> Exercise {
@@ -289,6 +303,21 @@ public enum SessionBuilder {
                 e.options = ([a] + distractors.prefix(3)).shuffled(using: &rng)
             } else { return make(.tf, card: c, extraWords: extraWords, rng: &rng) }
         case .tf:
+            // A concept card pairs its question with the right answer or a wrong one (spec 13.4).
+            if c.isConcept, let wrong = distractors.first {
+                func pair(_ a: String) -> String {
+                    var t = a
+                    while let l = t.last, l == "." || l.isWhitespace { t.removeLast() }
+                    return "\(c.question!) \(t)."
+                }
+                let truth = Bool.random(using: &rng)
+                e.tfIsTrue = truth
+                e.body = pair(truth ? c.answer! : wrong)
+                e.answer = truth ? "True" : "False"
+                e.hint = pair(c.answer!)
+                e.options = ["True", "False"]
+                break
+            }
             let showTrue = c.falseStatement == nil || Bool.random(using: &rng)
             e.tfIsTrue = showTrue
             e.body = showTrue ? c.statement : c.falseStatement!

@@ -68,7 +68,7 @@ const mcp = createMcpHandler(
       "study",
       {
         title: "Study",
-        description: "Study sessions and reviews started and finished, average accuracy, minutes, XP, lesson kinds, practice tests and Ask questions.",
+        description: "Study sessions and reviews started and finished, average accuracy, minutes, XP, lesson kinds, practice tests, Ask questions, concept questions per session, and what people pick on \"What do you want to focus on?\" (focus: set, everything, avgChosen, avgOffered).",
         inputSchema: z.object({ days }),
       },
       async ({ days }) => {

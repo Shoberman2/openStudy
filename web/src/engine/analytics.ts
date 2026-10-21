@@ -169,5 +169,19 @@ export function study(rows: EventRow[], now: Date, days: number) {
     startsByLessonKind: countBy(starts, (r) => str(r.props.lessonKind)),
     practiceTests: rows.filter((r) => r.name === "test_done" && r.t >= from).length,
     asks: rows.filter((r) => r.name === "ask" && r.t >= from).length,
+    // Spec 13: how often sessions ask about ideas, and what people choose to focus on.
+    avgConceptQuestions: avg(starts.filter((r) => typeof r.props.concepts === "number").map((r) => num(r.props.concepts))),
+    focus: (() => {
+      const set = rows.filter((r) => r.name === "focus_set" && r.t >= from);
+      const picked = set.filter((r) => num(r.props.chosen) > 0);
+      return {
+        set: set.length,
+        everything: set.length - picked.length,
+        avgChosen: avg(picked.map((r) => num(r.props.chosen))),
+        avgOffered: avg(set.map((r) => num(r.props.offered))),
+      };
+    })(),
   };
 }
+
+const avg = (xs: number[]) => (xs.length ? Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 10) / 10 : null);

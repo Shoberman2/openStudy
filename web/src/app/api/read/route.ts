@@ -1,5 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { aiEnabled, aiFailed, MODEL, noAi, RefusalError } from "@/lib/server/claude";
+import { aiClient, aiEnabled, aiFailed, modelParams, noAi, RefusalError } from "@/lib/server/claude";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +22,6 @@ const SYSTEM = `You transcribe study material from images: book pages, slides, h
 Copy the words exactly as written, fixing only obvious OCR-style breaks. Keep list structure as separate lines.
 Leave out phone status bars, page numbers and UI chrome. Never use em dashes.`;
 
-let client: Anthropic | null = null;
 
 export async function POST(req: Request) {
   if (!aiEnabled()) return noAi();
@@ -36,13 +34,10 @@ export async function POST(req: Request) {
   const mediaType = (MEDIA.includes(body.mediaType as Media) ? body.mediaType : "image/jpeg") as Media;
   if (!body.image || body.image.length > 8_000_000) return Response.json({ error: "bad_request" }, { status: 400 });
   try {
-    client ??= new Anthropic();
-    const msg = await client.beta.messages
-      .stream({
-        model: MODEL,
+    const msg = await aiClient()
+      .beta.messages.stream({
+        ...modelParams(),
         max_tokens: 16000,
-        betas: ["server-side-fallback-2026-07-01"],
-        fallbacks: "default",
         output_config: { effort: "low", format: { type: "json_schema", schema } },
         system: SYSTEM,
         messages: [

@@ -46,6 +46,9 @@ export type Project = {
   minutesPerDay?: number;
   /** Subject shelf, e.g. "Biology" (spec 9.4). */
   category?: string;
+  /** Theme lessons picked on "What do you want to focus on?" (spec 13.5); empty means everything. */
+  focusLessons?: string[];
+  focusAsked?: boolean;
 };
 
 export type ProjectType = "book" | "class" | "other";
@@ -118,6 +121,8 @@ export type Card = {
   attribution?: string;
   term?: string;
   definition?: string;
+  /** The idea a concept card tests (spec 13.1). */
+  concept?: string;
   srs: Srs;
 };
 

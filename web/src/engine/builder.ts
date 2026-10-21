@@ -15,6 +15,7 @@ export type FactDraft = {
   answer: string;
   distractors: string[];
   falseStatement: string;
+  concept?: string;
 };
 /** A picture card (spec 11.2): recall a photo or diagram page from its image. */
 export type PictureDraft = { pageId: string; statement: string; question: string };

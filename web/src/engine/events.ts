@@ -11,6 +11,7 @@ const STRING_KEYS = new Set([
 const VALUE_KEYS = new Set([
   "level", "dailyGoalXP", "count", "pages", "lessons", "projects", "files", "skipped", "duplicates", "checked", "found",
   "accuracy", "seconds", "xp", "questions", "yes", "ok", "smart", "grounded", "groups", "books", "classes", "others", "words",
+  "offered", "chosen", "concepts",
 ]);
 const DAY = 86_400_000;
 

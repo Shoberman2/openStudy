@@ -9,6 +9,7 @@ struct ProjectView: View {
     @State private var confirmDelete = false
     @State private var renaming = false
     @State private var newTitle = ""
+    @State private var choosingFocus = false
 
     var body: some View {
         if let project = store.library.project(projectId) {
@@ -16,6 +17,10 @@ struct ProjectView: View {
                 header(project)
                 if tab == 0 {
                     ScrollView {
+                        if themeLessons(project).count >= 2 {
+                            FocusRow(project: project, lessons: themeLessons(project)) { choosingFocus = true }
+                                .padding(.horizontal, 20).padding(.top, 16)
+                        }
                         ProjectGoalBar(project: project)
                             .padding(.horizontal, 20).padding(.top, 16)
                         WordsToDefine(projectId: project.id)
@@ -34,6 +39,12 @@ struct ProjectView: View {
             .sheet(item: Binding(get: { sheetLesson.map(IdentifiedString.init) }, set: { sheetLesson = $0?.id })) { s in
                 LessonSheet(lessonId: s.id)
             }
+            .sheet(isPresented: $choosingFocus, onDismiss: {
+                // Closing the first ask counts as Everything (spec 13.5).
+                if store.library.project(projectId)?.focusAsked != true { store.setFocus(projectId, lessonIds: []) }
+            }) {
+                FocusSheet(project: project, lessons: themeLessons(project))
+            }
             .confirmationDialog("Delete \(project.title)?", isPresented: $confirmDelete, titleVisibility: .visible) {
                 Button("Delete book and its lessons", role: .destructive) {
                     store.library.deleteProject(project.id)
@@ -49,11 +60,14 @@ struct ProjectView: View {
                 #if DEBUG
                 if UserDefaults.standard.integer(forKey: "debug.projectTab") == 1 { tab = 1; UserDefaults.standard.removeObject(forKey: "debug.projectTab") }
                 #endif
+                if project.focusAsked != true, project.sample != true, themeLessons(project).count >= 2 { choosingFocus = true }
             }
         } else {
             Color.clear.onAppear { dismiss() }
         }
     }
+
+    func themeLessons(_ project: Project) -> [Lesson] { store.library.lessons(of: project.id).filter { !$0.isQuotes } }
 
     func header(_ project: Project) -> some View {
         let pages = store.library.pages(of: project.id).count
@@ -98,6 +112,91 @@ struct ProjectView: View {
 }
 
 struct IdentifiedString: Identifiable { let id: String }
+
+// MARK: - Focus (spec 13.5)
+
+/// "Focus: <titles>" with a Change button that reopens the focus sheet.
+struct FocusRow: View {
+    let project: Project
+    let lessons: [Lesson]
+    var onChange: () -> Void
+
+    var body: some View {
+        let chosen = project.focusLessons ?? []
+        let titles = lessons.filter { chosen.contains($0.id) }.map(\.title)
+        HStack(spacing: 12) {
+            Image(systemName: "scope").font(.system(size: 18, weight: .bold)).foregroundStyle(Palette.blue)
+                .frame(width: 36, height: 36).background(Circle().fill(Palette.blueSoft))
+            Text("Focus: " + (titles.isEmpty ? "everything" : titles.joined(separator: ", ")))
+                .font(Typo.bodyBold).foregroundStyle(Palette.ink).lineLimit(2).minimumScaleFactor(0.85)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button("Change", action: onChange)
+                .buttonStyle(.chunky(.secondary, height: 40, fullWidth: false))
+        }
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Palette.shelf))
+    }
+}
+
+/// "What do you want to focus on?": one toggle row per theme lesson. Closing it counts as Everything.
+struct FocusSheet: View {
+    @EnvironmentObject var store: Store
+    @Environment(\.dismiss) var dismiss
+    let project: Project
+    let lessons: [Lesson]
+    @State private var picked = Set<String>()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("\(lessons.count) concepts found").font(Typo.small).foregroundStyle(Palette.blue)
+                Text("What do you want to focus on?").font(Typo.title).foregroundStyle(Palette.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("Pick what matters most. We'll start there.").font(Typo.body).foregroundStyle(Palette.muted)
+            }
+            ScrollView {
+                VStack(spacing: 10) {
+                    ForEach(lessons) { l in
+                        let on = picked.contains(l.id)
+                        Button {
+                            if on { picked.remove(l.id) } else { picked.insert(l.id) }
+                            Haptics.tap()
+                        } label: {
+                            HStack(spacing: 12) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(l.title).font(Typo.bodyBold).lineLimit(2)
+                                    if !l.summary.isEmpty {
+                                        Text(l.summary).font(Typo.rounded(14, .semibold)).foregroundStyle(Palette.muted).lineLimit(1)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                Image(systemName: on ? "checkmark.circle.fill" : "circle").font(.system(size: 22))
+                            }
+                        }
+                        .buttonStyle(TileStyle(state: on ? .selected : .normal))
+                        .accessibilityAddTraits(on ? .isSelected : [])
+                    }
+                }
+            }
+            Button("Start with these") {
+                store.setFocus(project.id, lessonIds: lessons.map(\.id).filter(picked.contains))
+                dismiss()
+            }
+            .buttonStyle(.chunky)
+            .disabled(picked.isEmpty)
+            Button("Everything") {
+                store.setFocus(project.id, lessonIds: [])
+                dismiss()
+            }
+            .buttonStyle(.chunky(.secondary))
+        }
+        .padding(24)
+        .onAppear { picked = Set(project.focusLessons ?? []) }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Palette.paper)
+    }
+}
 
 struct SegmentedTabs: View {
     @Binding var selection: Int

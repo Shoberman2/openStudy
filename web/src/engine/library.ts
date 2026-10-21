@@ -181,6 +181,7 @@ export function materialize(
         distractors: c.distractors,
         falseStatement: c.falseStatement,
         ...(c.term ? { term: c.term, definition: c.definition } : {}),
+        ...(c.concept ? { concept: c.concept } : {}),
         srs: newSrs(now),
       });
     }
@@ -407,4 +408,24 @@ export function defineWord(lib: Library, projectId: string, pageId: string, term
     lessons: [...lib.lessons, ...newLessons].map(relabel),
     cards: [...lib.cards, card],
   };
+}
+
+/**
+ * "What do you want to focus on?" (spec 13.5): focused theme lessons move to the front of the path,
+ * the Quotes lesson stays right after the first theme lesson. An empty list means everything.
+ */
+export function setFocus(lib: Library, projectId: string, lessonIds: string[], now: Date = new Date()): Library {
+  const lessons = projectLessons(lib, projectId);
+  const themes = lessons.filter((l) => l.kind === "theme");
+  const picked = new Set(lessonIds.filter((id) => themes.some((l) => l.id === id)));
+  const ordered = [...themes.filter((l) => picked.has(l.id)), ...themes.filter((l) => !picked.has(l.id))];
+  const quotes = lessons.find((l) => l.kind === "quotes");
+  if (quotes) ordered.splice(Math.min(1, ordered.length), 0, quotes);
+  const order = new Map(ordered.map((l, i) => [l.id, i]));
+  const next: Library = {
+    ...lib,
+    projects: lib.projects.map((p) => (p.id === projectId ? { ...p, focusLessons: ordered.filter((l) => picked.has(l.id)).map((l) => l.id), focusAsked: true } : p)),
+    lessons: lib.lessons.map((l) => (order.has(l.id) ? { ...l, order: order.get(l.id)! } : l)),
+  };
+  return logEvent(next, "focus_set", { offered: themes.length, chosen: picked.size, projectId }, now);
 }

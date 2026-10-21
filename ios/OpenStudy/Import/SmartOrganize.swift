@@ -67,13 +67,13 @@ struct SmartOrganizeClient {
         return groups.isEmpty ? nil : groups
     }
 
-    struct BuildCardDTO: Decodable { var pageId: String?; var statement: String; var cloze: String?; var question: String?; var answer: String?; var distractors: [String]?; var falseStatement: String? }
+    struct BuildCardDTO: Decodable { var pageId: String?; var statement: String; var cloze: String?; var question: String?; var answer: String?; var distractors: [String]?; var falseStatement: String?; var concept: String? }
     struct BuildLessonDTO: Decodable { var title: String; var summary: String?; var cards: [BuildCardDTO] }
     struct BuildQuoteDTO: Decodable { var pageId: String?; var text: String; var attribution: String? }
 
     /// Chunks large projects (about 60 pages per call) and merges lessons by title.
-    func build(title: String, author: String?, pages: [Page], profile: Profile, wantQuotes: Bool) async -> BuildResult? {
-        struct ProjectDTO: Encodable { var title: String; var author: String? }
+    func build(title: String, author: String?, type: String? = nil, pages: [Page], profile: Profile, wantQuotes: Bool) async -> BuildResult? {
+        struct ProjectDTO: Encodable { var title: String; var author: String?; var type: String? }
         struct PageDTO: Encodable { var id: String; var text: String }
         struct ProfileDTO: Encodable { var goals: [String]; var practice: [String]; var dailyGoalXP: Int }
         struct Body: Encodable { var project: ProjectDTO; var pages: [PageDTO]; var profile: ProfileDTO; var wantQuotes: Bool }
@@ -83,7 +83,7 @@ struct SmartOrganizeClient {
         var quotes: [BuiltQuote] = []
         let chunks = stride(from: 0, to: pages.count, by: 60).map { Array(pages[$0..<min(pages.count, $0 + 60)]) }
         for chunk in chunks {
-            let body = Body(project: ProjectDTO(title: title, author: author), pages: chunk.map { PageDTO(id: $0.id, text: $0.text) },
+            let body = Body(project: ProjectDTO(title: title, author: author, type: type), pages: chunk.map { PageDTO(id: $0.id, text: $0.text) },
                             profile: ProfileDTO(goals: profile.goals, practice: profile.practice, dailyGoalXP: profile.dailyGoalXP), wantQuotes: wantQuotes)
             guard let r = try? request("api/build", body: body, timeout: 180), let resp = await send(r, as: Resp.self) else { return nil }
             for l in resp.lessons {
@@ -92,7 +92,8 @@ struct SmartOrganizeClient {
                     return BuiltCard(pageId: c.pageId, statement: c.statement, cloze: cloze,
                                      question: c.question ?? LessonBuilder.replaceFirst(in: c.statement, cloze, with: "____"),
                                      answer: c.answer ?? cloze, distractors: Array((c.distractors ?? []).prefix(3)),
-                                     falseStatement: c.falseStatement ?? c.statement)
+                                     falseStatement: c.falseStatement ?? c.statement,
+                                     concept: (c.concept ?? "").trimmingCharacters(in: .whitespaces).isEmpty ? nil : c.concept)
                 }
                 if let i = lessons.firstIndex(where: { $0.title.lowercased() == l.title.lowercased() }) {
                     lessons[i].cards += cards

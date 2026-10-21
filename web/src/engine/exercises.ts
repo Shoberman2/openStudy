@@ -141,6 +141,12 @@ export function genMC(card: Card, ctx: GenCtx): Exercise {
 }
 
 export function genTF(card: Card, ctx: GenCtx): Exercise | null {
+  // A concept card pairs its question with the right answer or a wrong one (spec 13.4).
+  if (isConcept(card) && card.distractors?.length) {
+    const truth = ctx.rand() < 0.5;
+    const pair = (a: string) => `${card.question} ${a.replace(/[.\s]+$/, "")}.`;
+    return { id: exId(), cardIds: [card.id], projectId: card.projectId, type: "tf", truth, statement: pair(truth ? card.answer! : card.distractors[0]), trueStatement: pair(card.answer!) };
+  }
   const hasFalse = !!card.falseStatement && normalizeAnswer(card.falseStatement) !== normalizeAnswer(card.statement);
   if (!hasFalse) return null;
   const truth = ctx.rand() < 0.5;
@@ -222,6 +228,9 @@ export function genApply(card: Card): Exercise {
 // ---------- definition and explain exercises (spec 8.5) ----------
 
 export const isDefinition = (c: Card) => !!(c.term && c.definition);
+
+/** A card that asks about an idea rather than one missing word (spec 13.1). */
+export const isConcept = (c: Card) => !!(c.concept && c.question && c.answer && !c.term);
 
 export function genDefMC(card: Card, ctx: GenCtx): Exercise | null {
   if (!isDefinition(card)) return null;

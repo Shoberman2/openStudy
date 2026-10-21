@@ -12,6 +12,7 @@ struct LessonPath: View {
     var body: some View {
         let lessons = library.lessons(of: project.id)
         let current = library.currentLesson(of: project.id)
+        let focused = Set(project.focusLessons ?? [])
         VStack(spacing: 22) {
             ForEach(Array(lessons.enumerated()), id: \.element.id) { i, lesson in
                 let locked = !library.isUnlocked(lesson)
@@ -34,6 +35,14 @@ struct LessonPath: View {
                         .lineLimit(2)
                         .frame(width: 150)
                         .accessibilityHidden(true)
+                    if focused.contains(lesson.id) {
+                        Text("Focus")
+                            .font(Typo.tiny)
+                            .foregroundStyle(Palette.blue)
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(Capsule().fill(Palette.blueSoft))
+                            .accessibilityLabel("Focus lesson")
+                    }
                 }
                 .offset(x: Self.offsets[i % Self.offsets.count])
             }

@@ -1,15 +1,15 @@
 "use client";
 
-import { ArrowRightLeft, CalendarDays, ClipboardCheck, Library as ShelfIcon, Lock, Quote, Trash2 } from "lucide-react";
+import { ArrowRightLeft, CalendarDays, Check, ClipboardCheck, Library as ShelfIcon, Lock, Quote, Target, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { buildProject } from "@/engine/classbuilder";
 import { CATEGORY_NAMES } from "@/engine/categories";
-import { currentLesson, defineWord, extendProject, logEvent, projectLessons, unlockedIds, wordsToDefine } from "@/engine/library";
+import { currentLesson, defineWord, extendProject, logEvent, projectLessons, setFocus, unlockedIds, wordsToDefine } from "@/engine/library";
 import { newSrs } from "@/engine/srs";
 import { normalizeForDedupe, splitSentences, truncate, wordCount } from "@/engine/text";
-import type { Lesson, Library, Page as LibPage } from "@/engine/types";
+import type { Lesson, Library, Page as LibPage, Project } from "@/engine/types";
 import { newId } from "@/engine/util";
 import { toBuildPages } from "@/lib/actions";
 import { deleteImage } from "@/lib/images";
@@ -26,6 +26,7 @@ export default function ProjectPage() {
   const router = useRouter();
   const [tab, setTab] = useState<"path" | "pages">("path");
   const [open, setOpen] = useState<Lesson | null>(null);
+  const [focusOpen, setFocusOpen] = useState(false);
 
   if (!ready) return <Loading />;
   const project = lib.projects.find((p) => p.id === id);
@@ -45,6 +46,10 @@ export default function ProjectPage() {
   const pages = lib.pages.filter((p) => p.projectId === project.id);
   const readyCount = lessons.filter((l) => l.level >= 3).length;
   const cardCount = (lid: string) => lib.cards.filter((c) => c.lessonId === lid).length;
+  const themes = lessons.filter((l) => l.kind === "theme");
+  // Spec 13.5: ask once, right after a set is built.
+  const askFocus = focusOpen || (!project.focusAsked && !project.sample && themes.length >= 2);
+  const focused = new Set(project.focusLessons ?? []);
   const prevTheme = (l: Lesson) => lessons.filter((x) => x.kind === "theme" && x.order < l.order).slice(-1)[0];
 
   return (
@@ -131,6 +136,20 @@ export default function ProjectPage() {
           </div>
         </div>
 
+        {themes.length >= 2 && (
+          <div className="mt-3 flex items-center gap-3 rounded-[16px] border-2 border-line p-3" data-testid="focus-row">
+            <span className="flex h-10 w-10 flex-none items-center justify-center rounded-[12px] bg-blue-soft text-blue">
+              <Target size={20} strokeWidth={2.5} />
+            </span>
+            <p className="min-w-0 flex-1 truncate text-[15px] font-extrabold">
+              Focus: {themes.filter((l) => focused.has(l.id)).map((l) => l.title).join(", ") || "everything"}
+            </p>
+            <button className="btn btn-sm btn-secondary flex-none" onClick={() => setFocusOpen(true)}>
+              Change
+            </button>
+          </div>
+        )}
+
         {pages.length > 0 && (
           <div className="mt-5">
             <AskBox lib={lib} pages={pages} scope="project" label={`Ask about ${project.title}`} update={update} />
@@ -170,6 +189,7 @@ export default function ProjectPage() {
                   )}
                   <PathNode level={l.level} locked={locked} kind={l.kind} current={isCur} label={`${l.title}, level ${l.level} of 5${locked ? ", locked" : ""}`} onClick={() => setOpen(l)} />
                   <p className={`mt-2 max-w-[150px] text-center text-[14px] font-extrabold leading-tight ${locked ? "text-muted" : ""}`}>{l.title}</p>
+                  {focused.has(l.id) && <span className="mt-1 rounded-full bg-blue-soft px-2 py-0.5 text-[12px] font-black text-blue">Focus</span>}
                 </div>
               );
             })}
@@ -179,6 +199,18 @@ export default function ProjectPage() {
           <PagesTab lib={lib} projectId={project.id} pages={pages} update={update} onMoved={(pid) => router.push(`/app/p/${pid}`)} />
         )}
       </Page>
+
+      {askFocus && (
+        <FocusSheet
+          key={project.id}
+          project={project}
+          themes={themes}
+          onSave={(ids) => {
+            update((l) => setFocus(l, project.id, ids));
+            setFocusOpen(false);
+          }}
+        />
+      )}
 
       <Sheet open={!!open} onClose={() => setOpen(null)} label="Lesson">
         {open && (
@@ -209,6 +241,42 @@ export default function ProjectPage() {
         )}
       </Sheet>
     </>
+  );
+}
+
+/** "What do you want to focus on?" (spec 13.5). Closing it means everything. */
+function FocusSheet({ project, themes, onSave }: { project: Project; themes: Lesson[]; onSave: (ids: string[]) => void }) {
+  const [picked, setPicked] = useState<Set<string>>(() => new Set(project.focusLessons ?? []));
+  const toggle = (id: string) =>
+    setPicked((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  return (
+    <Sheet open onClose={() => onSave(project.focusAsked ? (project.focusLessons ?? []) : [])} label="Choose a focus">
+      <p className="kicker">{themes.length} concepts found</p>
+      <h3 className="mt-1 pr-8 text-[24px] font-black leading-tight">What do you want to focus on?</h3>
+      <p className="mt-2 text-muted">Pick what matters most. We&apos;ll start there.</p>
+      <div className="mt-5 grid grid-cols-1 gap-2.5">
+        {themes.map((l) => (
+          <button key={l.id} className="tile" aria-pressed={picked.has(l.id)} onClick={() => toggle(l.id)}>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13px] font-extrabold uppercase tracking-wide text-muted">{l.title}</span>
+              <span className="mt-0.5 line-clamp-2 block font-bold leading-snug">{l.summary || l.title}</span>
+            </span>
+            {picked.has(l.id) && <Check size={20} strokeWidth={3} className="flex-none" />}
+          </button>
+        ))}
+      </div>
+      <button className="btn btn-block mt-6" disabled={!picked.size} onClick={() => onSave(themes.filter((l) => picked.has(l.id)).map((l) => l.id))}>
+        Start with these
+      </button>
+      <button className="btn btn-secondary btn-block mt-3" onClick={() => onSave([])}>
+        Everything
+      </button>
+    </Sheet>
   );
 }
 

@@ -1,4 +1,5 @@
 // Lessons for class material and definition cards (spec 8.4).
+import { conceptCards } from "./concepts";
 import {
   absorbSmall,
   buildOffline,
@@ -319,6 +320,6 @@ export function buildProject(project: { title: string; author?: string; type?: P
   }
   const hasFiles = pages.some((p) => p.kind && p.kind !== "screenshot" && p.kind !== "note");
   const built = project.type === "class" || (project.type !== "book" && hasFiles) ? buildClass(project, pages) : buildOffline(project, pages);
-  return withPictures(built, pages);
+  return withPictures(conceptCards(built), pages);
 }
 

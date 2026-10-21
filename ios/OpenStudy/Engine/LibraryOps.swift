@@ -83,7 +83,7 @@ public extension Library {
             for bc in bl.cards where !knownStatements.contains(TextKit.normalizeKey(bc.statement)) {
                 cards.append(Card(lessonId: lesson.id, projectId: project.id, pageId: bc.pageId, kind: "fact", statement: bc.statement,
                                   cloze: bc.cloze, question: bc.question, answer: bc.answer, distractors: bc.distractors,
-                                  falseStatement: bc.falseStatement, term: bc.term, definition: bc.definition, srs: .fresh(now: now)))
+                                  falseStatement: bc.falseStatement, term: bc.term, definition: bc.definition, concept: bc.concept, srs: .fresh(now: now)))
             }
             for pic in bl.pictures where knownPictures.insert(pic.pageId).inserted {
                 cards.append(Card(lessonId: lesson.id, projectId: project.id, pageId: pic.pageId, kind: "picture", statement: pic.statement,
@@ -150,6 +150,25 @@ public extension Library {
         }
     }
 
+    /// "What do you want to focus on?" (spec 13.5). Focused theme lessons move to the front of the path
+    /// (each group keeps its relative order), the Quotes lesson stays right after the first theme lesson,
+    /// and orders are renumbered from 0. An empty list means everything.
+    mutating func setFocus(projectId: String, lessonIds: [String], now: Date = Date()) {
+        guard let pi = projects.firstIndex(where: { $0.id == projectId }) else { return }
+        let ls = lessons(of: projectId)
+        let themes = ls.filter { !$0.isQuotes }
+        // Kept in path order; ids that are not theme lessons of this project are ignored.
+        let wanted = Set(lessonIds)
+        let picked = themes.map(\.id).filter(wanted.contains)
+        var ordered = themes.filter { picked.contains($0.id) } + themes.filter { !picked.contains($0.id) }
+        if let q = ls.first(where: { $0.isQuotes }) { ordered.insert(q, at: min(1, ordered.count)) }
+        let order = Dictionary(uniqueKeysWithValues: ordered.enumerated().map { ($0.element.id, $0.offset) })
+        for i in lessons.indices { if let o = order[lessons[i].id] { lessons[i].order = o } }
+        projects[pi].focusLessons = picked
+        projects[pi].focusAsked = true
+        log("focus_set", ["offered": .number(Double(themes.count)), "chosen": .number(Double(picked.count)), "projectId": .string(projectId)], now: now)
+    }
+
     /// Applies a finished session: SRS already applied per answer; this bumps level and sessions.
     mutating func finishLesson(_ lessonId: String) {
         guard let i = lessons.firstIndex(where: { $0.id == lessonId }) else { return }
@@ -185,7 +204,7 @@ public enum LessonFactory {
         guard !wordLessons.isEmpty || !pages.isEmpty else { return BuildResult(lessons: [], quotes: []) }
         if pages.isEmpty { return BuildResult(lessons: wordLessons, quotes: []) }
         // Word-list pages never become picture cards; photos and diagrams do (spec 11.2).
-        let rest = PictureCards.attach(buildMaterial(pages: pages, title: title, author: author, type: type), pages: pages)
+        let rest = PictureCards.attach(Concepts.apply(buildMaterial(pages: pages, title: title, author: author, type: type)), pages: pages)
         return BuildResult(lessons: wordLessons + rest.lessons, quotes: rest.quotes)
     }
 

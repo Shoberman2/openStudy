@@ -169,7 +169,7 @@ final class V2Tests: XCTestCase {
         XCTAssertTrue(ex3.allSatisfy { [.termType, .type, .explain, .defMc, .mc, .tf].contains($0.kind) })
         XCTAssertTrue(ex3.contains { $0.kind == .termType })
         for e in ex3 where e.kind == .termType { XCTAssertEqual(lib.cards.first { $0.id == e.cardId }?.term, e.answer) }
-        XCTAssertLessThanOrEqual(ex3.filter { $0.kind == .explain }.count, 2)
+        XCTAssertLessThanOrEqual(ex3.filter { $0.kind == .explain || $0.kind == .apply }.count, 1)
     }
 
     // MARK: Plan

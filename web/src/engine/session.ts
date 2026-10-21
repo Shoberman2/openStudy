@@ -7,6 +7,7 @@ import {
   genPicture,
   genExplain,
   genTermType,
+  isConcept,
   isDefinition,
   genBank,
   genFlash,
@@ -26,18 +27,19 @@ import { MAX_PICTURES_PER_SESSION, isPicture } from "./pictures";
 import { isDue } from "./srs";
 import type { Card, Grade, Lesson, Profile, ProjectType } from "./types";
 
+// Concept questions lead; one missing word is the minority (spec 13.4).
 const THEME_MIX: ExType[][] = [
-  ["mc", "tf", "match", "bank"],
-  ["mc", "bank", "tf"],
-  ["bank", "type", "mc"],
-  ["type", "bank", "tf"],
-  ["type", "type", "mc", "apply"],
+  ["mc", "tf", "mc", "bank"],
+  ["mc", "tf", "bank"],
+  ["mc", "tf", "type"],
+  ["mc", "type", "explain"],
+  ["mc", "type", "tf", "explain", "apply"],
 ];
 const CLASS_MIX: ExType[][] = [
-  ["def-mc", "mc", "match"],
-  ["def-mc", "bank", "tf"],
-  ["term-type", "bank", "mc"],
-  ["term-type", "type", "explain"],
+  ["def-mc", "mc", "tf"],
+  ["def-mc", "mc", "bank"],
+  ["term-type", "mc", "tf"],
+  ["term-type", "mc", "explain"],
   ["term-type", "type", "mc", "explain"],
 ];
 const QUOTE_MIX: ExType[][] = [
@@ -63,9 +65,9 @@ export function pickOrder(cards: Card[], now: Date): Card[] {
 class CardPicker {
   private uses = new Map<string, number>();
   constructor(private order: Card[], private max = 2) {}
-  /** Next card with the fewest uses, in priority order. */
-  next(filter: (c: Card) => boolean = () => true): Card | null {
-    for (let round = 0; round < this.max; round++) {
+  /** Next card with the fewest uses, in priority order; `rounds` 1 means unused cards only. */
+  next(filter: (c: Card) => boolean = () => true, rounds = this.max): Card | null {
+    for (let round = 0; round < rounds; round++) {
       for (const c of this.order) if ((this.uses.get(c.id) ?? 0) === round && filter(c)) return c;
     }
     return null;
@@ -180,7 +182,8 @@ export function buildSession(
       type = "mc";
     }
     const wantsDef = type === "def-mc" || type === "term-type";
-    const card = (wantsDef ? picker.next(isDefinition) : null) ?? picker.next();
+    const wantsConcept = type === "mc" || type === "flash";
+    const card = (wantsDef ? picker.next(isDefinition) : null) ?? (wantsConcept ? picker.next(isConcept, 1) : null) ?? picker.next();
     if (!card) break;
     let ex = genFor(type, card, ctx);
     if (!ex && type === "term-type") ex = genType(card);
@@ -423,4 +426,10 @@ export function answerCurrent(s: SessionState, verdict: Verdict, grade: Grade): 
     graded: { ...s.graded, ...newlyGraded },
   };
   return { state, newlyGraded };
+}
+
+/** Exercises built from concept cards, for the `concepts` prop of `session_start` (spec 13.4). */
+export function conceptExercises(exercises: Exercise[], cards: Card[]): number {
+  const concept = new Set(cards.filter(isConcept).map((c) => c.id));
+  return exercises.filter((e) => e.cardIds.some((id) => concept.has(id))).length;
 }

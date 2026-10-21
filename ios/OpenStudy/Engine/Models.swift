@@ -106,17 +106,20 @@ public struct Project: Codable, Identifiable, Equatable, Hashable {
     public var goalDate: String?      // v2: "YYYY-MM-DD"
     public var minutesPerDay: Int?    // v2: plan override
     public var category: String?      // v3: subject shelf, e.g. "Biology" (spec 9.4)
+    public var focusLessons: [String]? // v7: lesson ids to study first; empty = everything (spec 13.5)
+    public var focusAsked: Bool?      // v7: the focus sheet was shown once
 
     public var kind: String { type ?? "book" }
     public var isClass: Bool { kind == "class" }
 
-    public init(id: String = IDGen.make(), title: String, author: String? = nil, color: ProjectColor, createdAt: String = ISO.now(), focus: String = "ideas", quotesAsked: Bool = false, sample: Bool? = nil, type: String? = nil, goalDate: String? = nil, minutesPerDay: Int? = nil, category: String? = nil) {
+    public init(id: String = IDGen.make(), title: String, author: String? = nil, color: ProjectColor, createdAt: String = ISO.now(), focus: String = "ideas", quotesAsked: Bool = false, sample: Bool? = nil, type: String? = nil, goalDate: String? = nil, minutesPerDay: Int? = nil, category: String? = nil, focusLessons: [String]? = nil, focusAsked: Bool? = nil) {
         self.id = id; self.title = title; self.author = author; self.color = color
         self.createdAt = createdAt; self.focus = focus; self.quotesAsked = quotesAsked; self.sample = sample
         self.type = type; self.goalDate = goalDate; self.minutesPerDay = minutesPerDay; self.category = category
+        self.focusLessons = focusLessons; self.focusAsked = focusAsked
     }
 
-    enum CodingKeys: String, CodingKey { case id, title, author, color, createdAt, focus, quotesAsked, sample, type, goalDate, minutesPerDay, category }
+    enum CodingKeys: String, CodingKey { case id, title, author, color, createdAt, focus, quotesAsked, sample, type, goalDate, minutesPerDay, category, focusLessons, focusAsked }
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(String.self, forKey: .id)
@@ -131,6 +134,8 @@ public struct Project: Codable, Identifiable, Equatable, Hashable {
         goalDate = try c.decodeIfPresent(String.self, forKey: .goalDate)
         minutesPerDay = try c.decodeIfPresent(Int.self, forKey: .minutesPerDay)
         category = try c.decodeIfPresent(String.self, forKey: .category)
+        focusLessons = try c.decodeIfPresent([String].self, forKey: .focusLessons)
+        focusAsked = try c.decodeIfPresent(Bool.self, forKey: .focusAsked)
     }
 }
 
@@ -269,21 +274,26 @@ public struct Card: Codable, Identifiable, Equatable, Hashable {
     public var attribution: String?
     public var term: String?
     public var definition: String?
+    /// v7: 1..5 word label for the idea a concept card tests (spec 13.1).
+    public var concept: String?
     public var srs: Srs
 
     public var isDefinition: Bool { !(term ?? "").isEmpty && !(definition ?? "").isEmpty }
 
     public var isQuote: Bool { kind == "quote" }
     public var isPicture: Bool { kind == "picture" }
+    /// A concept card asks about an idea: concept, question and answer set, and no term (spec 13.1).
+    public var isConcept: Bool { !(concept ?? "").isEmpty && !(question ?? "").isEmpty && !(answer ?? "").isEmpty && (term ?? "").isEmpty }
 
-    public init(id: String = IDGen.make(), lessonId: String, projectId: String, pageId: String? = nil, kind: String, statement: String, cloze: String? = nil, question: String? = nil, answer: String? = nil, distractors: [String]? = nil, falseStatement: String? = nil, attribution: String? = nil, term: String? = nil, definition: String? = nil, srs: Srs = .fresh()) {
+    public init(id: String = IDGen.make(), lessonId: String, projectId: String, pageId: String? = nil, kind: String, statement: String, cloze: String? = nil, question: String? = nil, answer: String? = nil, distractors: [String]? = nil, falseStatement: String? = nil, attribution: String? = nil, term: String? = nil, definition: String? = nil, concept: String? = nil, srs: Srs = .fresh()) {
         self.id = id; self.lessonId = lessonId; self.projectId = projectId; self.pageId = pageId
         self.kind = kind; self.statement = statement; self.cloze = cloze; self.question = question
         self.answer = answer; self.distractors = distractors; self.falseStatement = falseStatement
         self.attribution = attribution; self.srs = srs; self.term = term; self.definition = definition
+        self.concept = concept
     }
 
-    enum CodingKeys: String, CodingKey { case id, lessonId, projectId, pageId, kind, statement, cloze, question, answer, distractors, falseStatement, attribution, term, definition, srs }
+    enum CodingKeys: String, CodingKey { case id, lessonId, projectId, pageId, kind, statement, cloze, question, answer, distractors, falseStatement, attribution, term, definition, concept, srs }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -301,6 +311,7 @@ public struct Card: Codable, Identifiable, Equatable, Hashable {
         attribution = try c.decodeIfPresent(String.self, forKey: .attribution)
         term = try c.decodeIfPresent(String.self, forKey: .term)
         definition = try c.decodeIfPresent(String.self, forKey: .definition)
+        concept = try c.decodeIfPresent(String.self, forKey: .concept)
         // Sample cards ship without srs: initialize on load.
         srs = try c.decodeIfPresent(Srs.self, forKey: .srs) ?? .fresh()
     }

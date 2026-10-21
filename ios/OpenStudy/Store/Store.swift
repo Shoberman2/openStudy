@@ -205,7 +205,7 @@ final class Store: ObservableObject {
         let wordPages = pages.filter { !($0.words ?? []).isEmpty }
         let other = pages.filter { ($0.words ?? []).isEmpty }
         if !other.isEmpty, let client = smartClient, smartOn,
-           let r = await client.build(title: title, author: author, pages: other, profile: library.profile, wantQuotes: true) {
+           let r = await client.build(title: title, author: author, type: type, pages: other, profile: library.profile, wantQuotes: true) {
             let smart = PictureCards.attach(r, pages: PageNumbers.ordered(other))
             return BuildResult(lessons: WordList.lessons(PageNumbers.ordered(wordPages)) + smart.lessons, quotes: smart.quotes)
         }
@@ -282,6 +282,11 @@ final class Store: ObservableObject {
         library.log("project_renamed", ["projectId": .string(id)])
     }
 
+    /// Choose a focus (spec 13.5). An empty list means everything.
+    func setFocus(_ projectId: String, lessonIds: [String]) {
+        library.setFocus(projectId: projectId, lessonIds: lessonIds)
+    }
+
     func setCategory(_ id: String, to category: String) {
         let c = category.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !c.isEmpty, let i = library.projects.firstIndex(where: { $0.id == id }), library.projects[i].category != c else { return }
@@ -324,7 +329,8 @@ final class Store: ObservableObject {
         let isClass = SessionBuilder.usesClassMix(projectIsClass: library.project(lesson.projectId)?.isClass ?? false, cards: library.cards(of: lesson.id))
         let ex = SessionBuilder.build(lesson: lesson, cards: library.cards(of: lesson.id), projectCards: library.cards(ofProject: lesson.projectId), profile: library.profile, isClass: isClass, rng: &rng)
         guard !ex.isEmpty else { toast = "This lesson has no cards yet"; return }
-        library.log("session_start", ["lessonKind": .string(lesson.kind), "level": .number(Double(lesson.level)), "projectId": .string(lesson.projectId)])
+        library.log("session_start", ["lessonKind": .string(lesson.kind), "level": .number(Double(lesson.level)), "projectId": .string(lesson.projectId),
+                                      "concepts": .number(Double(SessionBuilder.conceptCount(ex, cards: library.cards(of: lesson.id))))])
         session = SessionLaunch(lessonId: lesson.id, projectId: lesson.projectId, exercises: ex, title: lesson.title)
     }
 
@@ -333,7 +339,7 @@ final class Store: ObservableObject {
         var rng = SystemRandomNumberGenerator()
         let ex = SessionBuilder.practice(cards: library.cards, profile: library.profile, rng: &rng)
         guard !ex.isEmpty else { return false }
-        library.log("session_start", ["lessonKind": .string("review"), "level": .number(0)])
+        library.log("session_start", ["lessonKind": .string("review"), "level": .number(0), "concepts": .number(Double(SessionBuilder.conceptCount(ex, cards: library.cards)))])
         session = SessionLaunch(lessonId: nil, projectId: nil, exercises: ex, title: "Practice")
         return true
     }
@@ -405,7 +411,8 @@ final class Store: ObservableObject {
         var rng = SystemRandomNumberGenerator()
         let ex = PracticeTest.build(project: p, lib: library, rng: &rng)
         guard !ex.isEmpty else { toast = "Add lessons before taking a test"; return }
-        library.log("session_start", ["lessonKind": "test", "level": 0, "projectId": .string(projectId)])
+        library.log("session_start", ["lessonKind": "test", "level": 0, "projectId": .string(projectId),
+                                      "concepts": .number(Double(SessionBuilder.conceptCount(ex, cards: library.cards(ofProject: projectId))))])
         session = SessionLaunch(lessonId: nil, projectId: projectId, exercises: ex, title: "Practice test", isTest: true)
     }
 
