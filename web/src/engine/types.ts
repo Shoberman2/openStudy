@@ -94,6 +94,8 @@ export type Lesson = {
   order: number;
   level: number;
   sessions: number;
+  /** A model already tried writing concept questions for this lesson (spec 13.6). */
+  conceptsWritten?: boolean;
 };
 
 export type Srs = {

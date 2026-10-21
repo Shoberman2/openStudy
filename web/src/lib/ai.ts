@@ -8,6 +8,7 @@ import { buildProject, wordLessons, type ClassPage } from "@/engine/classbuilder
 import { withPictures } from "@/engine/pictures";
 import { groupPages, orderByPageNumber, type GroupPage, type SuggestedGroup } from "@/engine/grouping";
 import type { Page, Profile, ProjectType } from "@/engine/types";
+import type { WrittenConcept } from "@/engine/written";
 
 let health: Promise<{ ai: boolean; notes: boolean }> | null = null;
 
@@ -193,4 +194,16 @@ export async function askNotes(question: string, pages: { id: string; title: str
   });
   if (!r?.grounded || !r.citations?.length) return offline(true);
   return { smart: true, answer: r.answer, citations: r.citations.map((c) => ({ pageId: c.pageId, text: c.quote })) };
+}
+
+/** Concept questions for a lesson's cards from the server (spec 13.6); null when there is no model or it failed. */
+export async function writeConcepts(
+  lesson: { title: string },
+  project: { title: string; type?: ProjectType },
+  cards: { id: string; text: string }[],
+): Promise<WrittenConcept[] | null> {
+  if (!cards.length || !(await smartOrganizeOn())) return null;
+  const timeout = new Promise<null>((r) => setTimeout(() => r(null), 25_000));
+  const res = await Promise.race([post<{ cards: WrittenConcept[] }>("/api/questions", { lesson, project, cards }), timeout]);
+  return res?.cards ?? null;
 }

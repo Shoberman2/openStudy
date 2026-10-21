@@ -77,6 +77,7 @@ struct RootView: View {
             PaywallView(from: req.from, onUnlocked: { store.paywall = nil }, onClose: { store.paywall = nil })
                 .environmentObject(store)
         }
+        .overlay { WritingQuestionsView() }
         .overlay(alignment: .top) { ToastView() }
         .task { await store.refreshSmartStatus() }
         .task {
@@ -94,6 +95,23 @@ struct RootView: View {
         #if DEBUG
         .onAppear { if DebugLaunch.screen == "onboarding" { showOnboarding = true } }
         #endif
+    }
+}
+
+/// "Writing questions for <lesson>" while a writer works on a lesson (spec 13.6).
+struct WritingQuestionsView: View {
+    @EnvironmentObject var store: Store
+    var body: some View {
+        if let title = store.writingFor {
+            VStack(spacing: 14) {
+                ProgressView().controlSize(.large)
+                Text("Writing questions for \(title)").font(Typo.headline).foregroundStyle(Palette.ink).multilineTextAlignment(.center)
+            }
+            .padding(24)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Palette.paper.ignoresSafeArea())
+            .transition(.opacity)
+        }
     }
 }
 

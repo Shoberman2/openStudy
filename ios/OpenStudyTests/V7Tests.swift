@@ -159,10 +159,15 @@ final class V7Tests: XCTestCase {
     // MARK: Session mix (13.4)
 
     func testMixes() {
-        XCTAssertEqual(SessionBuilder.themeMix(level: 0), [.mc, .tf, .mc, .bank])
-        XCTAssertEqual(SessionBuilder.themeMix(level: 4), [.mc, .type, .tf, .explain, .apply])
+        XCTAssertEqual(SessionBuilder.themeMix(level: 0), [.mc, .tf, .mc])
+        XCTAssertEqual(SessionBuilder.themeMix(level: 1), [.mc, .tf, .mc])
+        XCTAssertEqual(SessionBuilder.themeMix(level: 2), [.mc, .tf, .explain])
+        XCTAssertEqual(SessionBuilder.themeMix(level: 3), [.mc, .tf, .explain])
+        XCTAssertEqual(SessionBuilder.themeMix(level: 4), [.mc, .tf, .explain, .apply])
         XCTAssertEqual(SessionBuilder.classMix(level: 0), [.defMc, .mc, .tf])
+        XCTAssertEqual(SessionBuilder.classMix(level: 1), [.defMc, .mc, .tf])
         XCTAssertEqual(SessionBuilder.classMix(level: 3), [.termType, .mc, .explain])
+        XCTAssertEqual(SessionBuilder.classMix(level: 4), [.termType, .mc, .tf, .explain])
     }
 
     func testMcPrefersConceptCards() {
@@ -183,12 +188,12 @@ final class V7Tests: XCTestCase {
             XCTAssertEqual(ex.count, 10)
             let mc = ex.filter { $0.kind == .mc }
             XCTAssertFalse(mc.isEmpty)
-            // The first mc slots each take a concept card not used yet in this session; then the normal pick.
-            let firstMc = mc.prefix(5).map(\.cardId)
+            // The first mc and tf slots each take a concept card not used yet in this session; then the normal pick.
+            let firstMc = ex.filter { $0.kind == .mc || $0.kind == .tf }.prefix(5).map(\.cardId)
             XCTAssertTrue(firstMc.allSatisfy { $0.hasPrefix("c") }, "\(ex.map { ($0.kind, $0.cardId) })")
             XCTAssertEqual(Set(firstMc).count, firstMc.count)
-            XCTAssertEqual(mc.first?.body.hasPrefix("What does thing"), true)
-            XCTAssertGreaterThanOrEqual(SessionBuilder.conceptCount(ex, cards: cards), min(mc.count, 5))
+            XCTAssertEqual(mc.first.map { $0.cardId.hasPrefix("c") ? $0.body.hasPrefix("What does thing") : true }, true)
+            XCTAssertGreaterThanOrEqual(SessionBuilder.conceptCount(ex, cards: cards), 5)
         }
     }
 

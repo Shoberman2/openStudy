@@ -235,6 +235,8 @@ public struct Lesson: Codable, Identifiable, Equatable, Hashable {
     public var order: Int
     public var level: Int
     public var sessions: Int
+    /// v7: a writer already had its one try at concept questions for this lesson (spec 13.6).
+    public var conceptsWritten: Bool?
 
     public var isQuotes: Bool { kind == "quotes" }
 

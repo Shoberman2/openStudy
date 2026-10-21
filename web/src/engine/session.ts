@@ -27,20 +27,20 @@ import { MAX_PICTURES_PER_SESSION, isPicture } from "./pictures";
 import { isDue } from "./srs";
 import type { Card, Grade, Lesson, Profile, ProjectType } from "./types";
 
-// Concept questions lead; one missing word is the minority (spec 13.4).
+// Questions about ideas only; a missing word shows up only when a lesson has no concept card left (spec 13.4).
 const THEME_MIX: ExType[][] = [
-  ["mc", "tf", "mc", "bank"],
-  ["mc", "tf", "bank"],
-  ["mc", "tf", "type"],
-  ["mc", "type", "explain"],
-  ["mc", "type", "tf", "explain", "apply"],
+  ["mc", "tf", "mc"],
+  ["mc", "tf", "mc"],
+  ["mc", "tf", "explain"],
+  ["mc", "tf", "explain"],
+  ["mc", "tf", "explain", "apply"],
 ];
 const CLASS_MIX: ExType[][] = [
   ["def-mc", "mc", "tf"],
-  ["def-mc", "mc", "bank"],
+  ["def-mc", "mc", "tf"],
   ["term-type", "mc", "tf"],
   ["term-type", "mc", "explain"],
-  ["term-type", "type", "mc", "explain"],
+  ["term-type", "mc", "tf", "explain"],
 ];
 const QUOTE_MIX: ExType[][] = [
   ["q-bank1"],
@@ -167,7 +167,7 @@ export function buildSession(
     const matches = out.filter((e) => e.type === "match").length;
     if (type === "match" && (prev === "match" || matches >= (mine.length >= 12 ? 2 : 1))) type = "mc";
     if (type === "type" && out.length === 0) type = mix.find((t) => t !== "type" && t !== "apply") ?? "mc";
-    if ((type === "apply" || type === "explain") && (applyUsed || out.length === 0)) type = "type";
+    if ((type === "apply" || type === "explain") && (applyUsed || out.length === 0)) type = "mc";
     if (type === "term-type" && out.length === 0) type = "def-mc";
     if (type === "type" && out.length === 0) type = "mc";
 
@@ -182,7 +182,7 @@ export function buildSession(
       type = "mc";
     }
     const wantsDef = type === "def-mc" || type === "term-type";
-    const wantsConcept = type === "mc" || type === "flash";
+    const wantsConcept = type === "mc" || type === "tf" || type === "flash";
     const card = (wantsDef ? picker.next(isDefinition) : null) ?? (wantsConcept ? picker.next(isConcept, 1) : null) ?? picker.next();
     if (!card) break;
     let ex = genFor(type, card, ctx);

@@ -16,3 +16,4 @@ web/.next/
 web/.env*.local
 ios/build/
 ios/DerivedData/
+.vercel

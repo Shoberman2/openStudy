@@ -1,15 +1,18 @@
 "use client";
 
+import { LoaderCircle } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Exercise } from "@/engine/exercises";
 import { logEvent } from "@/engine/library";
 import { buildSession, conceptExercises } from "@/engine/session";
-import type { Grade } from "@/engine/types";
+import type { Card, Grade } from "@/engine/types";
+import { applyWrittenConcepts, needsWrittenConcepts, writerInput } from "@/engine/written";
 import { localDay } from "@/engine/util";
 import { displayStreak } from "@/engine/xp";
 import { applyGrades, finishLesson } from "@/lib/actions";
+import { writeConcepts } from "@/lib/ai";
 import { useLibrary } from "@/lib/store";
 import { PlusGate } from "@/components/app/PlusGate";
 import { Loading } from "@/components/app/AppChrome";
@@ -27,13 +30,25 @@ function LearnPageSession() {
   const project = lesson ? lib.projects.find((p) => p.id === lesson.projectId) : undefined;
 
   useEffect(() => {
-    if (!ready || built.current || !lesson) return;
+    if (!ready || built.current || !lesson || !project) return;
     built.current = true;
-    const projectType = lib.projects.find((p) => p.id === lesson.projectId)?.type;
-    const ex = buildSession(lesson, lib.cards, lib.profile, new Date(), Math.random, lib.cards.filter((c) => c.projectId === lesson.projectId), { projectType });
-    setExercises(ex);
-    update((l) => logEvent(l, "session_start", { lessonKind: lesson.kind, level: lesson.level, concepts: conceptExercises(ex, lib.cards), projectId: lesson.projectId, lessonId: lesson.id }));
-  }, [ready, lesson, lib.cards, lib.profile, lib.projects, update]);
+    const start = (cards: Card[]) => {
+      const ex = buildSession(lesson, cards, lib.profile, new Date(), Math.random, cards.filter((c) => c.projectId === lesson.projectId), { projectType: project.type });
+      setExercises(ex);
+      update((l) => logEvent(l, "session_start", { lessonKind: lesson.kind, level: lesson.level, concepts: conceptExercises(ex, cards), projectId: lesson.projectId, lessonId: lesson.id }));
+    };
+    if (!needsWrittenConcepts(lib, lesson.id)) return start(lib.cards);
+    // Spec 13.6: a model rewrites the lesson as questions about ideas the first time it is opened.
+    void writeConcepts({ title: lesson.title }, { title: project.title, type: project.type }, writerInput(lib, lesson.id)).then((written) => {
+      let cards = lib.cards;
+      update((l) => {
+        const next = applyWrittenConcepts(l, lesson.id, written ?? [], written ? "server" : "none");
+        cards = next.cards;
+        return next;
+      });
+      start(cards);
+    });
+  }, [ready, lesson, project, lib, update]);
 
   const sourceFor = useCallback(
     (ex: Exercise): Source | null => {
@@ -84,6 +99,13 @@ function LearnPageSession() {
       />
     );
   }
+  // Shown until the writer is done: applying its result marks the lesson as written (spec 13.6).
+  if (!exercises && needsWrittenConcepts(lib, lesson.id))
+    return (
+      <div className="flex min-h-dvh items-center justify-center gap-3 p-6 font-bold text-muted" aria-busy="true">
+        <LoaderCircle className="animate-spin" size={22} /> Writing questions for {lesson.title}
+      </div>
+    );
   if (!exercises) return <Loading />;
   if (!exercises.length)
     return (

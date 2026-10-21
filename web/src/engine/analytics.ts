@@ -170,6 +170,7 @@ export function study(rows: EventRow[], now: Date, days: number) {
     practiceTests: rows.filter((r) => r.name === "test_done" && r.t >= from).length,
     asks: rows.filter((r) => r.name === "ask" && r.t >= from).length,
     // Spec 13: how often sessions ask about ideas, and what people choose to focus on.
+    questionsWritten: countBy(rows.filter((r) => r.name === "questions_written" && r.t >= from), (r) => str(r.props.source)),
     avgConceptQuestions: avg(starts.filter((r) => typeof r.props.concepts === "number").map((r) => num(r.props.concepts))),
     focus: (() => {
       const set = rows.filter((r) => r.name === "focus_set" && r.t >= from);

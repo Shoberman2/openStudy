@@ -71,21 +71,22 @@ public enum SessionBuilder {
     public static func classMix(level: Int) -> [ExerciseKind] {
         switch level {
         case ...0: return [.defMc, .mc, .tf]
-        case 1: return [.defMc, .mc, .bank]
+        case 1: return [.defMc, .mc, .tf]
         case 2: return [.termType, .mc, .tf]
         case 3: return [.termType, .mc, .explain]
-        default: return [.termType, .type, .mc, .explain]
+        default: return [.termType, .mc, .tf, .explain]
         }
     }
 
-    /// Theme lessons by level (spec 13.4, replaces 5.2). Concept questions lead; one missing word is the minority.
+    /// Theme lessons by level (spec 13.4, replaces 5.2). No word bank, match or typed blank: a missing word
+    /// only shows up when the lesson has no concept card left for an mc or tf slot.
     public static func themeMix(level: Int) -> [ExerciseKind] {
         switch level {
-        case ...0: return [.mc, .tf, .mc, .bank]
-        case 1: return [.mc, .tf, .bank]
-        case 2: return [.mc, .tf, .type]
-        case 3: return [.mc, .type, .explain]
-        default: return [.mc, .type, .tf, .explain, .apply]
+        case ...0: return [.mc, .tf, .mc]
+        case 1: return [.mc, .tf, .mc]
+        case 2: return [.mc, .tf, .explain]
+        case 3: return [.mc, .tf, .explain]
+        default: return [.mc, .tf, .explain, .apply]
         }
     }
 
@@ -146,10 +147,11 @@ public enum SessionBuilder {
             var kind: ExerciseKind
             if out.count == flashSlot { kind = .flash }
             else { kind = weightedPick(mix, profile.practice, &rng) }
-            if (kind == .type || kind == .termType || kind == .explain) && out.isEmpty { kind = lesson.isQuotes ? .qBank1 : (isClass ? .defMc : .mc) }
-            if kind == .explain && deepUsed { kind = .termType }
+            if (kind == .type || kind == .termType) && out.isEmpty { kind = lesson.isQuotes ? .qBank1 : (isClass ? .defMc : .mc) }
+            // An explain or apply slot that cannot be used becomes mc, never a typed blank (spec 13.4).
+            if (kind == .explain || kind == .apply) && (out.isEmpty || deepUsed) { kind = .mc }
+            if kind == .apply && !profile.goals.contains("apply") { kind = .mc }
             if kind == .match && out.last?.kind == .match { kind = .mc }
-            if kind == .apply && (deepUsed || !profile.goals.contains("apply")) { kind = .type }
             if kind == .qRecall && out.isEmpty { kind = .qLetters }
 
             // Pick the next card, avoiding an immediate repeat when possible.
@@ -157,8 +159,8 @@ public enum SessionBuilder {
             let last = out.last?.cardIds.last
             if let last, sequence.count > 1, sequence[0] == last,
                let alt = sequence.firstIndex(where: { $0 != last }) { idx = alt }
-            // mc and flash slots take the next concept card not yet used in this session first (spec 13.4).
-            if kind == .mc || kind == .flash,
+            // mc, tf and flash slots take the next concept card not yet used in this session first (spec 13.4).
+            if kind == .mc || kind == .tf || kind == .flash,
                let ci = sequence.firstIndex(where: { !usedIds.contains($0) && byId[$0]!.isConcept }) { idx = ci }
             let card = byId[sequence[idx]]!
             sequence.remove(at: idx)

@@ -48,6 +48,8 @@ final class Store: ObservableObject {
     @Published var showImport = false
     @Published var toast: String?
     @Published var paywall: PaywallRequest?
+    /// The lesson title while a writer makes its concept questions (spec 13.6).
+    @Published var writingFor: String?
     @AppStorage("smartServer") var smartServer: String = ""
     @Published var smartOn = false
 
@@ -325,6 +327,23 @@ final class Store: ObservableObject {
 
     func start(lesson: Lesson) {
         guard plusAllowed(sample: isSample(lesson.projectId), from: "lesson") else { return }
+        guard writingFor == nil else { return }
+        guard WrittenConcepts.needsWrittenConcepts(library, lessonId: lesson.id) else { return begin(lesson) }
+        // The first time a lesson opens, a writer turns its cards into concept questions (spec 13.6).
+        let project = library.project(lesson.projectId)
+        let input = QuestionWriter.Input(lessonTitle: lesson.title, projectTitle: project?.title ?? "", projectType: project?.kind ?? "book",
+                                         cards: WrittenConcepts.writerInput(library, lessonId: lesson.id))
+        let server = smartOn ? smartClient : nil
+        writingFor = lesson.title
+        Task {
+            let result = await QuestionWriter.write(input, server: server)
+            library = WrittenConcepts.applyWrittenConcepts(library, lessonId: lesson.id, written: result.cards, source: result.source)
+            writingFor = nil
+            begin(library.lessons.first { $0.id == lesson.id } ?? lesson)
+        }
+    }
+
+    private func begin(_ lesson: Lesson) {
         var rng = SystemRandomNumberGenerator()
         let isClass = SessionBuilder.usesClassMix(projectIsClass: library.project(lesson.projectId)?.isClass ?? false, cards: library.cards(of: lesson.id))
         let ex = SessionBuilder.build(lesson: lesson, cards: library.cards(of: lesson.id), projectCards: library.cards(ofProject: lesson.projectId), profile: library.profile, isClass: isClass, rng: &rng)
