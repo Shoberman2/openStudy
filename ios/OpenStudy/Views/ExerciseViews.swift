@@ -45,6 +45,20 @@ struct MCView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             PromptText(text: ex.body)
+            if !ex.context.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(ex.context, id: \.self) { line in
+                        Text("\u{201C}\(line)\u{201D}")
+                            .font(Typo.serif(18))
+                            .foregroundStyle(Palette.ink)
+                            .lineSpacing(3)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Palette.shelf))
+            }
             VStack(spacing: 10) {
                 ForEach(Array(ex.options.enumerated()), id: \.offset) { _, o in
                     Button { Haptics.tap(); answer = .choice(o) } label: { Text(o).frame(maxWidth: .infinity, alignment: .leading) }

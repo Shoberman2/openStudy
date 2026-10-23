@@ -2,8 +2,16 @@ import Foundation
 
 // MARK: - Written concept questions (spec 13.6)
 
-/// One card a writer sends to the model: its id and statement.
+/// One card a writer sends to the model: its id, statement and the page it came from.
 public struct WriterCard: Codable, Equatable, Hashable {
+    public var id: String
+    public var text: String
+    public var pageId: String?
+    public init(id: String, text: String, pageId: String? = nil) { self.id = id; self.text = text; self.pageId = pageId }
+}
+
+/// A page the writer's cards come from, so it can ask about the page as a whole (spec 13.7).
+public struct WriterPage: Codable, Equatable, Hashable {
     public var id: String
     public var text: String
     public init(id: String, text: String) { self.id = id; self.text = text }
@@ -29,6 +37,7 @@ public struct WrittenConcept: Codable, Equatable, Hashable {
 public enum WrittenConcepts {
     public static let maxInput = 14
     public static let timeLimit: TimeInterval = 25
+    public static let pageChars = 1200
 
     /// Fact cards: no term, no pictures, no quotes.
     static func factCards(_ lib: Library, _ lessonId: String) -> [Card] {
@@ -47,7 +56,14 @@ public enum WrittenConcepts {
 
     /// The lesson's fact cards as `{id, text}`, at most 14.
     public static func writerInput(_ lib: Library, lessonId: String) -> [WriterCard] {
-        factCards(lib, lessonId).prefix(maxInput).map { WriterCard(id: $0.id, text: $0.statement) }
+        factCards(lib, lessonId).prefix(maxInput).map { WriterCard(id: $0.id, text: $0.statement, pageId: $0.pageId) }
+    }
+
+    /// The pages the writer's cards come from, text cut to 1200 characters.
+    public static func writerPages(_ lib: Library, lessonId: String) -> [WriterPage] {
+        let ids = Set(writerInput(lib, lessonId: lessonId).compactMap(\.pageId))
+        return lib.pages.filter { ids.contains($0.id) && !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .map { WriterPage(id: $0.id, text: String($0.text.prefix(pageChars))) }
     }
 
     static func clean(_ s: String?) -> String { (s ?? "").trimmingCharacters(in: .whitespacesAndNewlines) }

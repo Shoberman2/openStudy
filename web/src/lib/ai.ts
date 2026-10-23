@@ -200,10 +200,11 @@ export async function askNotes(question: string, pages: { id: string; title: str
 export async function writeConcepts(
   lesson: { title: string },
   project: { title: string; type?: ProjectType },
-  cards: { id: string; text: string }[],
+  cards: { id: string; text: string; pageId?: string }[],
+  pages: { id: string; text: string }[] = [],
 ): Promise<WrittenConcept[] | null> {
   if (!cards.length || !(await smartOrganizeOn())) return null;
   const timeout = new Promise<null>((r) => setTimeout(() => r(null), 25_000));
-  const res = await Promise.race([post<{ cards: WrittenConcept[] }>("/api/questions", { lesson, project, cards }), timeout]);
+  const res = await Promise.race([post<{ cards: WrittenConcept[] }>("/api/questions", { lesson, project, cards, pages }), timeout]);
   return res?.cards ?? null;
 }

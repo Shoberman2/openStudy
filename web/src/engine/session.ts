@@ -12,6 +12,7 @@ import {
   genBank,
   genFlash,
   genMC,
+  genPageMC,
   genMatch,
   genQuoteBank,
   genQuoteLetters,
@@ -22,6 +23,8 @@ import {
   type ExType,
   type Exercise,
   type GenCtx,
+  type McForm,
+  type PageForm,
 } from "./exercises";
 import { MAX_PICTURES_PER_SESSION, isPicture } from "./pictures";
 import { isDue } from "./srs";
@@ -78,6 +81,42 @@ class CardPicker {
   available(filter: (c: Card) => boolean = () => true): Card[] {
     return this.order.filter((c) => (this.uses.get(c.id) ?? 0) < this.max && filter(c)).sort((a, b) => (this.uses.get(a.id) ?? 0) - (this.uses.get(b.id) ?? 0));
   }
+}
+
+const MC_FORMS: McForm[] = ["concept", "gist", "odd", "mate"];
+const PAGE_FORMS: PageForm[] = ["gist", "odd", "mate"];
+
+/** The k-th mc slot of a lesson (spec 13.7): forms cycle from k and the first one that works wins, unused cards first. */
+function mixedMC(picker: CardPicker, ctx: GenCtx, k: number, asked: Set<string>): { card: Card; ex: Exercise } | null {
+  for (const rounds of [1, 2]) {
+    for (let i = 0; i < MC_FORMS.length; i++) {
+      const form = MC_FORMS[(k + i) % MC_FORMS.length];
+      if (form === "concept") {
+        const card = picker.next(isConcept, rounds);
+        if (card) return { card, ex: { ...genMC(card, ctx), form } as Exercise };
+        continue;
+      }
+      // Every card on a page gives the same gist and odd question, so each is asked once per session.
+      const key = (c: Card) => (form === "mate" ? `mate:${c.id}` : `${form}:${c.pageId}`);
+      const made: { ex: Exercise | null } = { ex: null };
+      const card = picker.next((c) => !asked.has(key(c)) && !!(made.ex = genPageMC(c, ctx, form)), rounds);
+      if (card && made.ex) {
+        asked.add(key(card));
+        return { card, ex: made.ex };
+      }
+    }
+  }
+  return null;
+}
+
+/** One card's mc outside a lesson (spec 13.7 Practice): its concept question, else a page form, else plain. */
+function cardMC(card: Card, ctx: GenCtx, k: number): Exercise {
+  if (isConcept(card)) return { ...genMC(card, ctx), form: "concept" } as Exercise;
+  for (let i = 0; i < PAGE_FORMS.length; i++) {
+    const ex = genPageMC(card, ctx, PAGE_FORMS[(k + i) % PAGE_FORMS.length]);
+    if (ex) return ex;
+  }
+  return genMC(card, ctx);
 }
 
 function weightedPick(types: ExType[], weights: number[], rand: () => number): ExType {
@@ -160,6 +199,8 @@ export function buildSession(
 
   const out: Exercise[] = [];
   let applyUsed = false;
+  let mcSlots = 0;
+  const asked = new Set<string>();
   for (let slot = 0; slot < length * 3 && out.length < length; slot++) {
     let type = isQuotes ? weightedPick(mix, mix.map(() => 1), rand) : weightedPick(mix, weights, rand);
     const prev = out[out.length - 1]?.type;
@@ -180,6 +221,22 @@ export function buildSession(
         continue;
       }
       type = "mc";
+    }
+    if (type === "mc") {
+      const picked = mixedMC(picker, ctx, mcSlots++, asked);
+      if (picked) {
+        picker.take(picked.card);
+        out.push(picked.ex);
+        continue;
+      }
+      // Nothing left to ask about a page: a whole-sentence true or false beats a missing word.
+      const card = picker.next();
+      const tf = card ? genTF(card, ctx) : null;
+      if (card && tf) {
+        picker.take(card);
+        out.push(tf);
+        continue;
+      }
     }
     const wantsDef = type === "def-mc" || type === "term-type";
     const wantsConcept = type === "mc" || type === "tf" || type === "flash";
@@ -241,22 +298,13 @@ export function buildPractice(cards: Card[], now: Date, rand: () => number = Mat
     if (card.kind === "quote") {
       ex = rand() < 0.5 ? genQuoteBank(card, ctx, 3) : genQuoteLetters(card);
       if (!ex) ex = genQuoteLetters(card);
-    } else {
-      const r = rand();
-      const t: ExType = isDefinition(card)
-        ? out.length === 0 || r < 0.5
-          ? "def-mc"
-          : "term-type"
-        : out.length === 0
-          ? r < 0.5
-            ? "mc"
-            : "bank"
-          : r < 0.4
-            ? "mc"
-            : r < 0.7
-              ? "bank"
-              : "type";
+    } else if (isDefinition(card)) {
+      const t: ExType = out.length === 0 || rand() < 0.5 ? "def-mc" : "term-type";
       ex = genFor(t, card, ctx) ?? genMC(card, ctx);
+    } else {
+      // No word bank or typed blank in Practice (spec 13.7).
+      const tf = out.length > 0 && rand() >= 0.6 ? genTF(card, ctx) : null;
+      ex = tf ?? cardMC(card, ctx, out.length);
     }
     out.push(ex);
   }
@@ -334,7 +382,7 @@ export function buildFromCards(cards: Card[], pool: Card[], rand: () => number =
     if (card.kind === "picture") return genPicture(card) ?? genMC(card, ctx);
     if (card.kind === "quote") return genQuoteBank(card, ctx, 3) ?? genQuoteLetters(card);
     if (isDefinition(card)) return (i % 2 ? genTermType(card) : genDefMC(card, ctx)) ?? genMC(card, ctx);
-    return (i % 2 ? genBank(card, ctx) : null) ?? genMC(card, ctx);
+    return (i % 2 ? genTF(card, ctx) : null) ?? cardMC(card, ctx, i);
   });
 }
 

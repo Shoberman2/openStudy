@@ -1,6 +1,6 @@
 // Exercise generation from cards (spec 5.1) and checking of answers (spec 5.3).
 import { checkTyped, scoreQuote, type DiffToken, type Verdict } from "./check";
-import { STOPWORDS, containsTerm, normalizeAnswer, replaceTerm, truncate, wordCount } from "./text";
+import { STOPWORDS, containsTerm, normalizeAnswer, replaceTerm, tokens, truncate, wordCount } from "./text";
 import type { Card, Grade } from "./types";
 import { shuffle } from "./util";
 
@@ -9,12 +9,15 @@ export type QuoteType = "q-bank1" | "q-bank3" | "q-order" | "q-letters" | "q-rec
 export type ExType = FactType | QuoteType | "picture";
 
 export type Segment = string | { blank: number };
+/** Forms of multiple choice (spec 13.7): a concept question or a question about the whole page. */
+export type McForm = "concept" | "gist" | "odd" | "mate";
+export type PageForm = Exclude<McForm, "concept">;
 
 type Base = { id: string; cardIds: string[]; projectId: string };
 
 export type Exercise = Base &
   (
-    | { type: "mc"; prompt: string; options: string[]; answer: string }
+    | { type: "mc"; prompt: string; options: string[]; answer: string; context?: string[]; form?: McForm }
     | { type: "tf"; statement: string; truth: boolean; trueStatement: string }
     | { type: "bank" | "q-bank1" | "q-bank3"; segments: Segment[]; answers: string[]; options: string[]; attribution?: string }
     | { type: "type"; prompt: string; accepted: string[]; answer: string }
@@ -138,6 +141,83 @@ export function genMC(card: Card, ctx: GenCtx): Exercise {
   let distractors = uniqNorm(card.distractors ?? [], [answer]).slice(0, 3);
   if (distractors.length < 3) distractors = uniqNorm([...distractors, ...otherAnswers(card, ctx, 6, false)], [answer]).slice(0, 3);
   return { id: exId(), cardIds: [card.id], projectId: card.projectId, type: "mc", prompt: factQuestion(card), answer, options: shuffle([answer, ...distractors], ctx.rand) };
+}
+
+// ---------- whole-page questions (spec 13.7) ----------
+
+const PAGE_PROMPTS: Record<PageForm, string> = {
+  gist: "What's the main point of the page these lines come from?",
+  odd: "Three of these come from the same page. Which one doesn't fit?",
+  mate: "Which idea comes from the same page as this one?",
+};
+
+const takesPart = (c: Card) => c.kind === "fact" && !c.term && wordCount(c.statement) >= 4 && wordCount(c.statement) <= 25;
+
+export function pageMates(card: Card, pool: Card[]): Card[] {
+  if (!card.pageId || !takesPart(card)) return [];
+  const seen = new Set([normalizeAnswer(card.statement)]);
+  return pool.filter((c) => {
+    if (c.id === card.id || c.pageId !== card.pageId || !takesPart(c)) return false;
+    const k = normalizeAnswer(c.statement);
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
+function outsiders(card: Card, pool: Card[], target: number, n: number): string[] {
+  const taken = new Set(pool.filter((c) => card.pageId && c.pageId === card.pageId).map((c) => normalizeAnswer(c.statement)));
+  taken.add(normalizeAnswer(card.statement));
+  const cands = pool
+    .map((c, i) => ({ c, i }))
+    .filter(({ c }) => takesPart(c) && (!card.pageId || c.pageId !== card.pageId))
+    .sort((a, b) => Number(a.c.lessonId === card.lessonId) - Number(b.c.lessonId === card.lessonId) || Math.abs(wordCount(a.c.statement) - target) - Math.abs(wordCount(b.c.statement) - target) || a.i - b.i);
+  const out: string[] = [];
+  for (const { c } of cands) {
+    if (out.length >= n) break;
+    const k = normalizeAnswer(c.statement);
+    if (taken.has(k)) continue;
+    taken.add(k);
+    out.push(c.statement);
+  }
+  return out;
+}
+
+/** The page card sharing the most content words with the rest of the page; ties go to the earlier card. */
+function keyCard(set: Card[]): Card {
+  const stems = set.map((c) => new Set(tokens(c.statement).map((t) => t.stem)));
+  let best = 0;
+  let bestScore = -1;
+  set.forEach((_, i) => {
+    let score = 0;
+    stems[i].forEach((s) => stems.forEach((o, j) => j !== i && o.has(s) && score++));
+    if (score > bestScore) [best, bestScore] = [i, score];
+  });
+  return set[best];
+}
+
+export function genPageMC(card: Card, ctx: GenCtx, form: PageForm): Exercise | null {
+  const mates = pageMates(card, ctx.pool);
+  const base = { id: exId(), cardIds: [card.id], projectId: card.projectId, type: "mc" as const, form, prompt: PAGE_PROMPTS[form] };
+  if (form === "mate") {
+    if (!mates.length) return null;
+    const answer = mates[0].statement;
+    const wrong = outsiders(card, ctx.pool, wordCount(answer), 3);
+    if (wrong.length < 3) return null;
+    return { ...base, context: [card.statement], answer, options: shuffle([answer, ...wrong], ctx.rand) };
+  }
+  if (mates.length < 2) return null;
+  if (form === "odd") {
+    const own = [card, mates[0], mates[1]].map((c) => c.statement);
+    const [answer] = outsiders(card, ctx.pool, Math.round(own.reduce((a, s) => a + wordCount(s), 0) / 3), 1);
+    if (!answer) return null;
+    return { ...base, answer, options: shuffle([...own, answer], ctx.rand) };
+  }
+  const set = [card, ...mates];
+  const key = keyCard(set);
+  const wrong = outsiders(card, ctx.pool, wordCount(key.statement), 3);
+  if (wrong.length < 3) return null;
+  return { ...base, context: set.filter((c) => c !== key).slice(0, 2).map((c) => c.statement), answer: key.statement, options: shuffle([key.statement, ...wrong], ctx.rand) };
 }
 
 export function genTF(card: Card, ctx: GenCtx): Exercise | null {

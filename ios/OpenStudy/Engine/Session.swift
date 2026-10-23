@@ -40,6 +40,9 @@ public struct Exercise: Identifiable, Equatable {
     public var isRetry = false
     /// The page a picture exercise shows (spec 11.2).
     public var pageId: String?
+    /// Lines from the page shown above an mc prompt, and which mc form this is (spec 13.7).
+    public var context: [String] = []
+    public var form: String?
 
     public var cardId: String { cardIds.first ?? "" }
 
@@ -141,6 +144,9 @@ public enum SessionBuilder {
         // Explain and apply share one slot per session (spec 13.4).
         var deepUsed = false
         var usedIds = Set<String>()
+        var mcSlots = 0
+        var asked = Set<String>()
+        let pagePool = projectCards.isEmpty ? cards : projectCards
         let flashSlot = profile.practice.contains("flash") && !lesson.isQuotes ? min(3, length - 1) : -1
 
         while out.count < length, !sequence.isEmpty {
@@ -153,6 +159,20 @@ public enum SessionBuilder {
             if kind == .apply && !profile.goals.contains("apply") { kind = .mc }
             if kind == .match && out.last?.kind == .match { kind = .mc }
             if kind == .qRecall && out.isEmpty { kind = .qLetters }
+
+            // mc slots rotate through concept and whole-page questions (spec 13.7).
+            if kind == .mc {
+                if let (card, e) = mixedMC(k: mcSlots, sequence: sequence, usedIds: usedIds, byId: byId, pool: pagePool, asked: &asked, extraWords: extraWords, defs: defs, rng: &rng) {
+                    sequence.remove(at: sequence.firstIndex(of: card.id)!)
+                    usedIds.insert(card.id)
+                    out.append(e)
+                    mcSlots += 1
+                    continue
+                }
+                mcSlots += 1
+                // Nothing left to ask about a page: a whole-sentence true or false beats a missing word.
+                kind = .tf
+            }
 
             // Pick the next card, avoiding an immediate repeat when possible.
             var idx = 0
@@ -204,6 +224,144 @@ public enum SessionBuilder {
         return insertPictures(out, Array(pictures.prefix(nPictures)), rng: &rng)
     }
 
+    // MARK: Whole-page questions (spec 13.7)
+
+    public enum PageForm: String, CaseIterable {
+        case gist, odd, mate
+        var prompt: String {
+            switch self {
+            case .gist: return "What's the main point of the page these lines come from?"
+            case .odd: return "Three of these come from the same page. Which one doesn't fit?"
+            case .mate: return "Which idea comes from the same page as this one?"
+            }
+        }
+    }
+
+    static let mcForms = ["concept", "gist", "odd", "mate"]
+
+    /// Word count on whitespace, as on web.
+    static func spaceCount(_ s: String) -> Int { s.split(whereSeparator: \.isWhitespace).count }
+
+    static func takesPart(_ c: Card) -> Bool {
+        c.kind == "fact" && (c.term ?? "").isEmpty && (4...25).contains(spaceCount(c.statement))
+    }
+
+    public static func pageMates(_ c: Card, pool: [Card]) -> [Card] {
+        guard let page = c.pageId, takesPart(c) else { return [] }
+        var seen: Set<String> = [AnswerChecker.normalize(c.statement)]
+        return pool.filter { o in
+            guard o.id != c.id, o.pageId == page, takesPart(o) else { return false }
+            return seen.insert(AnswerChecker.normalize(o.statement)).inserted
+        }
+    }
+
+    /// Statements from other pages: other lessons first, then closest in word count, then pool order.
+    static func outsiders(_ c: Card, pool: [Card], target: Int, count: Int) -> [String] {
+        var taken = Set(pool.filter { c.pageId != nil && $0.pageId == c.pageId }.map { AnswerChecker.normalize($0.statement) })
+        taken.insert(AnswerChecker.normalize(c.statement))
+        let cands = pool.enumerated()
+            .filter { takesPart($0.element) && (c.pageId == nil || $0.element.pageId != c.pageId) }
+            .sorted { a, b in
+                let la = a.element.lessonId == c.lessonId ? 1 : 0, lb = b.element.lessonId == c.lessonId ? 1 : 0
+                if la != lb { return la < lb }
+                let da = abs(spaceCount(a.element.statement) - target), db = abs(spaceCount(b.element.statement) - target)
+                return da != db ? da < db : a.offset < b.offset
+            }
+        var out: [String] = []
+        for (_, o) in cands where out.count < count {
+            if taken.insert(AnswerChecker.normalize(o.statement)).inserted { out.append(o.statement) }
+        }
+        return out
+    }
+
+    /// The page card sharing the most content words with the rest of the page; ties go to the earlier card.
+    static func keyCard(_ set: [Card]) -> Card {
+        let stems = set.map { Set(TextKit.tokens($0.statement)) }
+        var best = 0, bestScore = -1
+        for i in set.indices {
+            var score = 0
+            for s in stems[i] { for j in set.indices where j != i && stems[j].contains(s) { score += 1 } }
+            if score > bestScore { best = i; bestScore = score }
+        }
+        return set[best]
+    }
+
+    public static func pageMC<R: RandomNumberGenerator>(_ c: Card, pool: [Card], form: PageForm, rng: inout R) -> Exercise? {
+        let mates = pageMates(c, pool: pool)
+        var e = Exercise(kind: .mc, cardIds: [c.id])
+        e.form = form.rawValue
+        e.body = form.prompt
+        switch form {
+        case .mate:
+            guard let mate = mates.first else { return nil }
+            let wrong = outsiders(c, pool: pool, target: spaceCount(mate.statement), count: 3)
+            guard wrong.count == 3 else { return nil }
+            e.context = [c.statement]
+            e.answer = mate.statement
+            e.options = ([mate.statement] + wrong).shuffled(using: &rng)
+        case .odd:
+            guard mates.count >= 2 else { return nil }
+            let own = [c, mates[0], mates[1]].map(\.statement)
+            let mean = Int((Double(own.map(spaceCount).reduce(0, +)) / 3).rounded())
+            guard let odd = outsiders(c, pool: pool, target: mean, count: 1).first else { return nil }
+            e.answer = odd
+            e.options = (own + [odd]).shuffled(using: &rng)
+        case .gist:
+            guard mates.count >= 2 else { return nil }
+            let set = [c] + mates
+            let key = keyCard(set)
+            let wrong = outsiders(c, pool: pool, target: spaceCount(key.statement), count: 3)
+            guard wrong.count == 3 else { return nil }
+            e.context = set.filter { $0.id != key.id }.prefix(2).map(\.statement)
+            e.answer = key.statement
+            e.options = ([key.statement] + wrong).shuffled(using: &rng)
+        }
+        return e
+    }
+
+    /// The k-th mc slot of a lesson: forms cycle from k and the first one that works wins, unused cards first.
+    /// A gist or odd question is asked once per page, a mate question once per card.
+    static func mixedMC<R: RandomNumberGenerator>(k: Int, sequence: [String], usedIds: Set<String>, byId: [String: Card], pool: [Card], asked: inout Set<String>,
+                                                  extraWords: [String], defs: [Card], rng: inout R) -> (Card, Exercise)? {
+        var seen = Set<String>()
+        let order = sequence.filter { seen.insert($0).inserted }.compactMap { byId[$0] }
+        for unusedOnly in [true, false] {
+            let cands = order.filter { !unusedOnly || !usedIds.contains($0.id) }
+            for i in 0..<mcForms.count {
+                let name = mcForms[(k + i) % mcForms.count]
+                guard let form = PageForm(rawValue: name) else {
+                    if let c = cands.first(where: \.isConcept) {
+                        var e = make(.mc, card: c, extraWords: extraWords, defs: defs, rng: &rng)
+                        e.form = "concept"
+                        return (c, e)
+                    }
+                    continue
+                }
+                for c in cands {
+                    let key = form == .mate ? "mate:\(c.id)" : "\(name):\(c.pageId ?? "")"
+                    if !asked.contains(key), let e = pageMC(c, pool: pool, form: form, rng: &rng) {
+                        asked.insert(key)
+                        return (c, e)
+                    }
+                }
+            }
+        }
+        return nil
+    }
+
+    /// One card's mc outside a lesson: its concept question, else a page form, else a plain mc.
+    static func cardMC<R: RandomNumberGenerator>(_ c: Card, pool: [Card], index: Int, extraWords: [String], defs: [Card] = [], rng: inout R) -> Exercise {
+        if c.isConcept {
+            var e = make(.mc, card: c, extraWords: extraWords, defs: defs, rng: &rng)
+            e.form = "concept"
+            return e
+        }
+        for i in 0..<PageForm.allCases.count {
+            if let e = pageMC(c, pool: pool, form: PageForm.allCases[(index + i) % PageForm.allCases.count], rng: &rng) { return e }
+        }
+        return make(.mc, card: c, extraWords: extraWords, defs: defs, rng: &rng)
+    }
+
     /// Exercises built from concept cards, for the `concepts` prop of `session_start` (spec 13.4).
     public static func conceptCount(_ exercises: [Exercise], cards: [Card]) -> Int {
         let ids = Set(cards.filter(\.isConcept).map(\.id))
@@ -246,11 +404,14 @@ public enum SessionBuilder {
         let extra = cards.filter { !$0.isPicture }.flatMap { longWords($0.statement) }
         var out: [Exercise] = []
         for c in picked {
-            var kind: ExerciseKind
-            if c.isQuote { kind = Bool.random(using: &rng) ? .qBank3 : .qLetters }
-            else { kind = [ExerciseKind.mc, .bank, .type].randomElement(using: &rng)! }
-            if out.isEmpty && kind == .type { kind = .mc }
-            out.append(make(kind, card: c, extraWords: extra, rng: &rng))
+            if c.isQuote {
+                out.append(make(Bool.random(using: &rng) ? .qBank3 : .qLetters, card: c, extraWords: extra, rng: &rng))
+            } else if !out.isEmpty && Double.random(in: 0..<1, using: &rng) >= 0.6 {
+                // No word bank or typed blank in Practice (spec 13.7).
+                out.append(make(.tf, card: c, extraWords: extra, rng: &rng))
+            } else {
+                out.append(cardMC(c, pool: cards.filter { !$0.isPicture }, index: out.count, extraWords: extra, rng: &rng))
+            }
         }
         return insertPictures(out, Array(duePictures.prefix(nPictures)), rng: &rng)
     }

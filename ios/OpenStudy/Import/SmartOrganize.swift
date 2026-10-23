@@ -147,12 +147,12 @@ extension SmartOrganizeClient {
 
 extension SmartOrganizeClient {
     /// Concept questions for one lesson (spec 13.6). nil on any failure, including 503 when the server has no model.
-    func questions(lessonTitle: String, projectTitle: String, projectType: String, cards: [WriterCard], timeout: TimeInterval) async -> [WrittenConcept]? {
+    func questions(lessonTitle: String, projectTitle: String, projectType: String, cards: [WriterCard], pages: [WriterPage] = [], timeout: TimeInterval) async -> [WrittenConcept]? {
         struct LessonDTO: Encodable { var title: String }
         struct ProjectDTO: Encodable { var title: String; var type: String }
-        struct Body: Encodable { var lesson: LessonDTO; var project: ProjectDTO; var cards: [WriterCard] }
+        struct Body: Encodable { var lesson: LessonDTO; var project: ProjectDTO; var cards: [WriterCard]; var pages: [WriterPage] }
         struct Resp: Decodable { var cards: [WrittenConcept] }
-        let body = Body(lesson: LessonDTO(title: lessonTitle), project: ProjectDTO(title: projectTitle, type: projectType), cards: cards)
+        let body = Body(lesson: LessonDTO(title: lessonTitle), project: ProjectDTO(title: projectTitle, type: projectType), cards: cards, pages: pages)
         guard let r = try? request("api/questions", body: body, timeout: timeout), let resp = await send(r, as: Resp.self) else { return nil }
         return resp.cards
     }

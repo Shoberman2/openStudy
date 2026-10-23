@@ -546,3 +546,19 @@ Pattern rules (13.3) only catch some sentences, so a language model rewrites a l
 - Event `questions_written {source: "device"|"server"|"none", count}` (count = cards updated).
 - MCP `study` adds `questionsWritten` (count of `questions_written` by source).
 - `/api/questions` returns 503 `{error:"no_ai"}` when no model is set (3.4) and 400 for an empty card list.
+
+### 13.7 Whole-page questions and a mixed multiple choice (both platforms)
+Missing-word questions were still most of a session whenever no model was set (13.6 needs one). Questions now also come from a page as a whole, and multiple choice rotates through several forms.
+- Only fact cards without a `term`, not pictures, with a statement of 4..25 words take part, from the session pool (the project's cards; all cards in Practice).
+- **Page mates** of card C: other taking-part cards with C's `pageId` (C must have one), in pool order, skipping statements equal to C's or to an earlier mate (normalized, 5.3).
+- **Outsiders** for a target word count: taking-part cards whose `pageId` differs from C's (or is missing), statement not equal (normalized) to any card on C's page or an earlier pick. Order: cards in another lesson than C first, then the rest; within each group by distance from the target word count, then pool order.
+- Forms (each an `mc` exercise for C, with optional `context: string[]` shown above the prompt and `form`):
+  1. **gist** (2+ mates): page set = [C, ...mates]. Key = the set card sharing the most content tokens (`tokens`, by stem) with the rest of the set; ties go to the earlier card. Context = the first 2 set cards other than the key. Prompt **"What's the main point of the page these lines come from?"**; answer = key statement; 3 outsiders (target = key's word count).
+  2. **odd** (2+ mates): prompt **"Three of these come from the same page. Which one doesn't fit?"**; options C, mate 1, mate 2 and 1 outsider (target = rounded mean word count of the three); answer = the outsider.
+  3. **mate** (1+ mate): context = [C statement]; prompt **"Which idea comes from the same page as this one?"**; answer = mate 1; 3 outsiders (target = mate 1's word count).
+  A form fails when it lacks mates or outsiders. Options are shuffled; `cardIds` = [C].
+- **Mixed mc in lessons** (theme and class): the k-th `mc` slot of a session (k from 0) tries forms in the cycle concept, gist, odd, mate, starting at k mod 4. The concept form takes the next unused concept card (13.4) and asks its question. A page form takes the next unused card (priority order) for which the form works. A gist or odd question is asked at most once per page per session, and a mate question once per card. The first form that works wins; if none does, the cycle runs again allowing cards used once (each card at most twice per session, 5.2); if still none does, the slot takes the next card and plays its `tf` (13.4) when it has one, else a plain mc as before (the card's question, or the missing word). `tf` and `flash` slots keep the 13.4 card pick.
+- **Practice** (5.2): a fact card that is not a definition plays mc as its first exercise, then mc (draw < 0.6) or tf (falls back to mc). Its mc is the concept question when it has one, else a page form starting at (exercise index mod 3) in the cycle gist, odd, mate, else plain mc. No word bank, no typed blank.
+- **Review your misses**: fact cards alternate mc and tf (tf falls back to mc). Definitions unchanged.
+- Instruction for every non-blank mc: "Choose the right answer".
+- Writer (13.6) input: each card adds `pageId`, and the request adds `pages: [{id, text}]` for the pages its cards come from (text cut to 1200 characters). Prompt adds: read the whole page; each question is about what the page as a whole says or how its ideas connect, not only the one sentence; vary the form across the lesson (why, what follows, compare, example, main point), at most 1 in 3 of any one form.

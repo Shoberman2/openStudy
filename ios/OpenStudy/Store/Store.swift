@@ -332,7 +332,8 @@ final class Store: ObservableObject {
         // The first time a lesson opens, a writer turns its cards into concept questions (spec 13.6).
         let project = library.project(lesson.projectId)
         let input = QuestionWriter.Input(lessonTitle: lesson.title, projectTitle: project?.title ?? "", projectType: project?.kind ?? "book",
-                                         cards: WrittenConcepts.writerInput(library, lessonId: lesson.id))
+                                         cards: WrittenConcepts.writerInput(library, lessonId: lesson.id),
+                                         pages: WrittenConcepts.writerPages(library, lessonId: lesson.id))
         let server = smartOn ? smartClient : nil
         writingFor = lesson.title
         Task {
@@ -442,8 +443,13 @@ final class Store: ObservableObject {
         var rng = SystemRandomNumberGenerator()
         let defs = library.cards.filter(\.isDefinition)
         let extra = cards.flatMap { SessionBuilder.longWords($0.statement) }
+        let pool = library.cards.filter { $0.projectId == cards[0].projectId && !$0.isPicture }
         let ex = cards.enumerated().map { i, c -> Exercise in
-            let kind: ExerciseKind = c.isQuote ? .qBank3 : c.isDefinition ? (i % 2 == 0 ? .defMc : .termType) : (i % 2 == 0 ? .mc : .bank)
+            if !c.isQuote && !c.isDefinition && !c.isPicture {
+                return i % 2 == 0 ? SessionBuilder.cardMC(c, pool: pool, index: i, extraWords: extra, defs: defs, rng: &rng)
+                                  : SessionBuilder.make(.tf, card: c, extraWords: extra, defs: defs, rng: &rng)
+            }
+            let kind: ExerciseKind = c.isQuote ? .qBank3 : c.isDefinition ? (i % 2 == 0 ? .defMc : .termType) : .mc
             return SessionBuilder.make(kind, card: c, extraWords: extra, defs: defs, rng: &rng)
         }
         session = SessionLaunch(lessonId: nil, projectId: projectId, exercises: ex, title: "Review your misses")

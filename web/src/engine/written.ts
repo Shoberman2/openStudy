@@ -6,6 +6,7 @@ import { normalizeAnswer } from "./text";
 import type { Library } from "./types";
 
 export const WRITER_MAX_CARDS = 14;
+export const WRITER_PAGE_CHARS = 1200;
 
 export type WrittenConcept = { id: string; concept: string; question: string; answer: string; distractors: string[]; falseStatement: string };
 
@@ -19,10 +20,16 @@ export function needsWrittenConcepts(lib: Library, lessonId: string): boolean {
   return facts.length > 0 && facts.filter(isConcept).length * 2 < facts.length;
 }
 
-export function writerInput(lib: Library, lessonId: string): { id: string; text: string }[] {
+export function writerInput(lib: Library, lessonId: string): { id: string; text: string; pageId?: string }[] {
   return factCards(lib, lessonId)
     .slice(0, WRITER_MAX_CARDS)
-    .map((c) => ({ id: c.id, text: c.statement }));
+    .map((c) => ({ id: c.id, text: c.statement, ...(c.pageId ? { pageId: c.pageId } : {}) }));
+}
+
+/** The pages the writer's cards come from, so it can ask about each page as a whole (spec 13.7). */
+export function writerPages(lib: Library, lessonId: string): { id: string; text: string }[] {
+  const ids = new Set(writerInput(lib, lessonId).flatMap((c) => (c.pageId ? [c.pageId] : [])));
+  return lib.pages.filter((p) => ids.has(p.id) && p.text.trim()).map((p) => ({ id: p.id, text: p.text.slice(0, WRITER_PAGE_CHARS) }));
 }
 
 /** Applies what the writer returned; always marks the lesson so it is never held up twice. */

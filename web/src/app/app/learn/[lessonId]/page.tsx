@@ -8,7 +8,7 @@ import type { Exercise } from "@/engine/exercises";
 import { logEvent } from "@/engine/library";
 import { buildSession, conceptExercises } from "@/engine/session";
 import type { Card, Grade } from "@/engine/types";
-import { applyWrittenConcepts, needsWrittenConcepts, writerInput } from "@/engine/written";
+import { applyWrittenConcepts, needsWrittenConcepts, writerInput, writerPages } from "@/engine/written";
 import { localDay } from "@/engine/util";
 import { displayStreak } from "@/engine/xp";
 import { applyGrades, finishLesson } from "@/lib/actions";
@@ -39,7 +39,7 @@ function LearnPageSession() {
     };
     if (!needsWrittenConcepts(lib, lesson.id)) return start(lib.cards);
     // Spec 13.6: a model rewrites the lesson as questions about ideas the first time it is opened.
-    void writeConcepts({ title: lesson.title }, { title: project.title, type: project.type }, writerInput(lib, lesson.id)).then((written) => {
+    void writeConcepts({ title: lesson.title }, { title: project.title, type: project.type }, writerInput(lib, lesson.id), writerPages(lib, lesson.id)).then((written) => {
       let cards = lib.cards;
       update((l) => {
         const next = applyWrittenConcepts(l, lesson.id, written ?? [], written ? "server" : "none");

@@ -135,6 +135,15 @@ function MultipleChoice({ ex, result, onAnswer, compact }: P<"mc">) {
       <Prompt compact={compact}>
         <WithBlanks text={ex.prompt} />
       </Prompt>
+      {ex.context?.length ? (
+        <div className="card space-y-2 p-4">
+          {ex.context.map((line) => (
+            <p key={line} className="serif text-[17px] leading-snug text-ink">
+              “{line}”
+            </p>
+          ))}
+        </div>
+      ) : null}
       <div className="grid grid-cols-1 gap-2.5">
         {ex.options.map((o, i) => {
           const state = result ? (o === ex.answer ? "is-correct" : o === sel ? "is-wrong" : "") : sel === o ? "is-selected" : "";
