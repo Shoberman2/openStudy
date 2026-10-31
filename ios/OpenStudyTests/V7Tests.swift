@@ -156,19 +156,7 @@ final class V7Tests: XCTestCase {
         XCTAssertTrue(out.contains("\"focusLessons\":[\"x\"]") && out.contains("\"focusAsked\":true"))
     }
 
-    // MARK: Session mix (13.4)
-
-    func testMixes() {
-        XCTAssertEqual(SessionBuilder.themeMix(level: 0), [.mc, .tf, .mc])
-        XCTAssertEqual(SessionBuilder.themeMix(level: 1), [.mc, .tf, .mc])
-        XCTAssertEqual(SessionBuilder.themeMix(level: 2), [.mc, .tf, .explain])
-        XCTAssertEqual(SessionBuilder.themeMix(level: 3), [.mc, .tf, .explain])
-        XCTAssertEqual(SessionBuilder.themeMix(level: 4), [.mc, .tf, .explain, .apply])
-        XCTAssertEqual(SessionBuilder.classMix(level: 0), [.defMc, .mc, .tf])
-        XCTAssertEqual(SessionBuilder.classMix(level: 1), [.defMc, .mc, .tf])
-        XCTAssertEqual(SessionBuilder.classMix(level: 3), [.termType, .mc, .explain])
-        XCTAssertEqual(SessionBuilder.classMix(level: 4), [.termType, .mc, .tf, .explain])
-    }
+    // MARK: Session mix (13.4, now 13.8: see V9Tests)
 
     func testMcPrefersConceptCards() {
         let lesson = Lesson(id: "l", projectId: "p", title: "Sleep", summary: "", order: 0)

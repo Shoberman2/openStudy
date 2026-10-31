@@ -55,6 +55,8 @@ public enum Concepts {
         { s in
             guard let g = groups(why, s) else { return nil }
             let a = trimmed(g[1]), b = answerPart(g[3])
+            // "X not because Y, but because Z" says the opposite of a reason, so it is skipped.
+            guard a.split(separator: " ").last?.lowercased() != "not" else { return nil }
             guard !startsWithPronoun(a), !a.contains(":"), within(a, 3, 16), within(b, 2, 14) else { return nil }
             return Match(question: "\(a). Why?", answer: upperFirst(b))
         },
@@ -75,7 +77,9 @@ public enum Concepts {
         // 4. If / when
         { s in
             guard let g = groups(ifWhen, s) else { return nil }
-            let c = trimmed(g[2]), b = answerPart(g[3])
+            let c = trimmed(g[2])
+            var b = answerPart(g[3])
+            if let r = b.range(of: "^then\\s+", options: [.regularExpression, .caseInsensitive]) { b.removeSubrange(r) }
             guard within(c, 2, 12), within(b, 2, 12) else { return nil }
             return Match(question: "\(upperFirst(g[1].lowercased())) \(c), then what?", answer: upperFirst(b))
         },
@@ -91,6 +95,9 @@ public enum Concepts {
             guard let g = groups(effect, s) else { return nil }
             let a = trimmed(g[1]), b = answerPart(g[3])
             guard !startsWithPronoun(a), !a.contains(","), !a.contains(":"), within(a, 1, 8), within(b, 2, 12) else { return nil }
+            // A cause with its own verb ("Systems are about the processes that") is half a clause, not a subject.
+            let clause: Set<String> = ["is", "are", "was", "were", "that", "which", "who"]
+            guard !a.split(separator: " ").contains(where: { clause.contains($0.lowercased()) }), !startsWithPronoun(b) else { return nil }
             let v = g[2].lowercased()
             var parts = v.split(separator: " ").map(String.init)
             let third = parts[0].hasSuffix("s")
@@ -110,7 +117,11 @@ public enum Concepts {
     /// The concept question for one statement, or nil when no rule fits.
     public static func question(_ statement: String) -> Match? {
         let s = trimmed(trimmed(statement).replacingOccurrences(of: "[.!?\"\u{201D}\u{2019}')\\],]+$", with: "", options: .regularExpression))
-        for rule in rules { if let m = rule(s) { return m } }
+        // "Not X, but Y": an answer cut before ", but" would teach the half the text rejects.
+        let notBut = s.range(of: "\\bnot\\b[^,]*, but\\b", options: [.regularExpression, .caseInsensitive]) != nil
+        for rule in rules {
+            if let m = rule(s), !(notBut && m.answer.range(of: "\\bnot\\b", options: [.regularExpression, .caseInsensitive]) != nil) { return m }
+        }
         return nil
     }
 

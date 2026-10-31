@@ -70,29 +70,6 @@ public struct Exercise: Identifiable, Equatable {
 // MARK: - Session builder (spec 5.2)
 
 public enum SessionBuilder {
-    /// Class lessons by level (spec 13.4, replaces 8.5).
-    public static func classMix(level: Int) -> [ExerciseKind] {
-        switch level {
-        case ...0: return [.defMc, .mc, .tf]
-        case 1: return [.defMc, .mc, .tf]
-        case 2: return [.termType, .mc, .tf]
-        case 3: return [.termType, .mc, .explain]
-        default: return [.termType, .mc, .tf, .explain]
-        }
-    }
-
-    /// Theme lessons by level (spec 13.4, replaces 5.2). No word bank, match or typed blank: a missing word
-    /// only shows up when the lesson has no concept card left for an mc or tf slot.
-    public static func themeMix(level: Int) -> [ExerciseKind] {
-        switch level {
-        case ...0: return [.mc, .tf, .mc]
-        case 1: return [.mc, .tf, .mc]
-        case 2: return [.mc, .tf, .explain]
-        case 3: return [.mc, .tf, .explain]
-        default: return [.mc, .tf, .explain, .apply]
-        }
-    }
-
     public static func quoteMix(level: Int) -> [ExerciseKind] {
         switch level {
         case ...0: return [.qBank1]
@@ -100,16 +77,6 @@ public enum SessionBuilder {
         case 2: return [.qBank3, .qOrder]
         case 3: return [.qOrder, .qLetters]
         default: return [.qLetters, .qRecall]
-        }
-    }
-
-    static func weight(_ k: ExerciseKind, _ practice: [String]) -> Int {
-        switch k {
-        case .mc, .tf, .match, .defMc: return practice.contains("tap") ? 2 : 1
-        case .termType: return practice.contains("type") ? 2 : 1
-        case .bank: return practice.contains("blank") ? 2 : 1
-        case .type: return practice.contains("type") ? 2 : 1
-        default: return 1
         }
     }
 
@@ -132,112 +99,170 @@ public enum SessionBuilder {
         let sessionLength = lesson.isQuotes ? 8 : 10
         if own.isEmpty { return pictures.prefix(sessionLength).map(picture) }
         let nPictures = min(PictureCards.maxPerSession, pictures.count)
-        let pool = orderCards(own, now: now)
         let length = sessionLength - nPictures
-        let mix = lesson.isQuotes ? quoteMix(level: lesson.level) : isClass ? classMix(level: lesson.level) : themeMix(level: lesson.level)
-        let extraWords = (projectCards.isEmpty ? cards : projectCards).filter { !$0.isPicture }.flatMap { longWords($0.statement) }
-        let defs = (projectCards.isEmpty ? cards : projectCards).filter(\.isDefinition)
-
-        var sequence = pool.map(\.id) + pool.map(\.id) // each card at most twice
-        let byId = Dictionary(uniqueKeysWithValues: own.map { ($0.id, $0) })
-        var out: [Exercise] = []
-        // Explain and apply share one slot per session (spec 13.4).
-        var deepUsed = false
-        var usedIds = Set<String>()
-        var mcSlots = 0
-        var asked = Set<String>()
-        let pagePool = projectCards.isEmpty ? cards : projectCards
-        let flashSlot = profile.practice.contains("flash") && !lesson.isQuotes ? min(3, length - 1) : -1
-
-        while out.count < length, !sequence.isEmpty {
-            var kind: ExerciseKind
-            if out.count == flashSlot { kind = .flash }
-            else { kind = weightedPick(mix, profile.practice, &rng) }
-            if (kind == .type || kind == .termType) && out.isEmpty { kind = lesson.isQuotes ? .qBank1 : (isClass ? .defMc : .mc) }
-            // An explain or apply slot that cannot be used becomes mc, never a typed blank (spec 13.4).
-            if (kind == .explain || kind == .apply) && (out.isEmpty || deepUsed) { kind = .mc }
-            if kind == .apply && !profile.goals.contains("apply") { kind = .mc }
-            if kind == .match && out.last?.kind == .match { kind = .mc }
-            if kind == .qRecall && out.isEmpty { kind = .qLetters }
-
-            // mc slots rotate through concept and whole-page questions (spec 13.7).
-            if kind == .mc {
-                if let (card, e) = mixedMC(k: mcSlots, sequence: sequence, usedIds: usedIds, byId: byId, pool: pagePool, asked: &asked, extraWords: extraWords, defs: defs, rng: &rng) {
-                    sequence.remove(at: sequence.firstIndex(of: card.id)!)
-                    usedIds.insert(card.id)
-                    out.append(e)
-                    mcSlots += 1
-                    continue
-                }
-                mcSlots += 1
-                // Nothing left to ask about a page: a whole-sentence true or false beats a missing word.
-                kind = .tf
+        let pool = (projectCards.isEmpty ? cards : projectCards).filter { !$0.isPicture }
+        var picker = Picker(order: orderCards(own, now: now))
+        var out = lesson.isQuotes
+            ? quoteSession(&picker, lesson: lesson, pool: pool, length: length, rng: &rng)
+            : lessonSession(&picker, lesson: lesson, own: own, pool: pool, isClass: isClass, profile: profile, length: length, rng: &rng)
+        // Flashcards replace one slot when the user picked them (never the first).
+        if !lesson.isQuotes, profile.practice.contains("flash"), out.count > 2 {
+            let idx = min(3, out.count - 1)
+            if out[idx].kind != .match && out[idx].kind != .apply, let c = own.first(where: { $0.id == out[idx].cardId }) {
+                out[idx] = make(.flash, card: c, extraWords: [], rng: &rng)
             }
-
-            // Pick the next card, avoiding an immediate repeat when possible.
-            var idx = 0
-            let last = out.last?.cardIds.last
-            if let last, sequence.count > 1, sequence[0] == last,
-               let alt = sequence.firstIndex(where: { $0 != last }) { idx = alt }
-            // mc, tf and flash slots take the next concept card not yet used in this session first (spec 13.4).
-            if kind == .mc || kind == .tf || kind == .flash,
-               let ci = sequence.firstIndex(where: { !usedIds.contains($0) && byId[$0]!.isConcept }) { idx = ci }
-            let card = byId[sequence[idx]]!
-            sequence.remove(at: idx)
-
-            if kind == .match, own.filter(\.isDefinition).count + (card.isDefinition ? 0 : 1) >= 4 || (card.isDefinition && defs.count >= 4) {
-                // Prefer term <-> definition pairs whenever the lesson has definitions.
-                var chosen: [Card] = card.isDefinition ? [card] : []
-                if !card.isDefinition { sequence.insert(card.id, at: 0) }
-                let pool = sequence.compactMap { byId[$0] } + own + defs
-                for c in pool where chosen.count < 4 && c.isDefinition {
-                    if !chosen.contains(where: { $0.id == c.id || $0.term?.lowercased() == c.term?.lowercased() }) { chosen.append(c) }
-                }
-                if chosen.count == 4 { usedIds.formUnion(chosen.map(\.id)); out.append(makeMatch(chosen, rng: &rng)); continue }
-                if !card.isDefinition { sequence.removeFirst() }
-            }
-            if kind == .match {
-                var others: [Card] = []
-                var used = Set([card.id])
-                var clozes = Set([(card.cloze ?? "").lowercased()])
-                for id in sequence where others.count < 3 {
-                    if let c = byId[id], !used.contains(c.id), let cz = c.cloze, !cz.isEmpty, !clozes.contains(cz.lowercased()) {
-                        others.append(c); used.insert(c.id); clozes.insert(cz.lowercased())
-                    }
-                }
-                if others.count == 3, card.cloze?.isEmpty == false {
-                    usedIds.formUnion(([card] + others).map(\.id))
-                    out.append(makeMatch([card] + others, rng: &rng))
-                    continue
-                }
-                kind = .mc
-            }
-            var e = make(kind, card: card, extraWords: extraWords, defs: defs, rng: &rng)
-            if e.kind == .explain && (e.hint ?? "").isEmpty {
-                e.hint = lesson.title
-                e.body = "Explain \(lesson.title) in your own words like you're teaching a friend."
-            }
-            if e.kind == .explain || e.kind == .apply { deepUsed = true }
-            usedIds.formUnion(e.cardIds)
-            out.append(e)
         }
         return insertPictures(out, Array(pictures.prefix(nPictures)), rng: &rng)
+    }
+
+    /// Cards in priority order, each used at most twice per session; unused cards come first.
+    struct Picker {
+        let order: [Card]
+        var uses: [String: Int] = [:]
+        init(order: [Card]) { self.order = order }
+        func next(_ f: (Card) -> Bool = { _ in true }, unusedOnly: Bool = false) -> Card? {
+            for round in 0..<(unusedOnly ? 1 : 2) {
+                if let c = order.first(where: { (uses[$0.id] ?? 0) == round && f($0) }) { return c }
+            }
+            return nil
+        }
+        func unusedFirst(_ f: (Card) -> Bool) -> Card? { next(f) }
+        func available(_ f: (Card) -> Bool) -> [Card] { order.filter { (uses[$0.id] ?? 0) < 2 && f($0) } }
+        mutating func take(_ c: Card) { uses[c.id, default: 0] += 1 }
+    }
+
+    static func quoteSession<R: RandomNumberGenerator>(_ picker: inout Picker, lesson: Lesson, pool: [Card], length: Int, rng: inout R) -> [Exercise] {
+        let mix = quoteMix(level: lesson.level)
+        let extraWords = pool.flatMap { longWords($0.statement) }
+        var out: [Exercise] = []
+        while out.count < length, let card = picker.next() {
+            var kind = mix.randomElement(using: &rng)!
+            if kind == .qRecall && out.isEmpty { kind = .qLetters }
+            out.append(make(kind, card: card, extraWords: extraWords, rng: &rng))
+            picker.take(card)
+        }
+        return out
+    }
+
+    enum Slot: Equatable { case m, bank, type, tf, explain, apply, match }
+
+    /// Which kind of question each slot asks (spec 13.8): multiple choice everywhere except slots 2, 4, 6
+    /// and 8, which take two fill-ins and two others in a shuffled order.
+    static func slotPlan<R: RandomNumberGenerator>(level: Int, length: Int, apply: Bool, match: Bool, rng: inout R) -> [Slot] {
+        let lvl = min(4, max(0, level))
+        let fills: [Slot] = lvl <= 1 ? [.bank, .bank] : lvl <= 3 ? [.bank, .type] : [.type, .bank]
+        let others: [Slot] = lvl <= 1 ? [match ? .match : .tf, .tf] : [.tf, lvl >= 4 && apply ? .apply : .explain]
+        let special = (fills + others).shuffled(using: &rng)
+        var plan = [Slot](repeating: .m, count: length)
+        for (i, at) in [2, 4, 6, 8].enumerated() where at < length { plan[at] = special[i] }
+        return plan
+    }
+
+    /// Theme and class lessons (spec 13.8): a majority of multiple choice, two fill-ins and two others.
+    static func lessonSession<R: RandomNumberGenerator>(_ picker: inout Picker, lesson: Lesson, own: [Card], pool: [Card], isClass: Bool, profile: Profile, length: Int, rng: inout R) -> [Exercise] {
+        let defs = pool.filter(\.isDefinition)
+        let ownDefs = own.filter(\.isDefinition)
+        let extraWords = pool.flatMap { longWords($0.statement) }
+        let blanks = KeyBlanks(pool: pool)
+        let plan = slotPlan(level: lesson.level, length: length, apply: profile.goals.contains("apply"), match: isClass && ownDefs.count >= 4, rng: &rng)
+        var out: [Exercise] = []
+        var asked = Set<String>()
+        // A card plays at most one fill-in per session, so the same blank never shows up twice.
+        var filled = Set<String>()
+        var mcSlots = 0
+        var deepUsed = false
+        let tfReady: (Card) -> Bool = { $0.isConcept && !($0.distractors ?? []).isEmpty }
+
+        for slot in plan {
+            switch slot {
+            case .bank, .type:
+                if let card = picker.unusedFirst({ blanks.word($0) != nil && !filled.contains($0.id) }) {
+                    filled.insert(card.id)
+                    let fc = blanks.withBlank(card)
+                    let kind: ExerciseKind = slot == .type ? (card.isDefinition ? .termType : .type) : (card.isDefinition && lesson.level <= 1 ? .defMc : .bank)
+                    picker.take(card); out.append(make(kind, card: fc, extraWords: extraWords, defs: defs, rng: &rng)); continue
+                }
+            case .tf:
+                if let card = picker.unusedFirst(tfReady) {
+                    picker.take(card); out.append(make(.tf, card: card, extraWords: extraWords, rng: &rng)); continue
+                }
+            case .match:
+                var chosen: [Card] = []
+                for c in picker.available(\.isDefinition) where chosen.count < 4 {
+                    if !chosen.contains(where: { $0.term?.lowercased() == c.term?.lowercased() }) { chosen.append(c) }
+                }
+                if chosen.count == 4 { chosen.forEach { picker.take($0) }; out.append(makeMatch(chosen, rng: &rng)); continue }
+            case .explain, .apply:
+                if !deepUsed, !out.isEmpty {
+                    let card = slot == .explain ? (picker.unusedFirst({ $0.isConcept || $0.isDefinition }) ?? picker.next()) : picker.unusedFirst({ !$0.isDefinition })
+                    if let card {
+                        deepUsed = true
+                        var e = make(slot == .apply ? .apply : .explain, card: card, extraWords: extraWords, rng: &rng)
+                        if e.kind == .explain {
+                            let topic = explainTopic(card, lessonTitle: lesson.title, keyWord: blanks.word(card) == card.cloze ? card.cloze : nil)
+                            e.hint = topic
+                            e.body = "Explain \(topic) in your own words like you're teaching a friend."
+                        }
+                        picker.take(card); out.append(e); continue
+                    }
+                }
+            case .m:
+                break
+            }
+            // Multiple choice, or a slot above that could not be used.
+            let k = mcSlots
+            mcSlots += 1
+            if isClass, !ownDefs.isEmpty, k % 2 == 0, let card = picker.next(\.isDefinition, unusedOnly: true) {
+                picker.take(card); out.append(make(.defMc, card: card, extraWords: extraWords, defs: defs, rng: &rng)); continue
+            }
+            if let (card, e) = mixedMC(k: k, picker: picker, pool: pool, asked: &asked, extraWords: extraWords, defs: defs, rng: &rng) {
+                picker.take(card); out.append(e); continue
+            }
+            // Nothing new to ask about an idea: a missing key word, then an idea question again, then any card.
+            let fillable: (Card) -> Bool = { blanks.word($0) != nil && !filled.contains($0.id) }
+            var again = Set<String>()
+            if picker.available(fillable).isEmpty, let (card, e) = mixedMC(k: k, picker: picker, pool: pool, asked: &again, extraWords: extraWords, defs: defs, rng: &rng) {
+                picker.take(card); out.append(e); continue
+            }
+            guard let card = picker.unusedFirst(fillable) ?? picker.next() else { break }
+            picker.take(card)
+            if card.isDefinition {
+                out.append(make(k % 2 == 0 ? .defMc : .mc, card: card, extraWords: extraWords, defs: defs, rng: &rng)); continue
+            }
+            let fc = blanks.word(card) != nil && !card.isConcept ? blanks.withBlank(card) : card
+            if blanks.word(card) != nil { filled.insert(card.id) }
+            out.append(make(.mc, card: (fc.distractors ?? []).count >= 3 ? fc : card, extraWords: extraWords, defs: defs, rng: &rng))
+        }
+        return out
+    }
+
+    /// The idea an explain names (spec 13.8): a term, a concept that is more than the lesson title, the
+    /// sentence itself when short, its key word, or the lesson title.
+    static func explainTopic(_ c: Card, lessonTitle: String, keyWord: String?) -> String {
+        if let t = c.term, !t.isEmpty { return t }
+        if let concept = c.concept?.trimmingCharacters(in: .whitespaces), !concept.isEmpty, concept != lessonTitle { return concept }
+        if spaceCount(c.statement) <= 20 {
+            var t = c.statement
+            while let l = t.last, l == "." || l.isWhitespace { t.removeLast() }
+            return "\u{201C}\(t)\u{201D}"
+        }
+        if let k = keyWord, spaceCount(k) <= 3 { return k }
+        return lessonTitle
     }
 
     // MARK: Whole-page questions (spec 13.7)
 
     public enum PageForm: String, CaseIterable {
-        case gist, odd, mate
+        case gist, odd
         var prompt: String {
             switch self {
-            case .gist: return "What's the main point of the page these lines come from?"
-            case .odd: return "Three of these come from the same page. Which one doesn't fit?"
-            case .mate: return "Which idea comes from the same page as this one?"
+            case .gist: return "These lines come from one page. Which idea goes with them?"
+            case .odd: return "Three of these belong together. Which one doesn't?"
             }
         }
     }
 
-    static let mcForms = ["concept", "gist", "odd", "mate"]
+    static let mcForms = ["concept", "gist", "odd"]
 
     /// Word count on whitespace, as on web.
     static func spaceCount(_ s: String) -> Int { s.split(whereSeparator: \.isWhitespace).count }
@@ -292,13 +317,6 @@ public enum SessionBuilder {
         e.form = form.rawValue
         e.body = form.prompt
         switch form {
-        case .mate:
-            guard let mate = mates.first else { return nil }
-            let wrong = outsiders(c, pool: pool, target: spaceCount(mate.statement), count: 3)
-            guard wrong.count == 3 else { return nil }
-            e.context = [c.statement]
-            e.answer = mate.statement
-            e.options = ([mate.statement] + wrong).shuffled(using: &rng)
         case .odd:
             guard mates.count >= 2 else { return nil }
             let own = [c, mates[0], mates[1]].map(\.statement)
@@ -321,12 +339,10 @@ public enum SessionBuilder {
 
     /// The k-th mc slot of a lesson: forms cycle from k and the first one that works wins, unused cards first.
     /// A gist or odd question is asked once per page, a mate question once per card.
-    static func mixedMC<R: RandomNumberGenerator>(k: Int, sequence: [String], usedIds: Set<String>, byId: [String: Card], pool: [Card], asked: inout Set<String>,
+    static func mixedMC<R: RandomNumberGenerator>(k: Int, picker: Picker, pool: [Card], asked: inout Set<String>,
                                                   extraWords: [String], defs: [Card], rng: inout R) -> (Card, Exercise)? {
-        var seen = Set<String>()
-        let order = sequence.filter { seen.insert($0).inserted }.compactMap { byId[$0] }
         for unusedOnly in [true, false] {
-            let cands = order.filter { !unusedOnly || !usedIds.contains($0.id) }
+            let cands = picker.order.filter { (picker.uses[$0.id] ?? 0) < (unusedOnly ? 1 : 2) }
             for i in 0..<mcForms.count {
                 let name = mcForms[(k + i) % mcForms.count]
                 guard let form = PageForm(rawValue: name) else {
@@ -338,7 +354,7 @@ public enum SessionBuilder {
                     continue
                 }
                 for c in cands {
-                    let key = form == .mate ? "mate:\(c.id)" : "\(name):\(c.pageId ?? "")"
+                    let key = "\(name):\(c.pageId ?? "")"
                     if !asked.contains(key), let e = pageMC(c, pool: pool, form: form, rng: &rng) {
                         asked.insert(key)
                         return (c, e)
@@ -350,7 +366,7 @@ public enum SessionBuilder {
     }
 
     /// One card's mc outside a lesson: its concept question, else a page form, else a plain mc.
-    static func cardMC<R: RandomNumberGenerator>(_ c: Card, pool: [Card], index: Int, extraWords: [String], defs: [Card] = [], rng: inout R) -> Exercise {
+    static func cardMC<R: RandomNumberGenerator>(_ c: Card, pool: [Card], index: Int, extraWords: [String], defs: [Card] = [], blanks: KeyBlanks? = nil, rng: inout R) -> Exercise {
         if c.isConcept {
             var e = make(.mc, card: c, extraWords: extraWords, defs: defs, rng: &rng)
             e.form = "concept"
@@ -359,7 +375,88 @@ public enum SessionBuilder {
         for i in 0..<PageForm.allCases.count {
             if let e = pageMC(c, pool: pool, form: PageForm.allCases[(index + i) % PageForm.allCases.count], rng: &rng) { return e }
         }
+        if let blanks, blanks.word(c) != nil, !c.isDefinition {
+            let fc = blanks.withBlank(c)
+            if (fc.distractors ?? []).count >= 3 { return make(.mc, card: fc, extraWords: extraWords, defs: defs, rng: &rng) }
+        }
         return make(.mc, card: c, extraWords: extraWords, defs: defs, rng: &rng)
+    }
+
+    /// Everyday words that are never the point of a sentence, so they are never blanked.
+    static let plainWords: Set<String> = Set("want wants wanted take takes make makes made feel feels seem seems part good best better big new way ways self life thing things people person time times every little great really need needs needed give gives get gets go goes come comes look looks know knows keep keeps start starts find finds help helps tell tells talk talks show shows long much many most more first last next same other others another instead about rather without within never always often".split(separator: " ").map(String.init))
+
+    /// Key words for fill-ins (spec 13.8): a definition's term, or a word whose stem is on 2 or more fact
+    /// cards of the pool but no more than 30% of them, 5+ letters, not an everyday word, said once in its sentence.
+    public struct KeyBlanks {
+        var cardsWith: [String: Int] = [:]
+        var most = 2
+        var keyWords: [(stem: String, word: String)] = []
+
+        public init(pool: [Card]) {
+            var facts = 0
+            for c in pool where c.kind == "fact" {
+                facts += 1
+                for st in Set(TextKit.tokens(c.statement)) { cardsWith[st, default: 0] += 1 }
+            }
+            most = max(2, Int(Double(facts) * 0.3))
+            var seen = Set<String>()
+            for c in pool where c.kind == "fact" {
+                for t in TextKit.surfaceTokens(c.statement) where isKey(t.stem, t.surface) && seen.insert(t.stem).inserted {
+                    keyWords.append((t.stem, t.surface.lowercased()))
+                }
+            }
+        }
+
+        func isKey(_ stem: String?, _ surface: String) -> Bool {
+            guard let stem else { return false }
+            let n = cardsWith[stem] ?? 0
+            return n >= 2 && n <= most && surface.count >= 5 && !SessionBuilder.plainWords.contains(surface.lowercased())
+        }
+
+        /// The card's own blank when it is a key word, else the statement's key word on the most cards (then the longest).
+        public func word(_ c: Card) -> String? {
+            if c.isDefinition { return c.term }
+            guard c.kind == "fact" else { return nil }
+            var own: [String: Int] = [:]
+            for st in TextKit.tokens(c.statement) { own[st, default: 0] += 1 }
+            let once: (String?) -> Bool = { st in st.map { own[$0] == 1 } ?? false }
+            if let cz = c.cloze, !cz.isEmpty, LessonBuilder.containsTerm(c.statement, cz) {
+                let st = TextKit.tokens(cz).first
+                if isKey(st, cz) && once(st) { return cz }
+            }
+            var best: (word: String, n: Int)?
+            for t in TextKit.surfaceTokens(c.statement) where isKey(t.stem, t.surface) && once(t.stem) && LessonBuilder.containsTerm(c.statement, t.surface) {
+                let n = (cardsWith[t.stem] ?? 0) * 100 + t.surface.count
+                if best == nil || n > best!.n { best = (t.surface, n) }
+            }
+            return best?.word
+        }
+
+        /// Other key words: never the same stem or a word already in the sentence; same shape, then closest length.
+        public func wrong(_ c: Card, word: String, count: Int) -> [String] {
+            let w = word.lowercased()
+            let shape = LessonBuilder.shapeClass(w)
+            let own = TextKit.tokens(w).first
+            return keyWords.filter { $0.stem != own && !LessonBuilder.containsTerm(c.statement, $0.word) }.map(\.word)
+                .sorted { a, b in
+                    let sa = LessonBuilder.shapeClass(a) == shape, sb = LessonBuilder.shapeClass(b) == shape
+                    if sa != sb { return sa }
+                    let da = abs(a.count - w.count), db = abs(b.count - w.count)
+                    return da != db ? da < db : a < b
+                }
+                .prefix(count).map { $0 }
+        }
+
+        /// The card with its blank on its key word, and wrong answers that are other key words of the same shape.
+        public func withBlank(_ c: Card) -> Card {
+            guard !c.isDefinition, let w = word(c) else { return c }
+            let own = w == c.cloze ? (c.distractors ?? []).filter { TextKit.wordCount($0) == 1 && !LessonBuilder.containsTerm(c.statement, $0) } : []
+            var picks: [String] = []
+            for d in wrong(c, word: w, count: 3) + own where picks.count < 3 && !picks.contains(d) { picks.append(d) }
+            var out = c
+            out.cloze = w; out.question = nil; out.answer = nil; out.distractors = picks; out.falseStatement = nil
+            return out
+        }
     }
 
     /// Exercises built from concept cards, for the `concepts` prop of `session_start` (spec 13.4).
@@ -402,15 +499,22 @@ public enum SessionBuilder {
             for p in order where picked.count < size { if let c = buckets[p]?.first { picked.append(c); buckets[p]!.removeFirst() } }
         }
         let extra = cards.filter { !$0.isPicture }.flatMap { longWords($0.statement) }
+        let factPool = cards.filter { !$0.isPicture }
+        let blanks = KeyBlanks(pool: factPool)
         var out: [Exercise] = []
         for c in picked {
             if c.isQuote {
                 out.append(make(Bool.random(using: &rng) ? .qBank3 : .qLetters, card: c, extraWords: extra, rng: &rng))
-            } else if !out.isEmpty && Double.random(in: 0..<1, using: &rng) >= 0.6 {
-                // No word bank or typed blank in Practice (spec 13.7).
+                continue
+            }
+            // Mostly multiple choice, some fill-ins on key words, a few true or false (spec 13.8).
+            let r = out.isEmpty ? 0 : Double.random(in: 0..<1, using: &rng)
+            if r >= 0.85, c.isConcept, !(c.distractors ?? []).isEmpty {
                 out.append(make(.tf, card: c, extraWords: extra, rng: &rng))
+            } else if r >= 0.65, blanks.word(c) != nil, !c.isDefinition {
+                out.append(make(.bank, card: blanks.withBlank(c), extraWords: extra, rng: &rng))
             } else {
-                out.append(cardMC(c, pool: cards.filter { !$0.isPicture }, index: out.count, extraWords: extra, rng: &rng))
+                out.append(cardMC(c, pool: factPool, index: out.count, extraWords: extra, blanks: blanks, rng: &rng))
             }
         }
         return insertPictures(out, Array(duePictures.prefix(nPictures)), rng: &rng)
@@ -418,13 +522,6 @@ public enum SessionBuilder {
 
     public static func nextReview(_ cards: [Card]) -> Date? {
         cards.filter { $0.srs.state != "new" }.map(\.srs.dueDate).min()
-    }
-
-    static func weightedPick<R: RandomNumberGenerator>(_ kinds: [ExerciseKind], _ practice: [String], _ rng: inout R) -> ExerciseKind {
-        let weights = kinds.map { weight($0, practice) }
-        var r = Int.random(in: 0..<weights.reduce(0, +), using: &rng)
-        for (k, w) in zip(kinds, weights) { if r < w { return k }; r -= w }
-        return kinds[0]
     }
 
     // MARK: Exercise construction

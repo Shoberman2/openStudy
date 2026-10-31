@@ -194,7 +194,8 @@ extension Library {
 }
 
 public extension SessionBuilder {
-    /// "Practice both": cards of two lessons interleaved (A, B, A, B), theme mix for level 1, 10 exercises.
+    /// "Practice both": cards of two lessons interleaved (A, B, A, B), 10 exercises: every third a concept
+    /// true or false, the rest multiple choice (spec 13.8).
     static func connection<R: RandomNumberGenerator>(_ a: [Card], _ b: [Card], profile: Profile, rng: inout R) -> [Exercise] {
         let a = a.filter { !$0.isPicture }, b = b.filter { !$0.isPicture }
         var mixed: [Card] = []
@@ -206,11 +207,11 @@ public extension SessionBuilder {
         let all = a + b
         let extra = all.flatMap { longWords($0.statement) }
         let defs = all.filter(\.isDefinition)
+        let blanks = KeyBlanks(pool: all)
         var out: [Exercise] = []
-        for c in sequence {
-            var kind = weightedPick(themeMix(level: 1), profile.practice, &rng)
-            if kind == .match { kind = .mc }
-            out.append(make(kind, card: c, extraWords: extra, defs: defs, rng: &rng))
+        for (i, c) in sequence.enumerated() {
+            if i % 3 == 2, c.isConcept, !(c.distractors ?? []).isEmpty { out.append(make(.tf, card: c, extraWords: extra, rng: &rng)); continue }
+            out.append(cardMC(c, pool: all, index: i, extraWords: extra, defs: defs, blanks: blanks, rng: &rng))
         }
         return out
     }

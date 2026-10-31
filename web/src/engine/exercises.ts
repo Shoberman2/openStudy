@@ -10,7 +10,7 @@ export type ExType = FactType | QuoteType | "picture";
 
 export type Segment = string | { blank: number };
 /** Forms of multiple choice (spec 13.7): a concept question or a question about the whole page. */
-export type McForm = "concept" | "gist" | "odd" | "mate";
+export type McForm = "concept" | "gist" | "odd";
 export type PageForm = Exclude<McForm, "concept">;
 
 type Base = { id: string; cardIds: string[]; projectId: string };
@@ -123,7 +123,7 @@ function longWords(text: string): WordTok[] {
 
 // ---------- fact exercises ----------
 
-export type GenCtx = { pool: Card[]; rand: () => number; projectTitle?: string; lessonTitle?: string };
+export type GenCtx = { pool: Card[]; rand: () => number; projectTitle?: string; lessonTitle?: string; isKey?: (c: Card) => boolean };
 
 function otherAnswers(card: Card, ctx: GenCtx, want: number, short: boolean): string[] {
   const mine = short ? clozeOf(card) ?? factAnswer(card) : factAnswer(card);
@@ -146,9 +146,8 @@ export function genMC(card: Card, ctx: GenCtx): Exercise {
 // ---------- whole-page questions (spec 13.7) ----------
 
 const PAGE_PROMPTS: Record<PageForm, string> = {
-  gist: "What's the main point of the page these lines come from?",
-  odd: "Three of these come from the same page. Which one doesn't fit?",
-  mate: "Which idea comes from the same page as this one?",
+  gist: "These lines come from one page. Which idea goes with them?",
+  odd: "Three of these belong together. Which one doesn't?",
 };
 
 const takesPart = (c: Card) => c.kind === "fact" && !c.term && wordCount(c.statement) >= 4 && wordCount(c.statement) <= 25;
@@ -199,13 +198,6 @@ function keyCard(set: Card[]): Card {
 export function genPageMC(card: Card, ctx: GenCtx, form: PageForm): Exercise | null {
   const mates = pageMates(card, ctx.pool);
   const base = { id: exId(), cardIds: [card.id], projectId: card.projectId, type: "mc" as const, form, prompt: PAGE_PROMPTS[form] };
-  if (form === "mate") {
-    if (!mates.length) return null;
-    const answer = mates[0].statement;
-    const wrong = outsiders(card, ctx.pool, wordCount(answer), 3);
-    if (wrong.length < 3) return null;
-    return { ...base, context: [card.statement], answer, options: shuffle([answer, ...wrong], ctx.rand) };
-  }
   if (mates.length < 2) return null;
   if (form === "odd") {
     const own = [card, mates[0], mates[1]].map((c) => c.statement);
@@ -331,7 +323,12 @@ export function genTermType(card: Card): Exercise | null {
 }
 
 export function genExplain(card: Card, ctx: GenCtx): Exercise {
-  const topic = card.term ?? (clozeOf(card) && wordCount(clozeOf(card)!) <= 3 ? displayTerm(card, clozeOf(card)!) : ctx.lessonTitle ?? "this idea");
+  // A named idea when there is one; offline concepts are just the lesson title, so the sentence itself is clearer.
+  const named = card.concept?.trim() && card.concept.trim() !== ctx.lessonTitle ? card.concept.trim() : undefined;
+  const sentence = wordCount(card.statement) <= 20 ? `“${card.statement.replace(/[.\s]+$/, "")}”` : undefined;
+  const cz = clozeOf(card);
+  const keyWord = cz && wordCount(cz) <= 3 && (ctx.isKey?.(card) ?? true) ? displayTerm(card, cz) : undefined;
+  const topic = card.term || named || sentence || keyWord || ctx.lessonTitle || "this idea";
   const sameSource = ctx.pool.filter((c) => c.id !== card.id && c.pageId && c.pageId === card.pageId && c.kind === "fact").slice(0, 1);
   return { id: exId(), cardIds: [card.id], projectId: card.projectId, type: "explain", topic, sources: [card.statement, ...sameSource.map((c) => c.statement)] };
 }

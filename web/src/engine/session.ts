@@ -1,5 +1,7 @@
 // Session builder (spec 5.2) and the in-session state machine (mistake re-queue).
 import type { Verdict } from "./check";
+import { shapeClass } from "./builder";
+import { containsTerm, tokens, wordCount } from "./text";
 import { shuffle } from "./util";
 import {
   genApply,
@@ -7,6 +9,7 @@ import {
   genPicture,
   genExplain,
   genTermType,
+  clozeOf,
   isConcept,
   isDefinition,
   genBank,
@@ -30,21 +33,6 @@ import { MAX_PICTURES_PER_SESSION, isPicture } from "./pictures";
 import { isDue } from "./srs";
 import type { Card, Grade, Lesson, Profile, ProjectType } from "./types";
 
-// Questions about ideas only; a missing word shows up only when a lesson has no concept card left (spec 13.4).
-const THEME_MIX: ExType[][] = [
-  ["mc", "tf", "mc"],
-  ["mc", "tf", "mc"],
-  ["mc", "tf", "explain"],
-  ["mc", "tf", "explain"],
-  ["mc", "tf", "explain", "apply"],
-];
-const CLASS_MIX: ExType[][] = [
-  ["def-mc", "mc", "tf"],
-  ["def-mc", "mc", "tf"],
-  ["term-type", "mc", "tf"],
-  ["term-type", "mc", "explain"],
-  ["term-type", "mc", "tf", "explain"],
-];
 const QUOTE_MIX: ExType[][] = [
   ["q-bank1"],
   ["q-bank1", "q-bank3"],
@@ -53,7 +41,6 @@ const QUOTE_MIX: ExType[][] = [
   ["q-letters", "q-recall"],
 ];
 
-const PREF_TYPES: Record<string, ExType[]> = { tap: ["mc", "tf", "match", "def-mc"], blank: ["bank"], type: ["type", "term-type"] };
 
 /** Due first (oldest due), then new, then least recently seen (earliest due). */
 export function pickOrder(cards: Card[], now: Date): Card[] {
@@ -83,8 +70,87 @@ class CardPicker {
   }
 }
 
-const MC_FORMS: McForm[] = ["concept", "gist", "odd", "mate"];
-const PAGE_FORMS: PageForm[] = ["gist", "odd", "mate"];
+const MC_FORMS: McForm[] = ["concept", "gist", "odd"];
+const PAGE_FORMS: PageForm[] = ["gist", "odd"];
+
+/**
+ * A blank worth filling in (spec 13.8): a definition's term, or a cloze word whose stem shows up on 2 or
+ * more fact cards in the pool but on no more than 30% of them. A word on one card ("on earth") is trivia,
+ * and a word on most cards ("person") gives nothing away about the idea.
+ */
+/** Everyday words that are never the point of a sentence, so they are never blanked. */
+const PLAIN_WORDS = new Set(
+  "want wants wanted take takes make makes made feel feels seem seems part good best better big new way ways self life thing things people person time times every little great really need needs needed give gives get gets go goes come comes look looks know knows keep keeps start starts find finds help helps tell tells talk talks show shows long much many most more first last next same other others another instead about rather without within never always often".split(" "),
+);
+
+export type BlankFinder = ((c: Card) => string | undefined) & { wrong: (c: Card, word: string, n: number) => string[] };
+
+export function keyBlanks(pool: Card[]): BlankFinder {
+  const cardsWith = new Map<string, number>();
+  let facts = 0;
+  for (const c of pool) {
+    if (c.kind !== "fact") continue;
+    facts++;
+    for (const st of new Set(tokens(c.statement).map((t) => t.stem))) cardsWith.set(st, (cardsWith.get(st) ?? 0) + 1);
+  }
+  const most = Math.max(2, Math.floor(facts * 0.3));
+  const isKey = (stem: string | undefined, surface: string) => {
+    const n = stem ? (cardsWith.get(stem) ?? 0) : 0;
+    return n >= 2 && n <= most && surface.length >= 5 && !PLAIN_WORDS.has(surface.toLowerCase());
+  };
+  // Every key word in the pool, for wrong answers that read like the right one.
+  const keyWords = new Map<string, string>();
+  for (const c of pool) {
+    if (c.kind !== "fact") continue;
+    for (const t of tokens(c.statement)) if (!keyWords.has(t.stem) && isKey(t.stem, t.surface)) keyWords.set(t.stem, t.surface.toLowerCase());
+  }
+  const find = (c: Card): string | undefined => {
+    if (isDefinition(c)) return c.term;
+    // A word said twice in the sentence would give its own blank away.
+    const own = new Map<string, number>();
+    for (const t of tokens(c.statement)) own.set(t.stem, (own.get(t.stem) ?? 0) + 1);
+    const once = (stem: string | undefined) => !!stem && own.get(stem) === 1;
+    if (c.kind !== "fact") return undefined;
+    // The card's own blank when it is a key word, else the statement's key word on the most cards.
+    const cz = clozeOf(c);
+    if (cz && isKey(tokens(cz)[0]?.stem, cz) && once(tokens(cz)[0]?.stem)) return cz;
+    let best: { word: string; n: number } | undefined;
+    for (const t of tokens(c.statement)) {
+      if (!isKey(t.stem, t.surface) || !once(t.stem) || !containsTerm(c.statement, t.surface)) continue;
+      // Shared by more cards first, then the longer (more specific) word.
+      const n = cardsWith.get(t.stem)! * 100 + t.surface.length;
+      if (!best || n > best.n) best = { word: t.surface, n };
+    }
+    return best?.word;
+  };
+  const wrong = (c: Card, word: string, n: number) => {
+    const w = word.toLowerCase();
+    const shape = shapeClass(w);
+    const own = tokens(w)[0]?.stem;
+    // Other key words, never one with the same stem ("thinking" for "think") or one already in the sentence.
+    return [...keyWords.entries()]
+      .filter(([st, k]) => st !== own && !containsTerm(c.statement, k))
+      .map(([, k]) => k)
+      .sort((a, b) => Number(shapeClass(b) === shape) - Number(shapeClass(a) === shape) || Math.abs(a.length - w.length) - Math.abs(b.length - w.length) || a.localeCompare(b))
+      .slice(0, n);
+  };
+  return Object.assign(find, { wrong });
+}
+
+/**
+ * The card with its blank on its key word and wrong answers that are other key words of the same shape,
+ * topped up with its own single-word wrong answers.
+ */
+function withBlank(card: Card, blankOf: BlankFinder): Card {
+  const word = blankOf(card)!;
+  if (isDefinition(card)) return card;
+  const own = word === clozeOf(card) ? (card.distractors ?? []).filter((d) => wordCount(d) === 1 && !containsTerm(card.statement, d)) : [];
+  const wrong = [...new Set([...blankOf.wrong(card, word, 3), ...own])].slice(0, 3);
+  return { ...card, cloze: word, question: undefined, answer: undefined, distractors: wrong, falseStatement: undefined };
+}
+
+/** A concept card that can pair its question with a right or wrong answer (13.4). Others never play true or false. */
+const tfReady = (c: Card) => isConcept(c) && !!c.distractors?.length;
 
 /** The k-th mc slot of a lesson (spec 13.7): forms cycle from k and the first one that works wins, unused cards first. */
 function mixedMC(picker: CardPicker, ctx: GenCtx, k: number, asked: Set<string>): { card: Card; ex: Exercise } | null {
@@ -97,7 +163,7 @@ function mixedMC(picker: CardPicker, ctx: GenCtx, k: number, asked: Set<string>)
         continue;
       }
       // Every card on a page gives the same gist and odd question, so each is asked once per session.
-      const key = (c: Card) => (form === "mate" ? `mate:${c.id}` : `${form}:${c.pageId}`);
+      const key = (c: Card) => `${form}:${c.pageId}`;
       const made: { ex: Exercise | null } = { ex: null };
       const card = picker.next((c) => !asked.has(key(c)) && !!(made.ex = genPageMC(c, ctx, form)), rounds);
       if (card && made.ex) {
@@ -166,6 +232,24 @@ function genFor(type: ExType, card: Card, ctx: GenCtx): Exercise | null {
   }
 }
 
+type Slot = "M" | "bank" | "type" | "tf" | "explain" | "apply" | "match";
+
+/**
+ * Which kind of question each slot of a lesson asks (spec 13.8): multiple choice everywhere except four
+ * slots (2, 4, 6, 8) that take two fill-ins and two others in a shuffled order.
+ */
+export function slotPlan(level: number, length: number, opts: { apply: boolean; match: boolean }, rand: () => number): Slot[] {
+  const lvl = Math.min(4, Math.max(0, level));
+  const fills: Slot[] = lvl <= 1 ? ["bank", "bank"] : lvl <= 3 ? ["bank", "type"] : ["type", "bank"];
+  const others: Slot[] = lvl <= 1 ? [opts.match ? "match" : "tf", "tf"] : ["tf", lvl >= 4 && opts.apply ? "apply" : "explain"];
+  const special = shuffle([...fills, ...others], rand);
+  const plan: Slot[] = Array.from({ length }, () => "M");
+  [2, 4, 6, 8].forEach((at, i) => {
+    if (at < length) plan[at] = special[i];
+  });
+  return plan;
+}
+
 export function buildSession(
   lesson: Lesson,
   cards: Card[],
@@ -184,75 +268,13 @@ export function buildSession(
   if (!mine.length) return pictures.slice(0, sessionLength).map((c) => genPicture(c)!);
   const nPictures = Math.min(MAX_PICTURES_PER_SESSION, pictures.length);
   const ctx: GenCtx = { pool: pool.length ? pool : mine, rand, lessonTitle: lesson.title };
-  // Word lists and glossaries practice like a class (spec 10.2): half or more of the cards are definitions.
-  const isClass = opts.projectType === "class" || opts.projectType === "other" || mine.filter(isDefinition).length * 2 >= mine.length;
   const picker = new CardPicker(pickOrder(mine, now));
   const lvl = Math.min(4, Math.max(0, lesson.level));
-  const isQuotes = lesson.kind === "quotes";
   const length = sessionLength - nPictures;
-  let mix = (isQuotes ? QUOTE_MIX : isClass ? CLASS_MIX : THEME_MIX)[lvl].slice();
-  if (!isQuotes && !profile.goals.includes("apply")) mix = mix.filter((t) => t !== "apply");
-  // Definition exercises need definition cards; fall back to their cloze equivalents.
-  if (isClass && !mine.some(isDefinition)) mix = mix.map((t) => (t === "def-mc" ? "mc" : t === "term-type" ? "type" : t));
-  if (!mix.length) mix = ["mc"];
-  const weights = mix.map((t) => (Object.entries(PREF_TYPES).some(([p, ts]) => profile.practice.includes(p as never) && ts.includes(t)) ? 2 : 1));
-
-  const out: Exercise[] = [];
-  let applyUsed = false;
-  let mcSlots = 0;
-  const asked = new Set<string>();
-  for (let slot = 0; slot < length * 3 && out.length < length; slot++) {
-    let type = isQuotes ? weightedPick(mix, mix.map(() => 1), rand) : weightedPick(mix, weights, rand);
-    const prev = out[out.length - 1]?.type;
-    // Match uses 4 cards at once; on small lessons that would leave a very short session.
-    const matches = out.filter((e) => e.type === "match").length;
-    if (type === "match" && (prev === "match" || matches >= (mine.length >= 12 ? 2 : 1))) type = "mc";
-    if (type === "type" && out.length === 0) type = mix.find((t) => t !== "type" && t !== "apply") ?? "mc";
-    if ((type === "apply" || type === "explain") && (applyUsed || out.length === 0)) type = "mc";
-    if (type === "term-type" && out.length === 0) type = "def-mc";
-    if (type === "type" && out.length === 0) type = "mc";
-
-    if (type === "match") {
-      const avail = picker.available((c) => !!c.cloze);
-      const ex = genMatch(avail, ctx);
-      if (ex) {
-        ex.cardIds.forEach((id) => picker.take(mine.find((c) => c.id === id)!));
-        out.push(ex);
-        continue;
-      }
-      type = "mc";
-    }
-    if (type === "mc") {
-      const picked = mixedMC(picker, ctx, mcSlots++, asked);
-      if (picked) {
-        picker.take(picked.card);
-        out.push(picked.ex);
-        continue;
-      }
-      // Nothing left to ask about a page: a whole-sentence true or false beats a missing word.
-      const card = picker.next();
-      const tf = card ? genTF(card, ctx) : null;
-      if (card && tf) {
-        picker.take(card);
-        out.push(tf);
-        continue;
-      }
-    }
-    const wantsDef = type === "def-mc" || type === "term-type";
-    const wantsConcept = type === "mc" || type === "tf" || type === "flash";
-    const card = (wantsDef ? picker.next(isDefinition) : null) ?? (wantsConcept ? picker.next(isConcept, 1) : null) ?? picker.next();
-    if (!card) break;
-    let ex = genFor(type, card, ctx);
-    if (!ex && type === "term-type") ex = genType(card);
-    if (!ex && isQuotes) ex = genQuoteLetters(card);
-    if (!ex) ex = genMC(card, ctx);
-    picker.take(card);
-    if (ex.type === "apply" || ex.type === "explain") applyUsed = true;
-    out.push(ex);
-  }
+  const out = lesson.kind === "quotes" ? quoteSession(picker, ctx, lvl, length) : lessonSession(picker, ctx, mine, lvl, length, profile, opts.projectType);
 
   // Flashcards replace one slot when the user picked them (never the first).
-  if (!isQuotes && profile.practice.includes("flash") && out.length > 2) {
+  if (lesson.kind !== "quotes" && profile.practice.includes("flash") && out.length > 2) {
     const idx = 1 + Math.floor(rand() * (out.length - 1));
     const target = out[idx];
     if (target.type !== "match" && target.type !== "apply") {
@@ -261,6 +283,105 @@ export function buildSession(
     }
   }
   return insertPictures(out, pictures.slice(0, nPictures), rand);
+}
+
+function quoteSession(picker: CardPicker, ctx: GenCtx, lvl: number, length: number): Exercise[] {
+  const mix = QUOTE_MIX[lvl];
+  const out: Exercise[] = [];
+  while (out.length < length) {
+    const card = picker.next();
+    if (!card) break;
+    const type = weightedPick(mix, mix.map(() => 1), ctx.rand);
+    out.push(genFor(type, card, ctx) ?? genQuoteLetters(card) ?? genMC(card, ctx));
+    picker.take(card);
+  }
+  return out;
+}
+
+/** Theme and class lessons (spec 13.8): a majority of multiple choice, two fill-ins and two others. */
+function lessonSession(picker: CardPicker, ctx: GenCtx, mine: Card[], lvl: number, length: number, profile: Profile, projectType?: ProjectType): Exercise[] {
+  // Word lists and glossaries practice like a class (spec 10.2): half or more of the cards are definitions.
+  const defs = mine.filter(isDefinition);
+  const isClass = projectType === "class" || projectType === "other" || defs.length * 2 >= mine.length;
+  const blankOf = keyBlanks(ctx.pool);
+  const keyBlank = (c: Card) => !!blankOf(c);
+  ctx.isKey = (c) => !!blankOf(c) && blankOf(c) === clozeOf(c);
+  const plan = slotPlan(lvl, length, { apply: profile.goals.includes("apply"), match: isClass && defs.length >= 4 }, ctx.rand);
+  const out: Exercise[] = [];
+  const asked = new Set<string>();
+  // A card plays at most one fill-in per session, so the same blank never shows up twice.
+  const filled = new Set<string>();
+  let mcSlots = 0;
+  let deepUsed = false;
+  const add = (card: Card, ex: Exercise) => {
+    picker.take(card);
+    out.push(ex);
+  };
+  const unusedFirst = (f: (c: Card) => boolean) => picker.next(f, 1) ?? picker.next(f);
+
+  for (let i = 0; i < plan.length; i++) {
+    const slot = plan[i];
+    if (slot === "bank" || slot === "type") {
+      const card = unusedFirst((c) => keyBlank(c) && !filled.has(c.id));
+      if (card) filled.add(card.id);
+      const fc = card && withBlank(card, blankOf);
+      const ex = fc && (slot === "type" ? (isDefinition(fc) ? genTermType(fc) : genType(fc)) : isDefinition(fc) && lvl <= 1 ? genDefMC(fc, ctx) : genBank(fc, ctx));
+      if (card && ex) {
+        add(card, ex);
+        continue;
+      }
+    } else if (slot === "tf") {
+      const card = unusedFirst(tfReady);
+      const ex = card && genTF(card, ctx);
+      if (card && ex) {
+        add(card, ex);
+        continue;
+      }
+    } else if (slot === "match") {
+      const ex = genMatch(picker.available(isDefinition), ctx);
+      if (ex) {
+        ex.cardIds.forEach((id) => picker.take(mine.find((c) => c.id === id)!));
+        out.push(ex);
+        continue;
+      }
+    } else if ((slot === "explain" || slot === "apply") && !deepUsed) {
+      // Explain a named idea when there is one (a concept or a term), so the topic is never a stray word.
+      const card = slot === "explain" ? unusedFirst((c) => isConcept(c) || isDefinition(c)) ?? picker.next() : unusedFirst((c) => !isDefinition(c));
+      if (card) {
+        deepUsed = true;
+        add(card, slot === "apply" ? genApply(card) : genExplain(card, ctx));
+        continue;
+      }
+    }
+    // Multiple choice, or a slot above that could not be used.
+    const k = mcSlots++;
+    if (isClass && defs.length && k % 2 === 0) {
+      const card = picker.next(isDefinition, 1);
+      const ex = card && genDefMC(card, ctx);
+      if (card && ex) {
+        add(card, ex);
+        continue;
+      }
+    }
+    const picked = mixedMC(picker, ctx, k, asked);
+    if (picked) {
+      add(picked.card, picked.ex);
+      continue;
+    }
+    // Nothing new to ask about an idea: a missing key word, then an idea question again, then any card.
+    const again = picker.available((c) => keyBlank(c) && !filled.has(c.id)).length ? null : mixedMC(picker, ctx, k, new Set());
+    if (again) {
+      add(again.card, again.ex);
+      continue;
+    }
+    const card = unusedFirst((c) => keyBlank(c) && !filled.has(c.id)) ?? picker.next();
+    if (!card) break;
+    if (keyBlank(card)) filled.add(card.id);
+    const fc = keyBlank(card) && !isConcept(card) ? withBlank(card, blankOf) : card;
+    // Definitions alternate: pick the definition for a term, then the term for a definition.
+    add(card, isDefinition(card) ? (k % 2 === 0 ? genDefMC(card, ctx) : null) ?? genMC(card, ctx) : genMC(fc, ctx));
+  }
+  return out;
 }
 
 /** Put picture exercises at random positions after the first. */
@@ -288,6 +409,7 @@ export function buildPractice(cards: Card[], now: Date, rand: () => number = Mat
   const nPictures = Math.min(MAX_PICTURES_PER_SESSION, duePictures.length);
   size -= nPictures;
   const ctx: GenCtx = { pool: cards, rand };
+  const blankOf = keyBlanks(cards);
   const picker = new CardPicker(due);
   const out: Exercise[] = [];
   while (out.length < size) {
@@ -302,9 +424,9 @@ export function buildPractice(cards: Card[], now: Date, rand: () => number = Mat
       const t: ExType = out.length === 0 || rand() < 0.5 ? "def-mc" : "term-type";
       ex = genFor(t, card, ctx) ?? genMC(card, ctx);
     } else {
-      // No word bank or typed blank in Practice (spec 13.7).
-      const tf = out.length > 0 && rand() >= 0.6 ? genTF(card, ctx) : null;
-      ex = tf ?? cardMC(card, ctx, out.length);
+      // Mostly multiple choice, some fill-ins on key words, a few true or false (spec 13.8).
+      const r = out.length ? rand() : 0;
+      ex = (r >= 0.85 && tfReady(card) ? genTF(card, ctx) : null) ?? (r >= 0.65 && blankOf(card) ? genBank(withBlank(card, blankOf), ctx) : null) ?? cardMC(card, ctx, out.length);
     }
     out.push(ex);
   }
@@ -328,12 +450,15 @@ export function buildPracticeTest(lessons: Lesson[], cards: Card[], rand: () => 
       if (picked.length >= size) break;
     }
   }
-  const factTypes: ExType[] = ["type", "tf", "mc", "type"];
+  const blankOf = keyBlanks(cards);
   return picked.map((card, i) => {
     let ex: Exercise | null = null;
     if (card.kind === "quote") ex = i % 2 ? genQuoteLetters(card) : genQuoteBank(card, ctx, 3);
     else if (isDefinition(card)) ex = i % 3 === 2 ? genDefMC(card, ctx) : genTermType(card);
-    else ex = genFor(factTypes[i % factTypes.length], card, ctx);
+    // Recall on key words and concept answers; never a word-swap true or false (spec 13.8).
+    else if (i % 4 === 1 && blankOf(card)) ex = genType(withBlank(card, blankOf));
+    else if (i % 4 === 3 && tfReady(card)) ex = genTF(card, ctx);
+    else ex = cardMC(card, ctx, i);
     return ex ?? (card.kind === "quote" ? genQuoteLetters(card) : genMC(card, ctx));
   });
 }
@@ -378,11 +503,12 @@ export function scoreTest(answers: { ex: Exercise; verdict: Verdict }[], cards: 
 /** A normal practice session from specific cards (e.g. "Review your misses"). */
 export function buildFromCards(cards: Card[], pool: Card[], rand: () => number = Math.random): Exercise[] {
   const ctx: GenCtx = { pool, rand };
+  const blankOf = keyBlanks(pool);
   return cards.map((card, i) => {
     if (card.kind === "picture") return genPicture(card) ?? genMC(card, ctx);
     if (card.kind === "quote") return genQuoteBank(card, ctx, 3) ?? genQuoteLetters(card);
     if (isDefinition(card)) return (i % 2 ? genTermType(card) : genDefMC(card, ctx)) ?? genMC(card, ctx);
-    return (i % 2 ? genTF(card, ctx) : null) ?? cardMC(card, ctx, i);
+    return (i % 4 === 1 && blankOf(card) ? genBank(withBlank(card, blankOf), ctx) : null) ?? (i % 4 === 3 && tfReady(card) ? genTF(card, ctx) : null) ?? cardMC(card, ctx, i);
   });
 }
 
@@ -397,12 +523,10 @@ export function buildConnection(lessonA: string, lessonB: string, cards: Card[],
   }
   if (!order.length) return [];
   const ctx: GenCtx = { pool: cards, rand };
-  const mix = THEME_MIX[1];
   const out: Exercise[] = [];
   for (let i = 0; out.length < size && i < order.length * 2; i++) {
     const card = order[i % order.length];
-    const type = mix[Math.floor(rand() * mix.length)];
-    out.push(genFor(type, card, ctx) ?? genMC(card, ctx));
+    out.push((i % 3 === 2 && tfReady(card) ? genTF(card, ctx) : null) ?? cardMC(card, ctx, i));
   }
   return out;
 }

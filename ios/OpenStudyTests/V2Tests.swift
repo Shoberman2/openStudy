@@ -166,7 +166,7 @@ final class V2Tests: XCTestCase {
         for e in ex0 where e.kind == .match { XCTAssertTrue(e.pairs.allSatisfy { p in lib.cards.first { $0.id == p.cardId }?.term == p.term }) }
         lesson.level = 3
         let ex3 = SessionBuilder.build(lesson: lesson, cards: lib.cards, projectCards: lib.cards(ofProject: "smpbio101"), profile: lib.profile, isClass: true, rng: &rng)
-        XCTAssertTrue(ex3.allSatisfy { [.termType, .type, .explain, .defMc, .mc, .tf].contains($0.kind) })
+        XCTAssertTrue(ex3.allSatisfy { [.termType, .type, .bank, .explain, .defMc, .mc, .tf].contains($0.kind) }, "\(ex3.map(\.kind))")
         XCTAssertTrue(ex3.contains { $0.kind == .termType })
         for e in ex3 where e.kind == .termType { XCTAssertEqual(lib.cards.first { $0.id == e.cardId }?.term, e.answer) }
         XCTAssertLessThanOrEqual(ex3.filter { $0.kind == .explain || $0.kind == .apply }.count, 1)

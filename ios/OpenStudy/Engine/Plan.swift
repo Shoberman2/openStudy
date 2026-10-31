@@ -265,17 +265,15 @@ public enum PracticeTest {
         let projectCards = lib.cards(ofProject: project.id)
         let defs = projectCards.filter(\.isDefinition)
         let extra = projectCards.flatMap { SessionBuilder.longWords($0.statement) }
+        let pool = projectCards.filter { !$0.isPicture }
+        let blanks = SessionBuilder.KeyBlanks(pool: pool)
         return picked.enumerated().map { i, c in
-            let kind: ExerciseKind
-            if c.isQuote { kind = .qLetters }
-            else {
-                switch i % 4 {
-                case 0, 3: kind = c.isDefinition ? .termType : .type
-                case 1: kind = .tf
-                default: kind = c.isDefinition ? .defMc : .mc
-                }
-            }
-            return SessionBuilder.make(kind, card: c, extraWords: extra, defs: defs, rng: &rng)
+            if c.isQuote { return SessionBuilder.make(.qLetters, card: c, extraWords: extra, rng: &rng) }
+            if c.isDefinition { return SessionBuilder.make(i % 3 == 2 ? .defMc : .termType, card: c, extraWords: extra, defs: defs, rng: &rng) }
+            // Recall on key words and concept answers; never a word-swap true or false (spec 13.8).
+            if i % 4 == 1, blanks.word(c) != nil { return SessionBuilder.make(.type, card: blanks.withBlank(c), extraWords: extra, rng: &rng) }
+            if i % 4 == 3, c.isConcept, !(c.distractors ?? []).isEmpty { return SessionBuilder.make(.tf, card: c, extraWords: extra, rng: &rng) }
+            return SessionBuilder.cardMC(c, pool: pool, index: i, extraWords: extra, defs: defs, blanks: blanks, rng: &rng)
         }
     }
 

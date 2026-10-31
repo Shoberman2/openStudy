@@ -11,6 +11,7 @@ const THE_IS = /^(The [^,]+?) (is|are) (.+)$/;
 const EFFECT =
   /^(.+?) (leads to|lead to|causes|cause|results in|result in|prevents|prevent|reduces|reduce|increases|increase|improves|improve|depends on|depend on|protects|protect|controls|control) (.+)$/i;
 const DEFINE = /^(\p{Lu}[\p{L}'-]*(?: [\p{L}'-]+){0,2}) (is|are) (.+)$/u;
+const CLAUSE_WORDS = new Set(["is", "are", "was", "were", "that", "which", "who"]);
 const PRONOUNS = new Set(["it", "this", "that", "these", "those", "they", "he", "she", "which", "who", "what"]);
 const THE_IS_STARTS = new Set(["a", "an", "the", "to", "one", "that", "what", "how", "when", "where", "why", "your", "our", "their", "his", "her", "its", "my"]);
 const DEFINE_STARTS = new Set(["a", "an", "the", "one", "nothing", "your", "our", "their"]);
@@ -43,7 +44,9 @@ const RULES: Rule[] = [
     const m = WHY.exec(s);
     if (!m) return null;
     const [a, b] = [m[1].trim(), answerPart(m[3])];
-    return !startsWithPronoun(a) && noColon(a) && within(a, 3, 16) && within(b, 2, 14) ? { question: `${a}. Why?`, answer: upperFirst(b) } : null;
+    // "X not because Y, but because Z" says the opposite of a reason, so it is skipped.
+    const negated = /\bnot$/i.test(a);
+    return !negated && !startsWithPronoun(a) && noColon(a) && within(a, 3, 16) && within(b, 2, 14) ? { question: `${a}. Why?`, answer: upperFirst(b) } : null;
   },
   (s) => {
     const m = INSTEAD_FIRST.exec(s);
@@ -61,7 +64,7 @@ const RULES: Rule[] = [
   (s) => {
     const m = IF_WHEN.exec(s);
     if (!m) return null;
-    const [c, b] = [m[2].trim(), answerPart(m[3])];
+    const [c, b] = [m[2].trim(), answerPart(m[3]).replace(/^then\s+/i, "")];
     return within(c, 2, 12) && within(b, 2, 12) ? { question: `${upperFirst(m[1].toLowerCase())} ${c}, then what?`, answer: upperFirst(b) } : null;
   },
   (s) => {
@@ -77,6 +80,8 @@ const RULES: Rule[] = [
     if (!m) return null;
     const [a, b] = [m[1].trim(), answerPart(m[3])];
     if (startsWithPronoun(a) || a.includes(",") || !noColon(a) || !within(a, 1, 8) || !within(b, 2, 12)) return null;
+    // A cause with its own verb ("Systems are about the processes that") is half a clause, not a subject.
+    if (a.split(/\s+/).some((w) => CLAUSE_WORDS.has(w.toLowerCase())) || startsWithPronoun(b)) return null;
     const v = m[2].toLowerCase();
     const [head, ...rest] = v.split(" ");
     const third = head.endsWith("s");
@@ -96,9 +101,11 @@ const RULES: Rule[] = [
 /** The concept question for one statement, or null when no rule fits. */
 export function conceptQuestion(statement: string): ConceptMatch | null {
   const s = statement.trim().replace(/[.!?"”’')\],]+$/u, "").trim();
+  // "Not X, but Y": an answer cut before ", but" would teach the half the text rejects.
+  const notBut = /\bnot\b[^,]*, but\b/i.test(s);
   for (const rule of RULES) {
     const m = rule(s);
-    if (m) return m;
+    if (m && !(notBut && /\bnot\b/i.test(m.answer))) return m;
   }
   return null;
 }

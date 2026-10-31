@@ -444,10 +444,13 @@ final class Store: ObservableObject {
         let defs = library.cards.filter(\.isDefinition)
         let extra = cards.flatMap { SessionBuilder.longWords($0.statement) }
         let pool = library.cards.filter { $0.projectId == cards[0].projectId && !$0.isPicture }
+        let blanks = SessionBuilder.KeyBlanks(pool: pool)
         let ex = cards.enumerated().map { i, c -> Exercise in
+            // Mostly multiple choice, a fill-in on a key word, a true or false on a concept card (spec 13.8).
             if !c.isQuote && !c.isDefinition && !c.isPicture {
-                return i % 2 == 0 ? SessionBuilder.cardMC(c, pool: pool, index: i, extraWords: extra, defs: defs, rng: &rng)
-                                  : SessionBuilder.make(.tf, card: c, extraWords: extra, defs: defs, rng: &rng)
+                if i % 4 == 1, blanks.word(c) != nil { return SessionBuilder.make(.bank, card: blanks.withBlank(c), extraWords: extra, rng: &rng) }
+                if i % 4 == 3, c.isConcept, !(c.distractors ?? []).isEmpty { return SessionBuilder.make(.tf, card: c, extraWords: extra, rng: &rng) }
+                return SessionBuilder.cardMC(c, pool: pool, index: i, extraWords: extra, defs: defs, blanks: blanks, rng: &rng)
             }
             let kind: ExerciseKind = c.isQuote ? .qBank3 : c.isDefinition ? (i % 2 == 0 ? .defMc : .termType) : .mc
             return SessionBuilder.make(kind, card: c, extraWords: extra, defs: defs, rng: &rng)
