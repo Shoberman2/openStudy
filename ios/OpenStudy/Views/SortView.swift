@@ -53,7 +53,7 @@ struct SortView: View {
                     } else if bulk.count >= 2 {
                         let k = Set(bulk.compactMap { $0.category?.lowercased() }).count
                         VStack(alignment: .leading, spacing: 10) {
-                            Button("Create all \(bulk.count) projects") { if store.plusAllowed(from: "create_all") { Task { await createAll() } } }
+                            Button("Create all \(bulk.count) projects") { if store.plusAllowed(.studySet, count: bulk.count, from: "create_all") { Task { await createAll() } } }
                                 .buttonStyle(.chunky)
                             Text("Books, classes and topics, sorted into \(k) \(k == 1 ? "category" : "categories").")
                                 .font(Typo.small).foregroundStyle(Palette.muted)
@@ -61,7 +61,7 @@ struct SortView: View {
                     }
                     ForEach($groups) { $group in
                         GroupCard(group: $group, allGroups: groups,
-                                  onCreate: { if store.plusAllowed(from: "create_project") { creating = group } },
+                                  onCreate: { if store.plusAllowed(.studySet, from: "create_project") { creating = group } },
                                   onMove: { pageId, target in move(pageId, to: target) },
                                   onView: { viewing = $0 })
                     }

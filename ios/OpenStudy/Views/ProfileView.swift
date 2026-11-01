@@ -6,11 +6,11 @@ struct AvatarCircle: View {
     var size: CGFloat
     var body: some View {
         ZStack {
-            Circle().fill(initial == nil ? Palette.shelf : Palette.blue)
+            Circle().fill(initial == nil ? Palette.surfaceDim : Palette.ink)
             if let initial {
-                Text(initial).font(Typo.rounded(size * 0.46, .heavy)).foregroundStyle(.white)
+                Text(initial).font(Typo.geist(size * 0.44, .semibold)).foregroundStyle(Palette.onAccent)
             } else {
-                Image(systemName: "person.fill").font(.system(size: size * 0.46, weight: .semibold)).foregroundStyle(Palette.muted)
+                Image(systemName: "person").font(.system(size: size * 0.42, weight: .regular)).foregroundStyle(Palette.ink2)
             }
         }
         .frame(width: size, height: size)
@@ -18,12 +18,13 @@ struct AvatarCircle: View {
     }
 }
 
-/// Profile (spec 11.3): name, progress, and the subscription status.
+/// Profile sheet (spec 11.3, 14): name, progress, the study check, OpenStudy Plus and the account.
 struct ProfileView: View {
     @ObservedObject var usage = EventUploader.shared
     @EnvironmentObject var store: Store
     @Environment(\.dismiss) var dismiss
     @StateObject private var account = AccountService()
+    @ObservedObject private var shop = StoreService.shared
     @State private var name = ""
     @State private var signingIn = false
     @State private var confirmDelete = false
@@ -35,84 +36,80 @@ struct ProfileView: View {
         let lib = store.library
         let stats = ProfileInfo.stats(lib)
         let state = account.state
+        let check = StudyCheck.run(lib)
         VStack(spacing: 0) {
-            HStack {
-                IconButton(systemName: "chevron.left", label: "Back") { dismiss() }
-                Spacer()
-                IconButton(systemName: "gearshape.fill", label: "Settings") { store.path.append(.settings) }
-            }
-            .padding(.horizontal, 8)
+            SheetHeader(title: "Profile", leading: ("gearshape", "Settings", { store.sheet = .settings }), onClose: { dismiss() })
             ScrollView {
-                VStack(alignment: .leading, spacing: 26) {
+                VStack(alignment: .leading, spacing: 32) {
                     HStack(spacing: 16) {
-                        AvatarCircle(initial: ProfileInfo.avatarInitial(name: name, email: state.email), size: 72)
+                        AvatarCircle(initial: ProfileInfo.avatarInitial(name: name, email: state.email), size: 64)
                         VStack(alignment: .leading, spacing: 6) {
-                            SectionLabel(text: "Your name")
-                            TextField("What should we call you?", text: $name)
-                                .font(Typo.bodyBold)
+                            TextField("Your name", text: $name)
+                                .font(Typo.headline)
                                 .textContentType(.givenName)
                                 .submitLabel(.done)
                                 .focused($editingName)
                                 .onSubmit(saveName)
                                 .padding(.horizontal, 14).padding(.vertical, 10)
-                                .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Palette.shelf))
-                                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Palette.line, lineWidth: 2))
-                            if let email = state.email { Text(email).font(Typo.small).foregroundStyle(Palette.muted).lineLimit(1) }
-                            if let since = stats.memberSince { Text("Studying since \(Self.longDate(since))").font(Typo.small).foregroundStyle(Palette.muted) }
+                                .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Palette.surfaceDim))
+                            if let since = stats.memberSince { Text("Studying since \(Self.longDate(since))").font(Typo.small).foregroundStyle(Palette.ink3) }
                         }
                     }
 
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Your progress").font(Typo.headline).foregroundStyle(Palette.ink)
-                        LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
-                            tile("Total XP", "\(stats.xp)")
-                            tile("Streak", days(stats.streak))
-                            tile("Longest streak", days(stats.longestStreak))
-                            tile("Projects", "\(stats.projects)")
-                            tile("Cards learned", "\(stats.cardsLearned)")
-                            tile("Sessions", "\(stats.sessions)")
+                    section("Your Progress") {
+                        LazyVGrid(columns: [GridItem(.flexible(), alignment: .leading), GridItem(.flexible(), alignment: .leading)], alignment: .leading, spacing: 18) {
+                            stat("Total XP", "\(stats.xp)")
+                            stat("Streak", days(stats.streak))
+                            stat("Longest streak", days(stats.longestStreak))
+                            stat("Study sets", "\(stats.projects)")
+                            stat("Cards learned", "\(stats.cardsLearned)")
+                            stat("Sessions", "\(stats.sessions)")
                         }
                     }
 
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Subscription").font(Typo.headline).foregroundStyle(Palette.ink)
-                        Panel {
-                            if state.billingOn {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    Text(state.signedIn ? ProfileInfo.subscriptionLine(state.entitlement) : "Sign in to start your free trial or use your subscription.")
-                                        .font(Typo.bodyBold).foregroundStyle(Palette.ink).fixedSize(horizontal: false, vertical: true)
-                                    if let message { Text(message).font(Typo.small).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true) }
-                                    subscriptionButtons(state)
-                                }
-                            } else {
-                                Text("Accounts and subscriptions are not set up in this version yet. Everything is unlocked.")
-                                    .font(Typo.body).foregroundStyle(Palette.muted)
-                                    .fixedSize(horizontal: false, vertical: true)
+                    section("Study Check") {
+                        Button { store.sheet = .studyCheck } label: {
+                            row(StudyCheck.flagged(check) == 0 ? "Nothing to fix right now" : "\(StudyCheck.flagged(check)) \(StudyCheck.flagged(check) == 1 ? "habit" : "habits") to look at",
+                                label: "How you study", chevron: true)
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    section("OpenStudy Plus") {
+                        VStack(alignment: .leading, spacing: 14) {
+                            row(plusLine(state), label: store.plusActive ? "Your plan" : "Free this month")
+                            if let message { Text(message).font(Typo.small).foregroundStyle(Palette.ink2).fixedSize(horizontal: false, vertical: true) }
+                            if !store.plusActive {
+                                Button("Get OpenStudy Plus") { store.openPaywall(from: "profile") }.buttonStyle(.pill)
+                            } else if state.entitlement.source != "comp" {
+                                Button("Manage subscription") { Task { await manage(state) } }.buttonStyle(.ghostPill).disabled(busy)
                             }
+                            Button("Restore Purchases") { Task { await restore() } }
+                                .buttonStyle(TextLinkStyle(color: Palette.ink2)).disabled(busy)
+                                .frame(maxWidth: .infinity)
                         }
                     }
+
+                    section("Account") { accountSection(state) }
 
                     if usage.enabled {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Privacy").font(Typo.headline).foregroundStyle(Palette.ink)
-                            Panel {
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Toggle(isOn: $usage.share) { Text("Share usage data").font(Typo.bodyBold).foregroundStyle(Palette.ink) }
-                                        .tint(Palette.green)
-                                    Text("Counts and categories only, never your notes.")
-                                        .font(Typo.small).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
-                                }
+                        section("Privacy") {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Toggle(isOn: $usage.share) { Text("Share usage data").font(Typo.bodyBold).foregroundStyle(Palette.ink) }
+                                    .tint(Palette.ok)
+                                Text("Counts and categories only, never your notes.")
+                                    .font(Typo.small).foregroundStyle(Palette.ink3).fixedSize(horizontal: false, vertical: true)
                             }
                         }
                     }
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 24)
+                .padding(.top, 8)
                 .padding(.bottom, 40)
             }
             .scrollDismissesKeyboard(.interactively)
         }
-        .background(Palette.paper.ignoresSafeArea())
-        .toolbar(.hidden, for: .navigationBar)
+        .background(Palette.bg.ignoresSafeArea())
         .onAppear { name = lib.profile.name ?? "" }
         .onChange(of: editingName) { _, editing in if !editing { saveName() } }
         .onDisappear(perform: saveName)
@@ -123,29 +120,68 @@ struct ProfileView: View {
         .confirmationDialog("Delete your account?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete account", role: .destructive) { Task { await deleteAccount() } }
         } message: {
-            Text(state.entitlement.source == "apple"
-                 ? "This deletes your account. Your library stays on this iPhone. Cancel your subscription in Settings > Apple ID > Subscriptions too."
-                 : "This deletes your account and cancels a web subscription. Your library stays on this iPhone.")
+            Text(state.entitlement.source == "apple" || shop.hasPro
+                 ? "This deletes your account and its data on our server. Your library stays on this iPhone. Cancel your subscription in Settings > Apple ID > Subscriptions too."
+                 : "This deletes your account and its data on our server, and cancels a web subscription. Your library stays on this iPhone.")
         }
     }
 
-    @ViewBuilder func subscriptionButtons(_ state: AccountState) -> some View {
-        if !state.signedIn {
-            Button("Sign in") { signingIn = true }.buttonStyle(.chunky)
+    func plusLine(_ state: AccountState) -> String {
+        if store.plusActive {
+            if state.billingOn && state.signedIn && state.entitlement.active { return ProfileInfo.subscriptionLine(state.entitlement) }
+            return "OpenStudy Plus is on"
+        }
+        let u = store.currentUsage
+        return "\(u.studySetsLeft) of \(PlusLimits.freeStudySets) study sets and \(u.quizzesLeft) of \(PlusLimits.freeQuizzes) quizzes left"
+    }
+
+    @ViewBuilder func accountSection(_ state: AccountState) -> some View {
+        if !state.billingOn {
+            Text("Accounts are not set up in this version yet. Your library stays on this iPhone.")
+                .font(Typo.body).foregroundStyle(Palette.ink2).fixedSize(horizontal: false, vertical: true)
+        } else if !state.signedIn {
+            VStack(spacing: 10) {
+                AppleSignInButton { m in message = m }
+                Button("Use email") { signingIn = true }.buttonStyle(.ghostPill)
+            }
         } else {
-            if !state.entitlement.active {
-                Button("Start free trial") { store.paywall = PaywallRequest(from: "profile") }.buttonStyle(.chunky(.green))
+            VStack(alignment: .leading, spacing: 8) {
+                if let email = state.email { row(email, label: "Signed in as") }
+                Button("Sign out") { Task { await AccountController.shared.signOut(); message = nil; store.toast = "Signed out" } }
+                    .buttonStyle(TextLinkStyle())
+                Button("Delete account") { confirmDelete = true }
+                    .buttonStyle(TextLinkStyle(color: Palette.bad))
             }
-            if state.entitlement.active && state.entitlement.source != "comp" {
-                Button("Manage subscription") { Task { await manage(state) } }.buttonStyle(.chunky(.secondary)).disabled(busy)
+        }
+    }
+
+    func section<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(title).font(Typo.headline).tracking(Typo.tracking(for: 20)).foregroundStyle(Palette.ink)
+            content()
+        }
+    }
+
+    /// Settings-style row: small label over a 16pt+ value, on a quiet fill.
+    func row(_ value: String, label: String, chevron: Bool = false) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(label).font(Typo.small).foregroundStyle(Palette.ink3)
+                Text(value).font(Typo.bodyBold).foregroundStyle(Palette.ink).fixedSize(horizontal: false, vertical: true)
             }
-            if state.entitlement.source != "comp" {
-                Button("Restore purchases") { Task { await restore() } }.buttonStyle(.chunky(.secondary)).disabled(busy)
-            }
-            Button("Sign out") { Task { await AccountController.shared.signOut(); message = nil } }
-                .font(Typo.bodyBold).foregroundStyle(Palette.blue).frame(maxWidth: .infinity, minHeight: 44)
-            Button("Delete account") { confirmDelete = true }
-                .font(Typo.bodyBold).foregroundStyle(Palette.redText).frame(maxWidth: .infinity, minHeight: 44)
+            Spacer(minLength: 8)
+            if chevron { Image(systemName: "chevron.right").font(.system(size: 14, weight: .medium)).foregroundStyle(Palette.ink3) }
+        }
+        .padding(.horizontal, 16).padding(.vertical, 14)
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Palette.surfaceDim))
+        .contentShape(Rectangle())
+    }
+
+    func stat(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label).font(Typo.small).foregroundStyle(Palette.ink3)
+            Text(value).font(Typo.mono(22, .medium, relativeTo: .title3)).foregroundStyle(Palette.ink)
         }
     }
 
@@ -164,7 +200,7 @@ struct ProfileView: View {
         busy = false
         store.library.log("restore", ["ok": .bool(r == .purchased)])
         switch r {
-        case .purchased: message = "Your subscription is restored."
+        case .purchased: message = nil; store.toast = "Your subscription is restored"
         case .otherAccount: message = "This Apple ID's subscription belongs to another OpenStudy account."
         default: message = "No subscription to restore on this Apple ID."
         }
@@ -174,7 +210,7 @@ struct ProfileView: View {
         busy = true
         let ok = await AccountController.shared.deleteAccount()
         busy = false
-        message = ok ? "Your account is deleted. Your library is still on this iPhone." : "We could not delete your account. Try again."
+        if ok { message = nil; store.toast = "Account deleted" } else { message = "We could not delete your account. Try again." }
     }
 
     func saveName() {
@@ -184,17 +220,6 @@ struct ProfileView: View {
     }
 
     func days(_ n: Int) -> String { "\(n) \(n == 1 ? "day" : "days")" }
-
-    func tile(_ label: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(label).font(Typo.small).foregroundStyle(Palette.muted)
-            Text(value).font(Typo.rounded(22, .heavy)).foregroundStyle(Palette.ink).monospacedDigit()
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Palette.paper))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Palette.line, lineWidth: 2))
-    }
 
     static func longDate(_ d: Date) -> String {
         let f = DateFormatter()

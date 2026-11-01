@@ -1,25 +1,29 @@
 import SwiftUI
 
-/// The OpenStudy Plus paywall (spec 11.5). Shown when someone creates a project or studies their own
-/// material without an active subscription. One price, one button, no countdowns.
+/// The OpenStudy Plus paywall (spec 14.4). Opens when a free limit is reached or from the profile,
+/// never at launch. Shows price, period, trial terms, auto-renew terms, Terms and Privacy, and
+/// Restore Purchases, as App Review requires. No countdowns, no fake urgency.
 struct PaywallView: View {
     var from: String
-    /// Runs when the subscription is active (trial started, restored, or already on).
+    /// Runs when Plus is active (trial started, restored, or already on).
     var onUnlocked: () -> Void
     var onClose: () -> Void
 
     @EnvironmentObject var store: Store
     @ObservedObject var account = AccountController.shared
     @ObservedObject var shop = StoreService.shared
+    @State private var plan: PlusPlan = .yearly
     @State private var signingIn = false
     @State private var message: String?
     @State private var restoring = false
+    @State private var success = 0
 
-    static let title = "Keep everything you saved, and learn it."
-    static let lines = ["All your projects and lessons", "Your study plan and practice tests", "Smart organize and Ask your notes"]
-    /// Terms and Privacy live on the OpenStudy website (the same server that owns accounts).
-    static var termsURL: URL? { ServerConfig.base?.appendingPathComponent("terms") }
-    static var privacyURL: URL? { ServerConfig.base?.appendingPathComponent("privacy") }
+    static let title = "Study Everything You Save"
+    static let lines = ["Unlimited study sets and quizzes", "The full study check, with export", "Your shelf backed up and moved between devices"]
+
+    static let site = URL(string: "https://openstudy-psi.vercel.app")!
+    static var termsURL: URL { (ServerConfig.base ?? site).appendingPathComponent("terms") }
+    static var privacyURL: URL { (ServerConfig.base ?? site).appendingPathComponent("privacy") }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -32,47 +36,69 @@ struct PaywallView: View {
             }
             .padding(.horizontal, 8)
             ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
-                    Text("OpenStudy Plus").font(Typo.small).foregroundStyle(Palette.blue)
-                    Text(Self.title).font(Typo.display).foregroundStyle(Palette.ink).fixedSize(horizontal: false, vertical: true)
-                    VStack(alignment: .leading, spacing: 14) {
+                VStack(spacing: 24) {
+                    VStack(spacing: 12) {
+                        OwlView(mood: .happy, size: 72)
+                        Text(Self.title)
+                            .font(Typo.display).tracking(Typo.tracking(for: 32))
+                            .foregroundStyle(Palette.ink)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if let reason = PlusGate.reason(from) {
+                            Text(reason).font(Typo.body).foregroundStyle(Palette.ink2).multilineTextAlignment(.center)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 12) {
                         ForEach(Self.lines, id: \.self) { line in
-                            HStack(spacing: 12) {
-                                Image(systemName: "checkmark").font(.system(size: 14, weight: .heavy)).foregroundStyle(Palette.greenText)
-                                    .frame(width: 28, height: 28).background(Circle().fill(Palette.greenSoft))
-                                Text(line).font(Typo.bodyBold).foregroundStyle(Palette.ink)
+                            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                                Image(systemName: "checkmark").font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.ink)
+                                Text(line).font(Typo.body).foregroundStyle(Palette.ink)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
                         }
                     }
-                    if unavailable {
-                        Text("Subscriptions are not available yet.").font(Typo.bodyBold).foregroundStyle(Palette.muted)
-                    } else {
-                        Text(shop.priceLine).font(Typo.bodyBold).foregroundStyle(Palette.ink)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    VStack(spacing: 10) {
+                        ForEach(PlusPlan.allCases) { p in planRow(p) }
                     }
-                    if let message { Text(message).font(Typo.small).foregroundStyle(Palette.redText).fixedSize(horizontal: false, vertical: true) }
-                    VStack(spacing: 8) {
-                        Button(shop.busy && !restoring ? "Starting..." : (shop.trialEligible ? "Start free trial" : "Subscribe")) { Task { await start() } }
-                            .buttonStyle(.chunky(.green)).disabled(shop.busy || unavailable)
-                        Button(restoring ? "Restoring..." : "Restore purchases") { Task { await restore() } }
-                            .buttonStyle(.chunky(.secondary)).disabled(shop.busy || unavailable)
+
+                    VStack(spacing: 10) {
+                        Text(shop.priceLine(plan) + " Cancel anytime.")
+                            .font(Typo.bodyBold).foregroundStyle(Palette.ink)
+                            .multilineTextAlignment(.center)
+                        if let message {
+                            Text(message).font(Typo.small).foregroundStyle(Palette.bad).multilineTextAlignment(.center)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Button(shop.busy && !restoring ? "One moment..." : (shop.trialEligible ? "Start free trial" : "Subscribe")) { Task { await start() } }
+                            .buttonStyle(.pill).disabled(shop.busy)
+                        Button(restoring ? "Restoring..." : "Restore Purchases") { Task { await restore() } }
+                            .buttonStyle(TextLinkStyle(color: Palette.ink2)).disabled(shop.busy)
                     }
-                    Text("Payment is charged to your Apple ID. It renews monthly unless you cancel at least 24 hours before the period ends, in Settings > Apple ID > Subscriptions.")
-                        .font(Typo.tiny).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
-                    HStack(spacing: 16) {
-                        if let terms = Self.termsURL { Link("Terms", destination: terms) }
-                        if let privacy = Self.privacyURL { Link("Privacy", destination: privacy) }
+
+                    Text(renewalTerms)
+                        .font(Typo.small).foregroundStyle(Palette.ink3)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: 28) {
+                        Link("Terms", destination: Self.termsURL)
+                        Link("Privacy", destination: Self.privacyURL)
                     }
-                    .font(Typo.small).foregroundStyle(Palette.blue)
-                    .frame(maxWidth: .infinity)
+                    .font(Typo.smallBold).foregroundStyle(Palette.ink)
+                    .frame(minHeight: 44)
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 40)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 32)
             }
         }
-        .background(Palette.paper.ignoresSafeArea())
+        .background(Palette.bg.ignoresSafeArea())
+        .sensoryFeedback(.success, trigger: success)
         .task {
             store.library.log("paywall_view", ["from": .string(from)])
-            await shop.loadProduct()
+            await shop.loadProducts()
         }
         .sheet(isPresented: $signingIn) {
             SignInView(onDone: {
@@ -82,50 +108,75 @@ struct PaywallView: View {
         }
     }
 
-    var unavailable: Bool { !account.state.billingOn && !Self.billingOffUnlocked }
+    func planRow(_ p: PlusPlan) -> some View {
+        let price = shop.price(p) ?? p.fallbackPrice
+        return Button { plan = p } label: {
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(p.title).font(Typo.bodyBold).foregroundStyle(Palette.ink)
+                    Text(p == .yearly ? "\(price) a year" + (shop.yearlySaving.map { ", save \($0)%" } ?? "") : "\(price) a month")
+                        .font(Typo.small).foregroundStyle(Palette.ink2)
+                }
+                Spacer()
+                Image(systemName: plan == p ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 22, weight: .regular))
+                    .foregroundStyle(plan == p ? Palette.ink : Palette.lineStrong)
+            }
+        }
+        .buttonStyle(TileStyle(state: plan == p ? .selected : .normal, minHeight: 64))
+        .accessibilityAddTraits(plan == p ? .isSelected : [])
+    }
 
-    /// Development builds without a configured server unlock everything; release builds say "not yet".
-    static var billingOffUnlocked: Bool {
-        #if DEBUG
-        return true
-        #else
-        return false
-        #endif
+    var renewalTerms: String {
+        let price = shop.price(plan) ?? plan.fallbackPrice
+        let trial = shop.trialEligible ? "The 7-day free trial starts today. " : ""
+        return "\(trial)Payment is charged to your Apple ID at the end of the trial. OpenStudy Plus renews automatically at \(price) a \(plan.period) unless you cancel at least 24 hours before the current period ends. Manage or cancel in Settings > Apple ID > Subscriptions."
     }
 
     func start() async {
         message = nil
-        guard account.state.signedIn, let id = account.state.userId else { signingIn = true; return }
-        if account.state.entitlement.active { onUnlocked(); return }
+        if store.plusActive { onUnlocked(); return }
+        // With accounts set up, buy on the account so the web unlocks too; otherwise on this Apple ID.
+        var accountId: String?
+        if account.state.billingOn {
+            guard account.state.signedIn, let id = account.state.userId else { signingIn = true; return }
+            accountId = id
+        }
         let wasTrial = shop.trialEligible
-        switch await shop.purchase(accountId: id) {
+        switch await shop.purchase(plan, accountId: accountId) {
         case .purchased:
-            store.library.log(wasTrial ? "trial_start" : "subscribe", ["source": .string("apple")])
-            if account.state.entitlement.active { onUnlocked() } else { message = "Your purchase went through. It can take a moment to unlock; try again shortly." }
+            store.library.log(wasTrial ? "trial_start" : "subscribe", ["source": .string("apple"), "kind": .string(plan.rawValue)])
+            unlocked()
         case .pending: message = "Your purchase is waiting for approval."
         case .canceled: break
         case .otherAccount: message = "This Apple ID's subscription belongs to another OpenStudy account. Sign in with that account."
         case .unavailable: message = "The App Store is not available right now."
-        case .failed: message = "The purchase did not go through. Try again."
+        case .failed:
+            if shop.hasPro { unlocked() } else { message = "The purchase did not go through. Try again." }
         }
     }
 
     func restore() async {
         message = nil
-        guard account.state.signedIn else { signingIn = true; return }
         restoring = true
         let result = await shop.restore()
         restoring = false
         store.library.log("restore", ["ok": .bool(result == .purchased)])
         switch result {
-        case .purchased where account.state.entitlement.active: onUnlocked()
+        case .purchased: unlocked()
         case .otherAccount: message = "This Apple ID's subscription belongs to another OpenStudy account. Sign in with that account."
         default: message = "No subscription to restore on this Apple ID."
         }
     }
 
+    func unlocked() {
+        success += 1
+        store.toast = "OpenStudy Plus is on"
+        onUnlocked()
+    }
+
     func afterSignIn() async {
         await account.reload()
-        if account.state.entitlement.active { onUnlocked() }
+        if store.plusActive { unlocked() }
     }
 }

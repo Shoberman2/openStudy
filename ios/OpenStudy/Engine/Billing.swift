@@ -4,6 +4,10 @@ import Foundation
 /// grace rule for when the server cannot be reached. Mirrors web/src/engine/billing.ts.
 public enum Billing {
     public static let productId = "com.openstudy.shelf.plus.monthly"
+    public static let yearlyProductId = "com.openstudy.shelf.plus.yearly"
+    public static let productIds = [productId, yearlyProductId]
+    /// The RevenueCat entitlement that unlocks Plus.
+    public static let entitlementId = "pro"
     /// How long a cached entitlement is trusted past its end date when the server cannot be reached.
     public static let offlineGrace: TimeInterval = 3 * 86_400
 

@@ -97,6 +97,13 @@ struct SupabaseAuth {
                                                   body: ["email": email, "password": password])))
     }
 
+    /// Sign in with Apple: the identity token from AuthenticationServices plus the raw nonce whose
+    /// SHA-256 went into the Apple request. Needs the Apple provider turned on in Supabase.
+    func signInWithApple(idToken: String, nonce: String) async throws -> AuthSession {
+        try decodeSession(try await send(request("token", query: [URLQueryItem(name: "grant_type", value: "id_token")],
+                                                  body: ["provider": "apple", "id_token": idToken, "nonce": nonce])))
+    }
+
     func refresh(_ s: AuthSession) async throws -> AuthSession {
         try decodeSession(try await send(request("token", query: [URLQueryItem(name: "grant_type", value: "refresh_token")],
                                                   body: ["refresh_token": s.refreshToken])))

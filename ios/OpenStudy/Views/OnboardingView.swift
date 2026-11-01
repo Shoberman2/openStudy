@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct Choice: Identifiable { let id: String; let title: String; let detail: String?; let icon: String }
 
@@ -25,206 +26,204 @@ enum OnboardingCopy {
     ]
 }
 
+/// Onboarding is a chat with Ollie (spencer-app-style section 2): one question at a time, tap-only
+/// answers, five steps: what you study, what you want, time a day, account, first material.
 struct OnboardingView: View {
     @EnvironmentObject var store: Store
     @EnvironmentObject var importer: Importer
-    var onBack: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    @State private var step = 0
-    @State private var profile = Profile()
-    @State private var reminder = Reminders.date(from: "20:00")
+    enum Step: Int, CaseIterable { case bringing, goals, daily, account, material }
+
+    struct Line: Identifiable, Equatable { let id = UUID(); var owl: Bool; var text: String }
+
+    @State private var step: Step = .bringing
+    @State private var lines: [Line] = []
+    @State private var typing = false
+    @State private var profile: Profile = {
+        var p = Profile()
+        p.bringing = []
+        p.goals = []
+        p.practice = ["tap", "blank", "type"]
+        return p
+    }()
+    @State private var signingIn = false
     @State private var pasting = false
-    @State private var examDate = Calendar.current.date(byAdding: .day, value: 14, to: Date()) ?? Date()
-    @State private var hasExam = false
-    // Steps: 0 bringing, 1 exam (classes only), 2 goals, 3 practice, 4 daily goal, 5 reminder, 6 first material.
-    private var order: [Int] { profile.bringing.contains("class") ? [0, 1, 2, 3, 4, 5, 6] : [0, 2, 3, 4, 5, 6] }
-    private var steps: Int { order.count }
-    private var position: Int { order.firstIndex(of: step) ?? 0 }
-    private func advance() { withAnimation(Motion.slide) { step = order[min(order.count - 1, position + 1)] } }
-    private func back() { withAnimation(Motion.slide) { step = order[max(0, position - 1)] } }
+    @State private var importingFile = false
+    @State private var failed = false
+    @State private var accountNote: String?
+    @State private var tapCount = 0
+
+    static func question(_ step: Step) -> String {
+        switch step {
+        case .bringing: return "Hi, I'm \(Mascot.name). I turn what you save into short lessons. What are you studying?"
+        case .goals: return "Nice. What do you want from it?"
+        case .daily: return "How much time a day works for you?"
+        case .account: return "Want an account? It keeps your shelf and your subscription safe. You can add one later."
+        case .material: return "Last one. What should we start with?"
+        }
+    }
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                IconButton(systemName: "chevron.left", label: "Back") {
-                    if step == 0 { onBack() } else { back() }
-                }
-                ProgressBar(value: Double(position + 1) / Double(steps), color: Palette.blue)
-                Color.clear.frame(width: 44, height: 44)
-            }
-            .padding(.horizontal, 8)
-
+        ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text(title).font(Typo.title).foregroundStyle(Palette.ink)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.bottom, 2)
-                    if let s = subtitle { Text(s).font(Typo.body).foregroundStyle(Palette.muted).padding(.bottom, 8) }
-                    content
+                    OwlView(mood: owlMood, size: 84, blinks: true)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 20)
+                        .padding(.bottom, 8)
+                    ForEach(lines) { line in
+                        bubble(line)
+                            .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+                    }
+                    if typing { TypingBubble().transition(.opacity) }
+                    if let accountNote {
+                        Text(accountNote).font(Typo.small).foregroundStyle(Palette.ink2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Color.clear.frame(height: 1).id("end")
                 }
                 .padding(.horizontal, 20)
-                .padding(.top, 20)
-                .id(step)
-                .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity), removal: .opacity))
+                .padding(.bottom, 12)
             }
             .scrollBounceBehavior(.basedOnSize)
-
-            footer
+            .onChange(of: lines) { _, _ in withAnimation(Motion.slide) { proxy.scrollTo("end", anchor: .bottom) } }
+            .onChange(of: typing) { _, _ in withAnimation(Motion.slide) { proxy.scrollTo("end", anchor: .bottom) } }
+        }
+        .safeAreaInset(edge: .bottom) {
+            answers
                 .padding(.horizontal, 20)
+                .padding(.top, 12)
                 .padding(.bottom, 8)
+                .background(Palette.bg)
+                .opacity(typing ? 0.4 : 1)
+                .disabled(typing)
+                .animation(Motion.quick, value: typing)
         }
-        .background(Palette.paper.ignoresSafeArea())
+        .background(Palette.bg.ignoresSafeArea())
+        .sensoryFeedback(.selection, trigger: tapCount)
+        .onAppear { if lines.isEmpty { lines = [Line(owl: true, text: Self.question(.bringing))] } }
+        .sheet(isPresented: $signingIn) {
+            SignInView(onDone: {
+                signingIn = false
+                answer("Signed in", next: .material)
+            }, onCancel: { signingIn = false })
+            .presentationDetents([.large])
+        }
         .sheet(isPresented: $pasting, onDismiss: { if !store.library.inbox.isEmpty { complete(then: .sort) } }) { PasteNotesSheet() }
-    }
-
-    var title: String {
-        switch step {
-        case 0: return "What are you studying?"
-        case 1: return "Got an exam coming up?"
-        case 2: return "What do you want from it?"
-        case 3: return "How do you like to practice?"
-        case 4: return "Pick a daily goal"
-        case 5: return "When should we nudge you?"
-        default: return "Add your first material"
+        .fileImporter(isPresented: $importingFile, allowedContentTypes: [.json]) { result in
+            if case .success(let url) = result, store.importLibrary(from: url) {
+                complete(then: .home)
+            } else { failed = true }
+        }
+        .alert("That file could not be read", isPresented: $failed) { Button("OK", role: .cancel) {} } message: {
+            Text("Pick a library file exported from OpenStudy on the web or on iPhone.")
         }
     }
 
-    var subtitle: String? {
-        switch step {
-        case 0, 2, 3: return "Pick as many as you like."
-        case 1: return "We plan your study days so you are ready by then."
-        case 5: return "One reminder a day, at a time you choose."
-        case 6: return "Screenshots, photos of notes, PDFs, slides or docs. Add more any time."
-        default: return nil
-        }
+    var owlMood: OwlView.Mood {
+        if typing { return .thinking }
+        return step == .material ? .happy : .neutral
     }
 
-    @ViewBuilder var content: some View {
+    func bubble(_ line: Line) -> some View {
+        HStack {
+            if !line.owl { Spacer(minLength: 48) }
+            Text(line.text)
+                .font(Typo.body)
+                .foregroundStyle(line.owl ? Palette.ink : Palette.onAccent)
+                .padding(.horizontal, 16).padding(.vertical, 12)
+                .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(line.owl ? Palette.surfaceDim : Palette.ink))
+                .fixedSize(horizontal: false, vertical: true)
+            if line.owl { Spacer(minLength: 48) }
+        }
+        .accessibilityLabel(line.owl ? "\(Mascot.name): \(line.text)" : "You: \(line.text)")
+    }
+
+    // MARK: Answers
+
+    @ViewBuilder var answers: some View {
         switch step {
-        case 0:
-            ForEach(OnboardingCopy.bringing) { c in
-                tile(c, selected: profile.bringing.contains(c.id), multi: true) { toggle(&profile.bringing, c.id) }
+        case .bringing:
+            VStack(spacing: 8) {
+                ForEach(OnboardingCopy.bringing) { c in option(c.title, selected: profile.bringing.contains(c.id)) { toggle(&profile.bringing, c.id) } }
+                Button("Continue") { answer(titles(OnboardingCopy.bringing, profile.bringing), next: .goals) }
+                    .buttonStyle(.pill).disabled(profile.bringing.isEmpty).padding(.top, 4)
             }
-        case 1:
-            DatePicker("Exam date", selection: $examDate, in: Date()..., displayedComponents: .date)
-                .datePickerStyle(.graphical)
-                .tint(Palette.blue)
-                .padding(8)
-                .background(RoundedRectangle(cornerRadius: 16).fill(Palette.shelf))
-        case 2:
-            ForEach(OnboardingCopy.goals) { c in
-                tile(c, selected: profile.goals.contains(c.id), multi: true) { toggle(&profile.goals, c.id) }
+        case .goals:
+            VStack(spacing: 8) {
+                ForEach(OnboardingCopy.goals) { c in option(c.title, selected: profile.goals.contains(c.id)) { toggle(&profile.goals, c.id) } }
+                Button("Continue") { answer(titles(OnboardingCopy.goals, profile.goals), next: .daily) }
+                    .buttonStyle(.pill).disabled(profile.goals.isEmpty).padding(.top, 4)
             }
-        case 3:
-            ForEach(OnboardingCopy.practice) { c in
-                tile(c, selected: profile.practice.contains(c.id), multi: true) { toggle(&profile.practice, c.id) }
-            }
-        case 4:
-            ForEach(OnboardingCopy.dailyGoals, id: \.xp) { g in
-                Button { profile.dailyGoalXP = g.xp } label: {
-                    HStack {
-                        Text(g.title).font(Typo.bodyBold)
-                        Text(g.detail).font(Typo.body).foregroundStyle(Palette.muted)
-                        Spacer()
-                        Text("\(g.xp) XP").font(Typo.small)
+        case .daily:
+            VStack(spacing: 8) {
+                ForEach(OnboardingCopy.dailyGoals, id: \.xp) { g in
+                    option("\(g.detail.capitalizedFirst)", selected: false) {
+                        profile.dailyGoalXP = g.xp
+                        answer(g.detail.capitalizedFirst, next: .account)
                     }
                 }
-                .buttonStyle(TileStyle(state: profile.dailyGoalXP == g.xp ? .selected : .normal))
             }
-        case 5:
-            DatePicker("Reminder time", selection: $reminder, displayedComponents: .hourAndMinute)
-                .datePickerStyle(.wheel)
-                .labelsHidden()
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-                .background(RoundedRectangle(cornerRadius: 16).fill(Palette.shelf))
-        default:
-            VStack(spacing: 12) {
-                Button { complete(then: .importScreens) } label: { rowLabel("Add files or photos", "square.and.arrow.down", "Screenshots, whiteboard photos, PDFs, slides, docs") }
-                    .buttonStyle(TileStyle())
-                Button { pasting = true } label: { rowLabel("Paste notes", "doc.on.clipboard", "Paste excerpts copied from Notes") }
-                    .buttonStyle(TileStyle())
-                Button {
-                    store.addSample()
-                    complete(then: .home)
-                } label: { rowLabel("Try the samples", "book.closed", "Two books and a BIO 101 class, ready to study") }
-                    .buttonStyle(TileStyle())
+        case .account:
+            VStack(spacing: 10) {
+                AppleSignInButton { message in
+                    if let message { accountNote = message } else { accountNote = nil; answer("Signed in with Apple", next: .material) }
+                }
+                Button("Use email") { signingIn = true }.buttonStyle(.ghostPill)
+                Button("Later") { answer("Later", next: .material) }.buttonStyle(TextLinkStyle(color: Palette.ink2))
+            }
+        case .material:
+            VStack(spacing: 10) {
+                Button("Add files or photos") { complete(then: .importScreens) }.buttonStyle(.pill)
+                Button("Paste notes") { pasting = true }.buttonStyle(.ghostPill)
+                Button("Try the samples") { store.addSample(); complete(then: .home) }.buttonStyle(.ghostPill)
+                Button("I have a library file") { importingFile = true }.buttonStyle(TextLinkStyle(color: Palette.ink2))
             }
         }
     }
 
-    @ViewBuilder var footer: some View {
-        switch step {
-        case 1:
-            VStack(spacing: 10) {
-                Button("Continue") { hasExam = true; advance() }.buttonStyle(.chunky)
-                Button("Not yet") { hasExam = false; advance() }.buttonStyle(.chunky(.secondary))
-            }
-        case 5:
-            VStack(spacing: 10) {
-                Button("Allow notifications") {
-                    Task {
-                        let ok = await Reminders.request()
-                        let s = Reminders.string(from: reminder)
-                        profile.reminder = ok ? s : nil
-                        if ok { Reminders.schedule(s) }
-                        advance()
-                    }
-                }
-                .buttonStyle(.chunky)
-                Button("Not now") { profile.reminder = nil; advance() }
-                    .buttonStyle(.chunky(.secondary))
-            }
-        case 6:
-            EmptyView()
-        default:
-            Button("Continue") { advance() }
-                .buttonStyle(.chunky)
-                .disabled(step == 0 && profile.bringing.isEmpty || step == 2 && profile.goals.isEmpty || step == 3 && profile.practice.isEmpty)
-        }
-    }
-
-    func tile(_ c: Choice, selected: Bool, multi: Bool = false, action: @escaping () -> Void) -> some View {
-        Button { Haptics.tap(); action() } label: {
-            HStack(spacing: 14) {
-                Image(systemName: c.icon).font(.system(size: 20, weight: .semibold)).frame(width: 28)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(c.title).font(Typo.bodyBold)
-                    if let d = c.detail { Text(d).font(Typo.rounded(14, .medium)).foregroundStyle(Palette.muted) }
-                }
+    func option(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button { tapCount += 1; action() } label: {
+            HStack {
+                Text(title).font(Typo.bodyBold)
                 Spacer()
-                if multi {
-                    Image(systemName: selected ? "checkmark.square.fill" : "square")
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundStyle(selected ? Palette.blue : Palette.line)
-                }
+                if selected { Image(systemName: "checkmark").font(.system(size: 16, weight: .semibold)) }
             }
         }
-        .buttonStyle(TileStyle(state: selected ? .selected : .normal, minHeight: 64))
+        .buttonStyle(TileStyle(state: selected ? .selected : .normal, minHeight: 50))
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
-    func rowLabel(_ title: String, _ icon: String, _ detail: String) -> some View {
-        HStack(spacing: 14) {
-            Image(systemName: icon).font(.system(size: 20, weight: .semibold)).frame(width: 28).foregroundStyle(Palette.blue)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(Typo.bodyBold)
-                Text(detail).font(Typo.rounded(14, .medium)).foregroundStyle(Palette.muted)
-            }
-            Spacer()
-            Image(systemName: "chevron.right").foregroundStyle(Palette.muted)
-        }
+    func titles(_ choices: [Choice], _ ids: [String]) -> String {
+        choices.filter { ids.contains($0.id) }.map(\.title).joined(separator: ", ")
     }
 
     func toggle(_ list: inout [String], _ id: String) {
         if let i = list.firstIndex(of: id) { list.remove(at: i) } else { list.append(id) }
     }
 
+    /// Records the user's answer as a bubble, then Ollie asks the next question.
+    func answer(_ text: String, next: Step) {
+        withAnimation(Motion.reduced(reduceMotion, Motion.spring)) {
+            lines.append(Line(owl: false, text: text))
+            typing = true
+        }
+        Task {
+            try? await Task.sleep(nanoseconds: reduceMotion ? 150_000_000 : 650_000_000)
+            withAnimation(Motion.reduced(reduceMotion, Motion.spring)) {
+                typing = false
+                step = next
+                lines.append(Line(owl: true, text: Self.question(next)))
+            }
+        }
+    }
+
     enum Next { case home, importScreens, sort }
 
     func complete(then next: Next) {
-        // The exam date applies to the first class project created.
-        if hasExam && profile.bringing.contains("class") { UserDefaults.standard.set(DayKey.of(examDate), forKey: Store.pendingExamKey) }
+        if profile.bringing.isEmpty { profile.bringing = ["books"] }
+        if profile.goals.isEmpty { profile.goals = ["ideas"] }
         store.finishOnboarding(profile)
         switch next {
         case .home: break
@@ -232,4 +231,30 @@ struct OnboardingView: View {
         case .sort: DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { store.path = [.sort] }
         }
     }
+}
+
+/// Three quiet dots while Ollie writes (fades, no bounce).
+struct TypingBubble: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var phase = 0
+    var body: some View {
+        HStack(spacing: 5) {
+            ForEach(0..<3, id: \.self) { i in
+                Circle().fill(Palette.ink3).frame(width: 7, height: 7).opacity(reduceMotion || phase == i ? 1 : 0.35)
+            }
+        }
+        .padding(.horizontal, 16).padding(.vertical, 16)
+        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Palette.surfaceDim))
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 220_000_000)
+                withAnimation(.easeInOut(duration: 0.2)) { phase = (phase + 1) % 3 }
+            }
+        }
+        .accessibilityLabel("\(Mascot.name) is writing")
+    }
+}
+
+extension String {
+    var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
 }

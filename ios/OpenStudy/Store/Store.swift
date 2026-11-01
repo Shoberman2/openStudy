@@ -6,9 +6,13 @@ import UserNotifications
 enum Route: Hashable {
     case project(String)
     case sort
-    case settings
     case plan
-    case profile
+}
+
+/// Settings and profile open as sheets over the current screen (spencer-app-style section 1).
+enum AppSheet: String, Identifiable {
+    case settings, profile, studyCheck
+    var id: String { rawValue }
 }
 
 struct SessionLaunch: Identifiable {
@@ -48,6 +52,10 @@ final class Store: ObservableObject {
     @Published var showImport = false
     @Published var toast: String?
     @Published var paywall: PaywallRequest?
+    @Published var sheet: AppSheet?
+    /// What the free tier used this month (spec 14.2).
+    @Published var usage: MonthlyUsage { didSet { if let d = try? JSONEncoder().encode(usage) { UserDefaults.standard.set(d, forKey: Self.usageKey) } } }
+    static let usageKey = "plusUsage"
     /// The lesson title while a writer makes its concept questions (spec 13.6).
     @Published var writingFor: String?
     @AppStorage("smartServer") var smartServer: String = ""
@@ -70,6 +78,8 @@ final class Store: ObservableObject {
             ?? FileManager.default.temporaryDirectory
         let dir = base.appendingPathComponent("OpenStudy", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir.appendingPathComponent("images"), withIntermediateDirectories: true)
+        usage = (UserDefaults.standard.data(forKey: Self.usageKey).flatMap { try? JSONDecoder().decode(MonthlyUsage.self, from: $0) }
+                 ?? MonthlyUsage(month: MonthlyUsage.monthKey(Date()))).current()
         fileURL = dir.appendingPathComponent("library.json")
         imagesURL = dir.appendingPathComponent("images", isDirectory: true)
         if persist, let data = try? Data(contentsOf: fileURL), let lib = try? Library.decode(data) {
@@ -179,6 +189,7 @@ final class Store: ObservableObject {
             UserDefaults.standard.removeObject(forKey: Self.pendingExamKey)
         }
         let p = library.createProject(title: title, author: author, pageIds: pageIds, build: build, focus: focus, quotes: quotes, type: type, goalDate: goal, category: category)
+        countUse(.studySet)
         library.log("project_created", ["type": .string(type), "category": .string(p.category ?? category ?? "General"),
                                         "pages": .number(Double(pageIds.count)), "lessons": .number(Double(library.lessons(of: p.id).count))])
         if asked { library.log("quotes_answer", ["yes": .bool(!(quotes ?? []).isEmpty)]) }
@@ -310,14 +321,44 @@ final class Store: ObservableObject {
 
     func movePage(_ id: String, to projectId: String?) { library.movePages([id], to: projectId) }
 
-    // MARK: OpenStudy Plus (spec 11.5)
+    // MARK: OpenStudy Plus (spec 14)
 
-    /// True when the action may go ahead. Otherwise shows the paywall and returns false. Sample
-    /// projects, importing and sorting stay free.
-    func plusAllowed(sample: Bool = false, from: String) -> Bool {
-        if sample || !AccountController.shared.state.needsPlus { return true }
-        paywall = PaywallRequest(from: from)
+    /// Plus is on: the account's entitlement (App Store or web), or this Apple ID's subscription.
+    var plusActive: Bool {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-unlockPlus") { return true }
+        #endif
+        let account = AccountController.shared.state
+        return (account.billingOn && account.entitlement.active) || StoreService.shared.hasPro
+    }
+
+    var currentUsage: MonthlyUsage { usage.current() }
+
+    /// True when the action may go ahead on the free tier or Plus. Otherwise shows the paywall and
+    /// returns false. Sample material, importing and sorting stay free.
+    func plusAllowed(_ action: PlusGate.Action = .quiz, sample: Bool = false, count: Int = 1, from: String) -> Bool {
+        if PlusGate.allowed(action, plus: plusActive, sample: sample, usage: currentUsage, count: count) { return true }
+        openPaywall(from: from)
         return false
+    }
+
+    /// Shows the paywall, closing an open sheet first (a cover can't open on top of a sheet).
+    func openPaywall(from: String) {
+        guard sheet != nil else { paywall = PaywallRequest(from: from); return }
+        sheet = nil
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.paywall = PaywallRequest(from: from) }
+    }
+
+    /// Counts a free-tier use (only when Plus is off and the material is the user's own).
+    func countUse(_ action: PlusGate.Action, sample: Bool = false, count: Int = 1) {
+        guard !plusActive, !sample else { return }
+        var u = currentUsage
+        switch action {
+        case .studySet: u.studySets += count
+        case .quiz: u.quizzes += 1
+        default: return
+        }
+        usage = u
     }
 
     private func isSample(_ projectId: String?) -> Bool { projectId.flatMap { library.project($0)?.sample } ?? false }
@@ -326,7 +367,7 @@ final class Store: ObservableObject {
     // MARK: Sessions
 
     func start(lesson: Lesson) {
-        guard plusAllowed(sample: isSample(lesson.projectId), from: "lesson") else { return }
+        guard plusAllowed(.quiz, sample: isSample(lesson.projectId), from: "lesson") else { return }
         guard writingFor == nil else { return }
         guard WrittenConcepts.needsWrittenConcepts(library, lessonId: lesson.id) else { return begin(lesson) }
         // The first time a lesson opens, a writer turns its cards into concept questions (spec 13.6).
@@ -349,16 +390,18 @@ final class Store: ObservableObject {
         let isClass = SessionBuilder.usesClassMix(projectIsClass: library.project(lesson.projectId)?.isClass ?? false, cards: library.cards(of: lesson.id))
         let ex = SessionBuilder.build(lesson: lesson, cards: library.cards(of: lesson.id), projectCards: library.cards(ofProject: lesson.projectId), profile: library.profile, isClass: isClass, rng: &rng)
         guard !ex.isEmpty else { toast = "This lesson has no cards yet"; return }
+        countUse(.quiz, sample: isSample(lesson.projectId))
         library.log("session_start", ["lessonKind": .string(lesson.kind), "level": .number(Double(lesson.level)), "projectId": .string(lesson.projectId),
                                       "concepts": .number(Double(SessionBuilder.conceptCount(ex, cards: library.cards(of: lesson.id))))])
         session = SessionLaunch(lessonId: lesson.id, projectId: lesson.projectId, exercises: ex, title: lesson.title)
     }
 
     func startPractice() -> Bool {
-        guard plusAllowed(sample: !hasOwnProjects, from: "practice") else { return true }
+        guard plusAllowed(.quiz, sample: !hasOwnProjects, from: "practice") else { return true }
         var rng = SystemRandomNumberGenerator()
         let ex = SessionBuilder.practice(cards: library.cards, profile: library.profile, rng: &rng)
         guard !ex.isEmpty else { return false }
+        countUse(.quiz, sample: !hasOwnProjects)
         library.log("session_start", ["lessonKind": .string("review"), "level": .number(0), "concepts": .number(Double(SessionBuilder.conceptCount(ex, cards: library.cards)))])
         session = SessionLaunch(lessonId: nil, projectId: nil, exercises: ex, title: "Practice")
         return true
@@ -367,10 +410,11 @@ final class Store: ObservableObject {
     /// "Practice both" on a connection (spec 10.8).
     func startConnection(_ c: Connection) {
         guard c.lessons.count == 2 else { return }
-        guard plusAllowed(sample: c.projects.allSatisfy { isSample($0) }, from: "connection") else { return }
+        guard plusAllowed(.quiz, sample: c.projects.allSatisfy { isSample($0) }, from: "connection") else { return }
         var rng = SystemRandomNumberGenerator()
         let ex = SessionBuilder.connection(library.cards(of: c.lessons[0]), library.cards(of: c.lessons[1]), profile: library.profile, rng: &rng)
         guard !ex.isEmpty else { return }
+        countUse(.quiz, sample: c.projects.allSatisfy { isSample($0) })
         library.log("connection_practice", [:])
         let names = c.projects.compactMap { library.project($0)?.title }
         session = SessionLaunch(lessonId: nil, projectId: nil, exercises: ex, title: names.joined(separator: " + "))
@@ -427,10 +471,11 @@ final class Store: ObservableObject {
 
     func startTest(projectId: String) {
         guard let p = library.project(projectId) else { return }
-        guard plusAllowed(sample: p.sample == true, from: "test") else { return }
+        guard plusAllowed(.quiz, sample: p.sample == true, from: "test") else { return }
         var rng = SystemRandomNumberGenerator()
         let ex = PracticeTest.build(project: p, lib: library, rng: &rng)
         guard !ex.isEmpty else { toast = "Add lessons before taking a test"; return }
+        countUse(.quiz, sample: p.sample == true)
         library.log("session_start", ["lessonKind": "test", "level": 0, "projectId": .string(projectId),
                                       "concepts": .number(Double(SessionBuilder.conceptCount(ex, cards: library.cards(ofProject: projectId))))])
         session = SessionLaunch(lessonId: nil, projectId: projectId, exercises: ex, title: "Practice test", isTest: true)

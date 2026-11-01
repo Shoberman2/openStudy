@@ -398,3 +398,37 @@ struct IconButton: View {
         .accessibilityLabel(label)
     }
 }
+
+// MARK: - Sheet header
+
+/// Title on the left, close on the right, an optional icon action before it. 44pt targets.
+struct SheetHeader: View {
+    var title: String
+    var leading: (icon: String, label: String, action: () -> Void)? = nil
+    var onClose: () -> Void
+    var body: some View {
+        HStack(spacing: 0) {
+            Text(title).font(Typo.title).tracking(Typo.tracking(for: 24)).foregroundStyle(Palette.ink)
+            Spacer()
+            if let leading { IconButton(systemName: leading.icon, label: leading.label, action: leading.action) }
+            IconButton(systemName: "xmark", label: "Close", action: onClose)
+        }
+        .padding(.leading, 24).padding(.trailing, 12)
+        .padding(.top, 18).padding(.bottom, 8)
+    }
+}
+
+// MARK: - AI output label
+
+/// Shown on anything a model wrote: questions, answers, smart sorting.
+struct AIOutputNote: View {
+    var body: some View {
+        Text("AI-generated · Not medical or research advice")
+        .font(Typo.small)
+        .multilineTextAlignment(.leading)
+        .fixedSize(horizontal: false, vertical: true)
+        .foregroundStyle(Palette.ink3)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("AI-generated. Not medical or research advice.")
+    }
+}

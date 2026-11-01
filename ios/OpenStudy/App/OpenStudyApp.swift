@@ -19,7 +19,7 @@ struct OpenStudyApp: App {
             RootView()
                 .environmentObject(store)
                 .environmentObject(importer)
-                .tint(Palette.blue)
+                .tint(Palette.accent)
                 .onAppear {
                     importer.store = store
                     #if DEBUG
@@ -40,7 +40,7 @@ struct OpenStudyApp: App {
 struct RootView: View {
     @EnvironmentObject var store: Store
     @EnvironmentObject var importer: Importer
-    @State private var showOnboarding = false
+    @AppStorage(Appearance.key) private var appearance: String = Appearance.system.rawValue
 
     var body: some View {
         Group {
@@ -51,22 +51,33 @@ struct RootView: View {
                             switch route {
                             case .project(let id): ProjectView(projectId: id)
                             case .sort: SortView()
-                            case .settings: SettingsView()
                             case .plan: PlanView()
-                            case .profile: ProfileView()
                             }
                         }
                 }
                 .transition(.opacity)
-            } else if showOnboarding {
-                OnboardingView(onBack: { withAnimation(Motion.slide) { showOnboarding = false } })
-                    .transition(.move(edge: .trailing))
             } else {
-                WelcomeView(onStart: { withAnimation(Motion.slide) { showOnboarding = true } })
+                // No landing page in the app: it opens straight into the chat with Ollie.
+                OnboardingView()
                     .transition(.opacity)
             }
         }
-        .background(Palette.paper.ignoresSafeArea())
+        .background(Palette.bg.ignoresSafeArea())
+        .preferredColorScheme((Appearance(rawValue: appearance) ?? .system).scheme)
+        .sheet(item: $store.sheet) { sheet in
+            Group {
+                switch sheet {
+                case .settings: SettingsView().presentationDetents([.large])
+                case .profile: ProfileView().presentationDetents([.medium, .large])
+                case .studyCheck: StudyCheckView().presentationDetents([.medium, .large])
+                }
+            }
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(24)
+            .presentationBackground(Palette.bg)
+            .environmentObject(store)
+            .preferredColorScheme((Appearance(rawValue: appearance) ?? .system).scheme)
+        }
         .fullScreenCover(item: $store.session) { launch in
             SessionView(launch: launch)
         }
@@ -83,6 +94,7 @@ struct RootView: View {
         .task {
             StoreService.shared.start()
             await AccountController.shared.reload()
+            await StoreService.shared.refreshEntitlement()
         }
         // openstudy://import-notes: the Apple Notes Shortcut put every note on the clipboard (spec 9.2).
         .onOpenURL { url in
@@ -92,9 +104,6 @@ struct RootView: View {
             // After the sheet appears (it clears old messages), so the result stays visible.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { importer.importNotesFromClipboard() }
         }
-        #if DEBUG
-        .onAppear { if DebugLaunch.screen == "onboarding" { showOnboarding = true } }
-        #endif
     }
 }
 
@@ -103,9 +112,10 @@ struct WritingQuestionsView: View {
     @EnvironmentObject var store: Store
     var body: some View {
         if let title = store.writingFor {
-            VStack(spacing: 14) {
-                ProgressView().controlSize(.large)
-                Text("Writing questions for \(title)").font(Typo.headline).foregroundStyle(Palette.ink).multilineTextAlignment(.center)
+            VStack(spacing: 16) {
+                OwlView(mood: .reading, size: 88)
+                Text("Writing Questions For \(title)").font(Typo.title).tracking(Typo.tracking(for: 24)).foregroundStyle(Palette.ink).multilineTextAlignment(.center)
+                ProgressView().controlSize(.regular)
             }
             .padding(24)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -119,12 +129,15 @@ struct ToastView: View {
     @EnvironmentObject var store: Store
     var body: some View {
         if let t = store.toast {
-            Text(t)
-                .font(Typo.bodyBold)
-                .foregroundStyle(Palette.paper)
-                .padding(.horizontal, 18).padding(.vertical, 12)
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark").font(.system(size: 14, weight: .semibold))
+                Text(t).font(Typo.bodyBold)
+            }
+                .foregroundStyle(Palette.onAccent)
+                .padding(.horizontal, 20).padding(.vertical, 12)
                 .background(Capsule().fill(Palette.ink))
                 .padding(.top, 8)
+                .sensoryFeedback(.success, trigger: t)
                 .transition(.move(edge: .top).combined(with: .opacity))
                 .task(id: t) {
                     try? await Task.sleep(nanoseconds: 2_200_000_000)

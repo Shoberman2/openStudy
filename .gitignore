@@ -17,3 +17,6 @@ web/.env*.local
 ios/build/
 ios/DerivedData/
 .vercel
+
+# iOS secrets (real RevenueCat key)
+ios/OpenStudy/Config/Secrets.local.xcconfig

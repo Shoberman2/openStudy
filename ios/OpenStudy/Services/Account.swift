@@ -13,9 +13,6 @@ struct AccountState: Equatable {
     var entitlement: Entitlement
 
     static let billingOff = AccountState(billingOn: false, signedIn: false, entitlement: Entitlement(active: true, status: "none"))
-
-    /// Creating projects and studying your own material needs OpenStudy Plus.
-    var needsPlus: Bool { billingOn ? !entitlement.active : !PaywallView.billingOffUnlocked }
 }
 
 /// Screen-level view of AccountController.shared (the one owner of the session and entitlement).

@@ -25,6 +25,7 @@ enum DebugLaunch {
         let store = Store(persist: !wantsFresh)
         if demo { store.library = demoLibrary(store.sample) }
         if screen == "welcome" || screen == "onboarding" { store.library = Library() }
+        if let used = value("-usedQuizzes").flatMap(Int.init) { store.usage = MonthlyUsage(month: MonthlyUsage.monthKey(Date()), studySets: PlusLimits.freeStudySets, quizzes: used) }
         if (args.contains("-seedScreenshots") || args.contains("-seedFiles")) && !demo {
             var lib = demoLibrary(store.sample)
             lib.profile.onboarded = true
@@ -81,8 +82,11 @@ enum DebugLaunch {
         case "path": store.path = [.project("smpcarnegi")]
         case "pages": store.path = [.project("smpcarnegi")]; UserDefaults.standard.set(1, forKey: "debug.projectTab")
         case "sort": store.path = [.sort]
-        case "settings": store.path = [.settings]
-        case "profile": store.path = [.profile]
+        case "settings": store.sheet = .settings
+        case "profile": store.sheet = .profile
+        case "studycheck": store.sheet = .studyCheck
+        case "paywall": store.paywall = PaywallRequest(from: value("-from") ?? "lesson")
+        case "home-empty": store.library.projects = []; store.library.lessons = []; store.library.cards = []; store.library.pages = []
         case "plan": store.path = [.plan]
         case "bio": store.path = [.project("smpbio101")]
         case "testresult": store.startTest(projectId: "smpbio101")

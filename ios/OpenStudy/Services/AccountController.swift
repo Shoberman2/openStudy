@@ -124,6 +124,24 @@ final class AccountController: ObservableObject {
         }
     }
 
+    /// Sign in with Apple (above email everywhere). Returns a message to show, or nil when signed in.
+    func signInWithApple(idToken: String, nonce: String) async -> String? {
+        if remote == nil, let server { remote = await ServerConfig.fetch(server) }
+        guard let auth else { return "Accounts are not set up yet. You can keep studying without one." }
+        do {
+            let s = try await auth.signInWithApple(idToken: idToken, nonce: nonce)
+            let isNew = Keychain.session?.userId != s.userId
+            Keychain.session = s
+            if isNew { welcome(s) }
+            await reload()
+            return nil
+        } catch let error as SupabaseAuth.AuthError {
+            return error == .invalid ? "Sign in with Apple is not available yet. Use email instead." : Self.message(for: error)
+        } catch {
+            return Self.message(for: .server)
+        }
+    }
+
     /// `POST /api/welcome`: the server sends the welcome email once. Never blocks sign-up.
     private func welcome(_ s: AuthSession) {
         guard let server else { return }
