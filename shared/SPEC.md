@@ -574,3 +574,31 @@ Goal: about 6 in 10 questions are multiple choice about ideas, 2 in 10 fill in a
 - Prompts: gist **"These lines come from one page. Which idea goes with them?"**, odd **"Three of these belong together. Which one doesn't?"**.
 - **Practice**: first exercise mc; then per card one draw r: r >= 0.85 and a tf-ready concept card: tf; r >= 0.65 and a key word: bank; else mc (13.7). **Review your misses**: position mod 4 = 1 bank on a key word, 3 tf on a concept card, else mc. **Practice test**: position mod 4 = 1 type on a key word, 3 tf on a concept card, else mc; definitions and quotes as before. **Practice both**: every third a concept tf, else mc.
 - Concept rules (13.3): Why skips a cause half ending in "not" ("not because X, but because Y"); If/when drops a leading "then" from the answer; any rule's match is skipped when the sentence has "not ..., but" and the answer holds "not"; Effect skips a cause half holding is, are, was, were, that, which or who, and an answer that starts with a pronoun.
+
+## 14. v8 (iOS first): OpenStudy Plus plans, free tier, study check, Ollie (OVERRIDES 11.5 on iOS where they conflict)
+
+Web still follows 11.5 ($10 a month, everything locked) until it is brought over.
+
+### 14.1 Plans
+- One App Store subscription group "OpenStudy Plus": `com.openstudy.shelf.plus.yearly` $59.99 a year and `com.openstudy.shelf.plus.monthly` $7.99 a month (the existing product id, new price point), each with a 7-day free trial introductory offer.
+- RevenueCat Swift SDK (StoreKit 2) when `REVENUECAT_API_KEY` is set in `ios/OpenStudy/Config/Secrets.local.xcconfig`; app user id = the Supabase user id; entitlement `pro`. With the placeholder key the app uses StoreKit 2 directly (local `OpenStudy.storekit` in the scheme). Plus is on when the server entitlement is active (Apple, Stripe or comp) or this Apple ID owns `pro`.
+- With accounts set up, buying needs an account first (so the web unlocks too). With accounts off, purchases unlock this Apple ID only.
+
+### 14.2 Free tier (per calendar month, kept on the device)
+- 3 study sets made from your own material (sample sets never count). "Create all" counts every set it makes.
+- 10 quizzes: lesson sessions, Practice, practice tests and connection practice on your own material.
+- The basic study check checklist. Importing, sorting, Ask and the sample library stay free.
+- Plus: unlimited study sets and quizzes, the full study check report with export, and backup (library export/import, the shelf sync available today). Server-side shelf sync needs a new table and is not built yet.
+- The paywall says why it opened ("You've used your 10 free quizzes this month.").
+
+### 14.3 Study check
+Deterministic screen for common study biases from the library's own events: Spacing (sessions on 2 or fewer of the last 14 days = cramming), Confidence vs. results (lesson accuracy more than 15 points above the last practice tests), Reviews (10+ cards over 2 days overdue), Saving vs. studying (20+ own pages and fewer than a quarter studied), Question variety (one practice format). Each item is OK, Check, or Not enough data. Free: title + one line. Plus: the numbers, what to do, and a plain-text export.
+
+### 14.4 Paywall
+Ollie, "Study Everything You Save", why it opened, three lines of what Plus gives, Yearly / Monthly rows with prices, the trial price line, "Start free trial", "Restore Purchases", the auto-renew terms, Terms and Privacy links. No countdowns.
+
+### 14.5 AI label
+Model-written questions (`questions_written` with source `device` or `server`), grounded Ask answers and smart organize results show "AI-generated · Not medical or research advice".
+
+### 14.6 Onboarding and account
+The welcome screen is gone: the app opens to a five-step chat with Ollie (see `ios/DESIGN.md`). Sign in with Apple sits above email everywhere (Supabase `grant_type=id_token`, provider `apple`; the Apple provider must be turned on in Supabase). Account deletion stays in Profile.
