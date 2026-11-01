@@ -87,7 +87,6 @@ struct OnboardingView: View {
                 .padding(.bottom, 12)
             }
             .scrollBounceBehavior(.basedOnSize)
-            .clipped()
             .onChange(of: lines) { _, _ in withAnimation(Motion.slide) { proxy.scrollTo("end", anchor: .bottom) } }
             .onChange(of: typing) { _, _ in withAnimation(Motion.slide) { proxy.scrollTo("end", anchor: .bottom) } }
         }
@@ -102,6 +101,11 @@ struct OnboardingView: View {
                 .animation(Motion.quick, value: typing)
         }
         .background(Palette.bg.ignoresSafeArea())
+        // Older bubbles scroll away under a plain status bar, not behind the clock.
+        .overlay(alignment: .top) {
+            Color.clear.frame(maxWidth: .infinity).frame(height: 0)
+                .background(Palette.bg.ignoresSafeArea(edges: .top))
+        }
         .sensoryFeedback(.selection, trigger: tapCount)
         .onAppear {
             if lines.isEmpty { lines = [Line(owl: true, text: Self.question(.bringing))] }
