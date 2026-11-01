@@ -79,6 +79,7 @@
 		91533BF1A0C31384F7AE75E3 /* Pictures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08E4BFFDFB74E8CF130221F1 /* Pictures.swift */; };
 		991D42602A4CED100AC4CFB3 /* Pictures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08E4BFFDFB74E8CF130221F1 /* Pictures.swift */; };
 		9B8480343697336A53940361 /* AppleSignIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE1314ED5B1A4D17D8F12112 /* AppleSignIn.swift */; };
+		9B95073D5A99556C957530D7 /* V10Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BE21391F9CAEFC02647CA6A /* V10Tests.swift */; };
 		9E172A468A9489E2B7A68029 /* Builder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57B9BFAF141E27118501D6EE /* Builder.swift */; };
 		9E5A5B6E03602400D3C19A6E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 89056B0B2B4168B3118EB46E /* Assets.xcassets */; };
 		9EF82AF6AD2047E60A900ECB /* V6Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42FDE16B43AEAB5776BDA132 /* V6Tests.swift */; };
@@ -185,6 +186,7 @@
 		433A9B789BFAF035C65B7E22 /* Geist-OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Geist-OFL.txt"; sourceTree = "<group>"; };
 		4348EF172D52E635E76F3EA7 /* Session.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Session.swift; sourceTree = "<group>"; };
 		494AA7F42FD0E499234975B4 /* OpenStudyUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = OpenStudyUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		4BE21391F9CAEFC02647CA6A /* V10Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = V10Tests.swift; sourceTree = "<group>"; };
 		4C647EA1B7C0DADF12520218 /* DebugFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugFixtures.swift; sourceTree = "<group>"; };
 		4E7E30E4AE282420B0A71E16 /* PictureViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PictureViews.swift; sourceTree = "<group>"; };
 		50A137114AE83C93553EEE27 /* book_p13_reencoded.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = book_p13_reencoded.jpg; sourceTree = "<group>"; };
@@ -377,6 +379,7 @@
 				58862F9A022074B40960C2F5 /* V7Tests.swift */,
 				ADDC48A4C98F179B923C5C57 /* V8Tests.swift */,
 				A5E6527409C10FF96925B665 /* V9Tests.swift */,
+				4BE21391F9CAEFC02647CA6A /* V10Tests.swift */,
 				F91638F20D6ABDF5B95CA53E /* Fixtures */,
 			);
 			path = OpenStudyTests;
@@ -855,6 +858,7 @@
 				65BC7727B76C25AA4D9A986A /* StudyCheck.swift in Sources */,
 				B222CAEC36DAF0741963AE6B /* Text.swift in Sources */,
 				63B44A683EF48E2B7E73C182 /* Usage.swift in Sources */,
+				9B95073D5A99556C957530D7 /* V10Tests.swift in Sources */,
 				D03BA3833DB0862894D64186 /* V2Tests.swift in Sources */,
 				103DE33D8BF87E64FC2FC1B3 /* V3Tests.swift in Sources */,
 				1DCFE28C42575FF163ED5128 /* V4Tests.swift in Sources */,

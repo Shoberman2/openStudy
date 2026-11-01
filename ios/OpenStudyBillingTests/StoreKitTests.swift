@@ -15,10 +15,30 @@ final class StoreKitTests: XCTestCase {
         session.disableDialogs = true
     }
 
-    func testProductIsTenDollarsMonthlyWithSevenDayTrial() async throws {
+    func testYearlyIsFiftyNineNinetyNineInTheSameGroupWithSevenDayTrial() async throws {
+        let products = try await Product.products(for: Billing.productIds)
+        XCTAssertEqual(products.count, 2)
+        let yearly = try XCTUnwrap(products.first { $0.id == Billing.yearlyProductId })
+        let monthly = try XCTUnwrap(products.first { $0.id == Billing.productId })
+        XCTAssertEqual(yearly.price, Decimal(string: "59.99"))
+        XCTAssertEqual(yearly.subscription?.subscriptionGroupID, monthly.subscription?.subscriptionGroupID)
+        XCTAssertEqual(yearly.subscription?.subscriptionPeriod.unit, .year)
+        XCTAssertEqual(yearly.subscription?.introductoryOffer?.paymentMode, .freeTrial)
+        XCTAssertEqual(yearly.subscription?.introductoryOffer?.period.value, 1)
+        XCTAssertEqual(yearly.subscription?.introductoryOffer?.period.unit, .week)
+    }
+
+    func testPurchaseWithoutAccountUnlocksOnThisAppleID() async throws {
+        let shop = StoreService()
+        let r = await shop.purchase(.yearly, accountId: nil)
+        XCTAssertEqual(r, .purchased)
+        XCTAssertTrue(shop.hasPro)
+    }
+
+    func testProductIsSevenNinetyNineMonthlyWithSevenDayTrial() async throws {
         let products = try await Product.products(for: [Billing.productId])
         let product = try XCTUnwrap(products.first)
-        XCTAssertEqual(product.price, 10)
+        XCTAssertEqual(product.price, Decimal(string: "7.99"))
         XCTAssertEqual(product.type, .autoRenewable)
         let sub = try XCTUnwrap(product.subscription)
         XCTAssertEqual(sub.subscriptionPeriod.unit, .month)

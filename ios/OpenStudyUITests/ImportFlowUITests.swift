@@ -55,19 +55,16 @@ final class ImportFlowUITests: XCTestCase {
 
     func testOnboardingFindNotesInPhotosSortCreateAll() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-screen", "welcome", "-noAccountServer"]
+        app.launchArguments = ["-screen", "onboarding", "-noAccountServer", "-unlockPlus"]
         app.launch()
 
-        tap(app, "Get started")
+        // The chat with Ollie: one question at a time.
         select(app, "Books I'm reading")
         tap(app, "Continue")
         select(app, "Remember the big ideas")
         tap(app, "Continue")
-        select(app, "Quick taps")
-        tap(app, "Continue")
-        tap(app, "XP")
-        tap(app, "Continue")
-        tap(app, "Not now")
+        tap(app, "10 min a day")
+        tap(app, "Later")
         XCTAssertTrue(button(app, "Add files or photos").waitForExistence(timeout: 5))
         shot("onboarding-last")
         tap(app, "Add files or photos")
@@ -101,7 +98,7 @@ final class ImportFlowUITests: XCTestCase {
 
     func testShortcutNotesHandOff() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-demo", "-noAccountServer"]
+        app.launchArguments = ["-demo", "-noAccountServer", "-unlockPlus"]
         app.launch()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
 
