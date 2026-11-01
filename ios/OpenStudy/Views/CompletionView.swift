@@ -16,29 +16,31 @@ struct CompletionView: View {
                     GoalRing(progress: ring, size: 150, lineWidth: 14)
                     VStack(spacing: 0) {
                         Text("+\(shownXP)")
-                            .font(.system(size: 46, weight: .heavy, design: .rounded))
+                            .font(Typo.mono(44, .semibold, relativeTo: .largeTitle))
                             .foregroundStyle(Palette.ink)
                             .contentTransition(.numericText(value: Double(shownXP)))
                             .monospacedDigit()
-                        Text("XP").font(Typo.rounded(16, .heavy)).foregroundStyle(Palette.yellowLip)
+                        Text("XP").font(Typo.smallBold).foregroundStyle(Palette.ink3)
                     }
                 }
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("\(summary.xp) XP earned")
                 VStack(spacing: 6) {
-                    Text(summary.isPractice ? "Practice done" : "Lesson complete")
-                        .font(Typo.display).tracking(-0.6).foregroundStyle(Palette.ink)
+                    OwlView(mood: .happy, size: 56).padding(.bottom, 4)
+                    Text(summary.isPractice ? "Practice Done" : "Lesson Complete")
+                        .font(Typo.display).tracking(Typo.tracking(for: 32)).foregroundStyle(Palette.ink)
                     Text(summary.perfect ? "No mistakes. \(title) is sticking." : "\(title), one level further.")
-                        .font(Typo.body).foregroundStyle(Palette.muted).multilineTextAlignment(.center)
+                        .font(Typo.body).foregroundStyle(Palette.ink2).multilineTextAlignment(.center)
                 }
-                HStack(spacing: 10) {
-                    stat("Accuracy", "\(Int((summary.accuracy * 100).rounded()))%", Palette.green, "target")
-                    stat("Time", timeText, Palette.blue, "clock")
-                    stat("Streak", "\(summary.streak)", Palette.yellowLip, "flame.fill")
+                HStack(spacing: 0) {
+                    stat("Accuracy", "\(Int((summary.accuracy * 100).rounded()))%")
+                    stat("Time", timeText)
+                    stat("Streak", "\(summary.streak) \(summary.streak == 1 ? "day" : "days")")
                 }
+                .padding(.top, 6)
                 if summary.goalAfter >= 1 && summary.goalBefore < 1 {
-                    Label("Daily goal reached", systemImage: "checkmark.circle.fill")
-                        .font(Typo.bodyBold).foregroundStyle(Palette.greenText)
+                    Label("Daily goal reached", systemImage: "checkmark.circle")
+                        .font(Typo.bodyBold).foregroundStyle(Palette.ok)
                 }
             }
             .padding(.horizontal, 20)
@@ -47,7 +49,7 @@ struct CompletionView: View {
                 .buttonStyle(.chunky)
                 .padding(.horizontal, 20).padding(.bottom, 8)
         }
-        .background(Palette.paper.ignoresSafeArea())
+        .background(Palette.bg.ignoresSafeArea())
         .onAppear(perform: animate)
     }
 
@@ -56,17 +58,13 @@ struct CompletionView: View {
         return m > 0 ? "\(m):\(String(format: "%02d", s))" : "\(s)s"
     }
 
-    func stat(_ label: String, _ value: String, _ color: Color, _ icon: String) -> some View {
-        VStack(spacing: 6) {
-            Text(label).font(Typo.tiny).foregroundStyle(Palette.muted)
-            HStack(spacing: 4) {
-                Image(systemName: icon).font(.system(size: 15, weight: .bold))
-                Text(value).font(Typo.rounded(20, .heavy)).monospacedDigit()
-            }
-            .foregroundStyle(color)
+    func stat(_ label: String, _ value: String) -> some View {
+        VStack(spacing: 4) {
+            Text(value).font(Typo.mono(20, .medium)).foregroundStyle(Palette.ink).lineLimit(1).minimumScaleFactor(0.8)
+            Text(label).font(Typo.small).foregroundStyle(Palette.ink3)
         }
-        .frame(maxWidth: .infinity, minHeight: 74)
-        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Palette.line, lineWidth: 2))
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
     }
 
     func animate() {

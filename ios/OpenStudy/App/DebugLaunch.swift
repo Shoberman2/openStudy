@@ -25,6 +25,7 @@ enum DebugLaunch {
         let store = Store(persist: !wantsFresh)
         if demo { store.library = demoLibrary(store.sample) }
         if screen == "welcome" || screen == "onboarding" { store.library = Library() }
+        if args.contains("-aiWritten") { store.library.log("questions_written", ["source": "server", "count": 6, "lessonId": .string(value("-lessonId") ?? "lc1")]) }
         if let used = value("-usedQuizzes").flatMap(Int.init) { store.usage = MonthlyUsage(month: MonthlyUsage.monthKey(Date()), studySets: PlusLimits.freeStudySets, quizzes: used) }
         if (args.contains("-seedScreenshots") || args.contains("-seedFiles")) && !demo {
             var lib = demoLibrary(store.sample)

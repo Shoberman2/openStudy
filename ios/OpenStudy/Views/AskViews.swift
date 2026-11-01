@@ -42,6 +42,7 @@ struct AskBox: View {
                 Text("Your notes don't mention this yet.").font(Typo.body).foregroundStyle(Palette.muted)
             case .answer:
                 Text(o.answer).font(Typo.body).foregroundStyle(Palette.ink).fixedSize(horizontal: false, vertical: true)
+                AIOutputNote()
             case .local:
                 Text("From your notes").font(Typo.small).foregroundStyle(Palette.muted)
             case .fallback:

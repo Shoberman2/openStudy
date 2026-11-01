@@ -5,18 +5,16 @@ struct PlanRow: View {
     var color: Color = Palette.blue
     var body: some View {
         HStack(spacing: 12) {
-            ZStack {
-                Circle().fill(item.done ? Palette.green : color.opacity(0.14)).frame(width: 38, height: 38)
-                Image(systemName: item.done ? "checkmark" : icon)
-                    .font(.system(size: 16, weight: .heavy))
-                    .foregroundStyle(item.done ? .white : color)
-            }
+            Image(systemName: item.done ? "checkmark.circle" : icon)
+                .font(.system(size: 20, weight: .regular))
+                .foregroundStyle(item.done ? Palette.ok : Palette.ink)
+                .frame(width: 28)
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.title).font(Typo.bodyBold).foregroundStyle(Palette.ink).lineLimit(1)
-                Text(item.subtitle).font(Typo.rounded(13, .semibold)).foregroundStyle(Palette.muted).lineLimit(1)
+                Text(item.subtitle).font(Typo.small).foregroundStyle(Palette.ink3).lineLimit(1)
             }
             Spacer(minLength: 6)
-            Text(minutesText).font(Typo.rounded(14, .bold)).foregroundStyle(Palette.muted).monospacedDigit()
+            Text(minutesText).font(Typo.mono(15, .regular)).foregroundStyle(Palette.ink3)
                 .fixedSize()
         }
         .opacity(item.done ? 0.7 : 1)
@@ -28,7 +26,7 @@ struct PlanRow: View {
         switch item.kind {
         case .review: return "arrow.triangle.2.circlepath"
         case .test: return "checklist"
-        case .lesson: return "star.fill"
+        case .lesson: return "star"
         }
     }
 
@@ -48,7 +46,7 @@ struct PlanView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Your plan").font(Typo.title).foregroundStyle(Palette.ink)
+                        Text("Your Plan").font(Typo.title).tracking(Typo.tracking(for: 24)).foregroundStyle(Palette.ink)
                         Text("About \(Int(plan.today?.budget ?? 10)) min a day. Reviews first, then new lessons spread out so they stick.")
                             .font(Typo.body).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
                     }
@@ -70,18 +68,18 @@ struct PlanView: View {
                                 Text(day.exams.isEmpty ? "Rest day. Nothing planned." : "Good luck. Light review only.")
                                     .font(Typo.rounded(15, .medium)).foregroundStyle(Palette.muted)
                             }
-                            VStack(spacing: 0) {
+                            VStack(spacing: 8) {
                                 ForEach(day.items) { item in
                                     Button { if i == 0 && !item.done { store.startPlanItem(item) } } label: {
-                                        PlanRow(item: item, color: color(item)).padding(.vertical, 8).contentShape(Rectangle())
+                                        PlanRow(item: item, color: color(item))
+                                            .padding(.horizontal, 14).padding(.vertical, 10)
+                                            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Palette.surfaceDim))
+                                            .contentShape(Rectangle())
                                     }
                                     .buttonStyle(.plain)
                                     .allowsHitTesting(i == 0 && !item.done)
-                                    if item.id != day.items.last?.id { Rectangle().fill(Palette.line).frame(height: 1).padding(.leading, 50) }
                                 }
                             }
-                            .padding(.horizontal, 14).padding(.vertical, day.items.isEmpty ? 0 : 6)
-                            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(day.items.isEmpty ? .clear : Palette.line, lineWidth: 2))
                         }
                     }
                 }
@@ -94,7 +92,7 @@ struct PlanView: View {
 
     func color(_ item: PlanItem) -> Color {
         guard let p = store.project(item.projectId) else { return Palette.blue }
-        return p.color == .yellow ? Palette.yellowLip : p.color.fill
+        return Palette.ink
     }
 
     static func dayTitle(_ d: Date, index: Int) -> String {

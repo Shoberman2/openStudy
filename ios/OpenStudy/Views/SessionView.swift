@@ -60,6 +60,7 @@ struct SessionView: View {
                                 .font(Typo.title)
                                 .foregroundStyle(Palette.ink)
                                 .fixedSize(horizontal: false, vertical: true)
+                            if store.library.aiWritten(lessonId: launch.lessonId) { AIOutputNote() }
                             if launch.isTest {
                                 Text("Question \(state.index + 1) of \(state.total). Results at the end.")
                                     .font(Typo.small).foregroundStyle(Palette.muted)
@@ -104,16 +105,16 @@ struct SessionView: View {
     var topBar: some View {
         HStack(spacing: 12) {
             IconButton(systemName: "xmark", label: "Close lesson") { confirmQuit = true }
-            ProgressBar(value: state.progress, color: Palette.green)
+            ProgressBar(value: state.progress, color: Palette.ink)
             HStack(spacing: 3) {
-                Image(systemName: "flame.fill").font(.system(size: 18, weight: .bold))
-                Text("\(state.combo)").font(Typo.rounded(17, .heavy)).monospacedDigit()
+                Image(systemName: "flame").font(.system(size: 17, weight: .regular))
+                Text("\(state.combo)").font(Typo.mono(16, .medium))
             }
-            .foregroundStyle(Palette.yellow)
+            .foregroundStyle(Palette.ink)
             .frame(width: 44)
             .opacity(state.combo >= 3 ? 1 : 0)
             .scaleEffect(state.combo >= 3 ? 1 : 0.6)
-            .animation(.spring(response: 0.25, dampingFraction: 0.6), value: state.combo)
+            .animation(Motion.spring, value: state.combo)
             .accessibilityLabel("\(state.combo) in a row")
             .accessibilityHidden(state.combo < 3)
         }
@@ -134,9 +135,8 @@ struct SessionView: View {
             Color.clear.frame(height: 20)
         } else {
             VStack(spacing: 0) {
-                Rectangle().fill(Palette.line).frame(height: 2)
                 Button(launch.isTest ? "Next" : "Check") { check() }
-                    .buttonStyle(.chunky(.green))
+                    .buttonStyle(.pill)
                     .disabled(!isReady(ex))
                     .padding(.horizontal, 20).padding(.top, 14).padding(.bottom, 8)
             }
@@ -275,27 +275,26 @@ struct FeedbackPanel: View {
         let tint = ok ? Palette.greenText : Palette.redText
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
-                Image(systemName: ok ? "checkmark.circle.fill" : "xmark.circle.fill")
-                    .font(.system(size: 26, weight: .bold))
-                Text(headline).font(Typo.title)
+                Image(systemName: ok ? "checkmark.circle" : "xmark.circle")
+                    .font(.system(size: 24, weight: .regular))
+                Text(headline).font(Typo.title).tracking(Typo.tracking(for: 24))
             }
             .foregroundStyle(tint)
             detail(ex, ok: ok, tint: tint)
             SourceThumb(cardId: ex.cardId)
             if let bookTitle {
                 Button(action: onSource) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "book.closed").font(.system(size: 13, weight: .bold))
-                        Text("From \(bookTitle)").lineLimit(1)
-                        Image(systemName: "chevron.right").font(.system(size: 11, weight: .bold))
-                    }
-                    .font(Typo.rounded(14, .bold))
-                    .foregroundStyle(tint.opacity(0.85))
+                    Text("From \(bookTitle)").lineLimit(1)
+                        .font(Typo.smallBold)
+                        .foregroundStyle(tint)
+                        .underline()
+                        .frame(minHeight: 44)
                 }
                 .accessibilityHint("Shows the source page")
             }
             Button("Continue", action: onContinue)
                 .buttonStyle(.chunky(ok ? .green : .red))
+                .sensoryFeedback(ok ? .success : .error, trigger: feedback.exercise.id)
                 .padding(.top, 4)
         }
         .padding(.horizontal, 20)

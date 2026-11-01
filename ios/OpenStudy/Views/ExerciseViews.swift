@@ -138,7 +138,6 @@ struct BankView: View {
             if ex.kind.isQuote, let a = ex.attribution {
                 Text(a).font(Typo.small).foregroundStyle(Palette.muted).padding(.top, -14)
             }
-            Rectangle().fill(Palette.line).frame(height: 2)
             FlowLayout(spacing: 10, lineSpacing: 12, alignment: .center) {
                 ForEach(Array(ex.options.enumerated()), id: \.offset) { i, o in
                     let used = filled.contains(i)
@@ -386,7 +385,6 @@ struct FlashView: View {
             VStack(alignment: .leading, spacing: 16) {
                 PromptText(text: ex.body)
                 if revealed {
-                    Rectangle().fill(Palette.line).frame(height: 2)
                     Text(ex.answer).font(Typo.serif(22, .semibold)).foregroundStyle(Palette.blue)
                         .fixedSize(horizontal: false, vertical: true)
                         .transition(.opacity)

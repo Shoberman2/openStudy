@@ -12,6 +12,10 @@ struct OpenStudyApp: App {
         let s = Store()
         #endif
         _store = StateObject(wrappedValue: s)
+        // System controls use the app font too.
+        if let f = UIFont(name: "Geist-Medium", size: 15) {
+            UISegmentedControl.appearance().setTitleTextAttributes([.font: UIFontMetrics(forTextStyle: .subheadline).scaledFont(for: f)], for: .normal)
+        }
     }
 
     var body: some Scene {

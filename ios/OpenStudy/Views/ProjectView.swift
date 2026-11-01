@@ -97,7 +97,7 @@ struct ProjectView: View {
             HStack(alignment: .top, spacing: 14) {
                 RoundedRectangle(cornerRadius: 4).fill(project.color.fill).frame(width: 10, height: 56)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(project.title).font(Typo.title).foregroundStyle(Palette.ink).lineLimit(2).minimumScaleFactor(0.8)
+                    Text(project.title).font(Typo.title).tracking(Typo.tracking(for: 24)).foregroundStyle(Palette.ink).lineLimit(2).minimumScaleFactor(0.8)
                     Text([project.author, "\(pages) \(pages == 1 ? "page" : "pages")", "\(done) of \(lessons.count) started"].compactMap { $0 }.joined(separator: "  \u{00B7}  "))
                         .font(Typo.small).foregroundStyle(Palette.muted).lineLimit(1).minimumScaleFactor(0.8)
                 }
@@ -105,8 +105,7 @@ struct ProjectView: View {
             .padding(.horizontal, 20)
             SegmentedTabs(selection: $tab, titles: ["Path", "Pages"])
                 .padding(.horizontal, 20)
-                .padding(.bottom, 4)
-            Rectangle().fill(Palette.line).frame(height: 2)
+                .padding(.bottom, 8)
         }
     }
 }

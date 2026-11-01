@@ -63,11 +63,12 @@ enum Palette {
 
     /// The owl's own colors (Mascot.swift). Drawn on the page, never on a background.
     enum Owl {
-        static let body = dyn(0x1A1A18, 0xF2F2EF)
-        static let face = dyn(0xFFFFFF, 0x0E0E10)
-        static let eye = dyn(0x1A1A18, 0xF2F2EF)
+        // Dark mode draws Ollie as a pale snowy owl with dark eyes (designed, not inverted).
+        static let body = dyn(0x1A1A18, 0xD9D6CE)
+        static let face = dyn(0xFFFFFF, 0xF2F2EF)
+        static let eye = dyn(0x1A1A18, 0x17171A)
         static let beak = dyn(0xB8860B, 0xD4B46A)
-        static let wing = dyn(0x4A4843, 0xB4B2AC)
+        static let wing = dyn(0x4A4843, 0x8C8A84)
         static let book = dyn(0x5A574F, 0x8C8A84)
         static let page = dyn(0xF4F4F2, 0x2A2A2F)
     }
@@ -120,7 +121,9 @@ enum Typo {
     /// Older call sites ask for "rounded"; they get Geist at the same size, never below 13pt.
     static func rounded(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
         let w: Font.Weight = (weight == .heavy || weight == .black) ? .semibold : (weight == .bold ? .semibold : weight)
-        return geist(max(13, size), w, relativeTo: size >= 22 ? .title2 : (size >= 17 ? .body : .subheadline))
+        // 16pt minimum for text; only dense chrome (13pt and below) stays small.
+        let sized: CGFloat = size <= 13 ? 13 : max(16, size)
+        return geist(sized, w, relativeTo: size >= 22 ? .title2 : (size >= 17 ? .body : .subheadline))
     }
 
     static let hero = geist(40, .semibold, relativeTo: .largeTitle)

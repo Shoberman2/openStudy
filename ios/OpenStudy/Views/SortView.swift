@@ -6,6 +6,7 @@ struct SortView: View {
     @State private var groups: [SuggestedGroup] = []
     @State private var creating: SuggestedGroup?
     @State private var smartBusy = false
+    @State private var smartSorted = false
     @State private var viewing: Page?
     @State private var organizing: (index: Int, total: Int, title: String)?
 
@@ -20,10 +21,11 @@ struct SortView: View {
                         Task { await smartSort() }
                     } label: {
                         HStack(spacing: 6) {
-                            if smartBusy { ProgressView().controlSize(.small) } else { Image(systemName: "sparkle") }
+                            if smartBusy { ProgressView().controlSize(.small) }
                             Text("Smart organize")
                         }
-                        .font(Typo.rounded(15, .bold))
+                        .font(Typo.smallBold).foregroundStyle(Palette.ink)
+                        .frame(minHeight: 44)
                     }
                     .disabled(smartBusy || !store.smartOn)
                     .padding(.trailing, 12)
@@ -32,6 +34,7 @@ struct SortView: View {
             .padding(.horizontal, 8)
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
+                    if smartSorted { AIOutputNote() }
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Sort new pages").font(Typo.title).foregroundStyle(Palette.ink)
                         if !inbox.isEmpty {
@@ -172,7 +175,7 @@ struct SortView: View {
         let wordPages = inbox.filter { !($0.words ?? []).isEmpty }
         let rest = inbox.filter { ($0.words ?? []).isEmpty }
         if rest.isEmpty { withAnimation(Motion.quick) { groups = Grouper.group(wordPages) }; return }
-        if let result = await client.sort(rest) { withAnimation(Motion.quick) { groups = (wordPages.isEmpty ? [] : Grouper.group(wordPages)) + result } }
+        if let result = await client.sort(rest) { withAnimation(Motion.quick) { groups = (wordPages.isEmpty ? [] : Grouper.group(wordPages)) + result; smartSorted = true } }
         else { store.toast = "Smart organize is off, using offline sorting" }
     }
 }
