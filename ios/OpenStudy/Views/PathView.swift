@@ -91,7 +91,7 @@ struct LessonSheet: View {
                         dismiss()
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { store.start(lesson: lesson) }
                     }
-                    .buttonStyle(.chunky(.custom(fill: project.color.fill, lip: project.color.lip, text: project.color.text)))
+                    .buttonStyle(.chunky)
                 }
             }
             .padding(24)

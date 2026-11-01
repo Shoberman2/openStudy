@@ -1,7 +1,8 @@
 import SwiftUI
 import UIKit
 
-// Design tokens from spec section 7.
+// Every color and font in the app lives in this file (ios/DESIGN.md). Components never hardcode
+// hex values. Light tokens follow spencer-web-style, dark tokens follow spencer-app-style section 8.
 extension UIColor {
     convenience init(hex: UInt32) {
         self.init(red: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255, blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
@@ -11,75 +12,148 @@ extension UIColor {
     }
 }
 
-enum Palette {
-    static let paper = Color(uiColor: .dynamic(0xFFFFFF, 0x101012))
-    static let shelf = Color(uiColor: .dynamic(0xF4F3EF, 0x18181B))
-    static let ink = Color(uiColor: .dynamic(0x141414, 0xF3F3F3))
-    static let muted = Color(uiColor: .dynamic(0x6E6E6E, 0xA0A0A6))
-    static let line = Color(uiColor: .dynamic(0xE5E4DF, 0x2A2A2E))
-    static let lineStrong = Color(uiColor: .dynamic(0xD3D2CC, 0x3A3A40))
+private func dyn(_ light: UInt32, _ dark: UInt32) -> Color { Color(uiColor: .dynamic(light, dark)) }
 
-    static let blue = Color(uiColor: UIColor(hex: 0x2F5BEA))
-    static let blueLip = Color(uiColor: UIColor(hex: 0x1F43B8))
-    static let blueSoft = Color(uiColor: .dynamic(0xEAF0FF, 0x1B2550))
-    static let red = Color(uiColor: UIColor(hex: 0xE8423A))
-    static let redLip = Color(uiColor: UIColor(hex: 0xB32D27))
-    static let redSoft = Color(uiColor: .dynamic(0xFDECEB, 0x3A1513))
-    static let redText = Color(uiColor: .dynamic(0xC8322B, 0xFF8A82))
-    static let yellow = Color(uiColor: UIColor(hex: 0xFFC531))
-    static let yellowLip = Color(uiColor: UIColor(hex: 0xD49B10))
-    static let yellowSoft = Color(uiColor: .dynamic(0xFFF6DD, 0x2E2610))
-    static let green = Color(uiColor: UIColor(hex: 0x1FA35B))
-    static let greenLip = Color(uiColor: UIColor(hex: 0x167A43))
-    static let greenSoft = Color(uiColor: .dynamic(0xE6F7EE, 0x10301F))
-    static let greenText = Color(uiColor: .dynamic(0x14874A, 0x5FD596))
-    static let inkLip = Color(uiColor: .dynamic(0x000000, 0xB8B8BE))
-    static let onInk = Color(uiColor: .dynamic(0xFFFFFF, 0x101012))
-    static let lockedFill = Color(uiColor: .dynamic(0xE5E4DF, 0x2A2A2E))
-    static let lockedLip = Color(uiColor: .dynamic(0xC9C8C2, 0x1E1E22))
+enum Palette {
+    // MARK: Ground
+    static let bg = dyn(0xFFFFFF, 0x0E0E10)
+    static let surface = dyn(0xFFFFFF, 0x17171A)
+    /// Quiet fills: inputs, rows, segmented controls.
+    static let surfaceDim = dyn(0xF4F4F2, 0x1F1F23)
+    /// A raised surface's own outline only, never a divider.
+    static let cardEdge = dyn(0xECEEF1, 0x2A2A2F)
+
+    // MARK: Ink
+    static let ink = dyn(0x1A1A18, 0xF2F2EF)
+    static let ink2 = dyn(0x5A574F, 0xB4B2AC)
+    static let ink3 = dyn(0x6D6B63, 0x8C8A84)
+
+    // MARK: Accent: none. Ink is the accent (links, primary button, focus, state).
+    static let accent = ink
+    static let onAccent = dyn(0xFFFFFF, 0x0E0E10)
+
+    // MARK: Status only
+    static let ok = dyn(0x1F7A4D, 0x4CC38A)
+    static let warn = dyn(0xB45309, 0xF5A524)
+    static let bad = dyn(0xB4372F, 0xF2555A)
+    static let okSoft = dyn(0xE9F4EE, 0x13261C)
+    static let badSoft = dyn(0xF9ECEA, 0x2C1718)
+    static let warnSoft = dyn(0xFBF1E4, 0x2B2213)
+    static let onStatus = dyn(0xFFFFFF, 0x0E0E10)
+
+    // MARK: Older names, kept so every screen reads the same tokens.
+    static let paper = bg
+    static let shelf = surfaceDim
+    static let muted = ink3
+    static let line = cardEdge
+    static let lineStrong = dyn(0xD9D7D0, 0x3A3A40)
+    static let blue = accent
+    static let blueSoft = surfaceDim
+    static let yellow = accent
+    static let yellowLip = ink2
+    static let yellowSoft = surfaceDim
+    static let green = ok
+    static let greenSoft = okSoft
+    static let greenText = ok
+    static let red = bad
+    static let redSoft = badSoft
+    static let redText = bad
+    static let onInk = onAccent
+    static let lockedFill = surfaceDim
+
+    /// The owl's own colors (Mascot.swift). Drawn on the page, never on a background.
+    enum Owl {
+        static let body = dyn(0x1A1A18, 0xF2F2EF)
+        static let face = dyn(0xFFFFFF, 0x0E0E10)
+        static let eye = dyn(0x1A1A18, 0xF2F2EF)
+        static let beak = dyn(0xB8860B, 0xD4B46A)
+        static let wing = dyn(0x4A4843, 0xB4B2AC)
+        static let book = dyn(0x5A574F, 0x8C8A84)
+        static let page = dyn(0xF4F4F2, 0x2A2A2F)
+    }
 }
 
+/// Book spines and lesson nodes use quiet ink tones, not hues (DESIGN.md: no brand accent).
+/// The stored color names stay the same so library files keep working on web and iOS.
 extension ProjectColor {
     var fill: Color {
         switch self {
-        case .blue: return Palette.blue
-        case .red: return Palette.red
-        case .yellow: return Palette.yellow
-        case .green: return Palette.green
-        case .ink: return Palette.ink
-        }
-    }
-    var lip: Color {
-        switch self {
-        case .blue: return Palette.blueLip
-        case .red: return Palette.redLip
-        case .yellow: return Palette.yellowLip
-        case .green: return Palette.greenLip
-        case .ink: return Palette.inkLip
+        case .ink: return dyn(0x1A1A18, 0xF2F2EF)
+        case .blue: return dyn(0x4A4843, 0xB4B2AC)
+        case .red: return dyn(0x8C8A84, 0x5E5C57)
+        case .green: return dyn(0xD9D6CE, 0x3A3935)
+        case .yellow: return dyn(0xECEAE4, 0x2A2A2F)
         }
     }
     var text: Color {
         switch self {
-        case .yellow: return Color(uiColor: UIColor(hex: 0x141414))
-        case .ink: return Palette.onInk
-        default: return .white
+        case .ink, .blue: return dyn(0xFFFFFF, 0x0E0E10)
+        case .red: return dyn(0x1A1A18, 0xF2F2EF)
+        case .green, .yellow: return dyn(0x1A1A18, 0xF2F2EF)
+        }
+    }
+    /// Light tones get their own outline so they stay visible on the page.
+    var edge: Color? {
+        switch self {
+        case .yellow, .green: return Palette.cardEdge
+        default: return nil
         }
     }
 }
 
+/// Geist everywhere, Geist Mono for numbers. Every size scales with Dynamic Type.
 enum Typo {
-    static func rounded(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font { .system(size: size, weight: weight, design: .rounded) }
-    static let display = Font.system(size: 34, weight: .heavy, design: .rounded)
-    static let title = Font.system(size: 24, weight: .heavy, design: .rounded)
-    static let headline = Font.system(size: 19, weight: .heavy, design: .rounded)
-    static let body = Font.system(size: 17, weight: .regular, design: .rounded)
-    static let bodyBold = Font.system(size: 17, weight: .bold, design: .rounded)
-    static let small = Font.system(size: 14, weight: .semibold, design: .rounded)
-    static let tiny = Font.system(size: 12, weight: .bold, design: .rounded)
-    static func serif(_ size: CGFloat = 19, _ weight: Font.Weight = .regular) -> Font { .system(size: size, weight: weight, design: .serif) }
+    static func geist(_ size: CGFloat, _ weight: Font.Weight = .regular, relativeTo style: Font.TextStyle = .body) -> Font {
+        let name: String
+        switch weight {
+        case .bold, .heavy, .black: name = "Geist-Bold"
+        case .semibold: name = "Geist-SemiBold"
+        case .medium: name = "Geist-Medium"
+        default: name = "Geist-Regular"
+        }
+        return .custom(name, size: size, relativeTo: style)
+    }
+    static func mono(_ size: CGFloat, _ weight: Font.Weight = .medium, relativeTo style: Font.TextStyle = .body) -> Font {
+        let name = weight == .regular ? "GeistMono-Regular" : (weight == .medium ? "GeistMono-Medium" : "GeistMono-SemiBold")
+        return .custom(name, size: size, relativeTo: style)
+    }
+    /// Older call sites ask for "rounded"; they get Geist at the same size, never below 13pt.
+    static func rounded(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
+        let w: Font.Weight = (weight == .heavy || weight == .black) ? .semibold : (weight == .bold ? .semibold : weight)
+        return geist(max(13, size), w, relativeTo: size >= 22 ? .title2 : (size >= 17 ? .body : .subheadline))
+    }
+
+    static let hero = geist(40, .semibold, relativeTo: .largeTitle)
+    static let display = geist(32, .semibold, relativeTo: .largeTitle)
+    static let title = geist(24, .semibold, relativeTo: .title2)
+    static let headline = geist(20, .semibold, relativeTo: .title3)
+    static let body = geist(17, .regular, relativeTo: .body)
+    static let bodyBold = geist(17, .medium, relativeTo: .body)
+    static let small = geist(16, .regular, relativeTo: .callout)
+    static let smallBold = geist(16, .medium, relativeTo: .callout)
+    /// Dense app chrome only (counts, timestamps).
+    static let tiny = geist(13, .medium, relativeTo: .caption)
+    static let num = mono(17, .medium)
+    /// Book pages and quotes: same face as everything else (no serif, DESIGN.md).
+    static func serif(_ size: CGFloat = 19, _ weight: Font.Weight = .regular) -> Font { geist(size, weight == .regular ? .regular : .medium, relativeTo: .body) }
+
+    /// Tight tracking for big Title Case headlines.
+    static func tracking(for size: CGFloat) -> CGFloat { size >= 30 ? -size * 0.035 : (size >= 20 ? -size * 0.02 : 0) }
 }
 
 enum Motion {
     static let quick = Animation.easeOut(duration: 0.15)
-    static let slide = Animation.easeOut(duration: 0.18)
+    static let slide = Animation.easeOut(duration: 0.2)
+    /// Subtle spring with no visible overshoot.
+    static let spring = Animation.spring(response: 0.35, dampingFraction: 0.9)
+    static func reduced(_ reduce: Bool, _ a: Animation) -> Animation { reduce ? .easeInOut(duration: 0.2) : a }
+}
+
+/// Follow the system, with an override in the settings sheet.
+enum Appearance: String, CaseIterable, Identifiable {
+    case system, light, dark
+    var id: String { rawValue }
+    var title: String { switch self { case .system: "System"; case .light: "Light"; case .dark: "Dark" } }
+    var scheme: ColorScheme? { switch self { case .system: nil; case .light: .light; case .dark: .dark } }
+    static let key = "appearance"
 }

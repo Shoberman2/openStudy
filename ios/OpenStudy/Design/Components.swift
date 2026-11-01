@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-// MARK: - Chunky buttons (radius 16, height 52, bottom lip that presses down)
+// MARK: - Pill buttons (one button component for the whole app, words only)
 
 enum ChunkyKind { case primary, secondary, green, red, yellow, custom(fill: Color, lip: Color, text: Color) }
 
@@ -11,34 +11,34 @@ struct ChunkyButtonStyle: ButtonStyle {
     var fullWidth = true
     @Environment(\.isEnabled) private var isEnabled
 
-    private var colors: (fill: Color, lip: Color, text: Color, border: Color?) {
-        if !isEnabled { return (Palette.shelf, Palette.line, Palette.muted, nil) }
+    private var colors: (fill: Color, text: Color, border: Color?) {
+        if !isEnabled { return (Palette.surfaceDim, Palette.ink3, nil) }
         switch kind {
-        case .primary: return (Palette.blue, Palette.blueLip, .white, nil)
-        case .secondary: return (Palette.paper, Palette.line, Palette.ink, Palette.line)
-        case .green: return (Palette.green, Palette.greenLip, .white, nil)
-        case .red: return (Palette.red, Palette.redLip, .white, nil)
-        case .yellow: return (Palette.yellow, Palette.yellowLip, Color(uiColor: UIColor(hex: 0x141414)), nil)
-        case .custom(let f, let l, let t): return (f, l, t, nil)
+        case .primary, .yellow: return (Palette.accent, Palette.onAccent, nil)
+        case .secondary: return (Palette.bg, Palette.ink, Palette.lineStrong)
+        case .green: return (Palette.ok, Palette.onStatus, nil)
+        case .red: return (Palette.bad, Palette.onStatus, nil)
+        case .custom(let f, _, let t): return (f, t, nil)
         }
     }
 
     func makeBody(configuration: Configuration) -> some View {
         let c = colors
         let pressed = configuration.isPressed && isEnabled
-        let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
         return configuration.label
             .font(Typo.bodyBold)
             .foregroundStyle(c.text)
-            .padding(.horizontal, 18)
+            .lineLimit(1)
+            .minimumScaleFactor(0.85)
+            .padding(.horizontal, 26)
             .frame(maxWidth: fullWidth ? .infinity : nil, minHeight: height)
-            .background(shape.fill(c.fill))
-            .overlay { if let b = c.border { shape.strokeBorder(b, lineWidth: 2) } }
-            .contentShape(shape)
-            .offset(y: pressed ? 4 : 0)
-            .background(shape.fill(c.lip).offset(y: 4))
-            .padding(.bottom, 4)
+            .background(Capsule().fill(c.fill))
+            .overlay { if let b = c.border { Capsule().strokeBorder(b, lineWidth: 1.5) } }
+            .contentShape(Capsule())
+            .scaleEffect(pressed ? 0.98 : 1)
+            .opacity(pressed ? 0.88 : 1)
             .animation(.easeOut(duration: 0.12), value: pressed)
+            .sensoryFeedback(.impact(weight: .light), trigger: pressed) { _, now in now }
     }
 }
 
@@ -47,9 +47,25 @@ extension ButtonStyle where Self == ChunkyButtonStyle {
     static func chunky(_ kind: ChunkyKind, height: CGFloat = 52, fullWidth: Bool = true) -> ChunkyButtonStyle {
         ChunkyButtonStyle(kind: kind, height: height, fullWidth: fullWidth)
     }
+    static var pill: ChunkyButtonStyle { ChunkyButtonStyle() }
+    static var ghostPill: ChunkyButtonStyle { ChunkyButtonStyle(kind: .secondary) }
 }
 
-// MARK: - Option tiles (2px line border, radius 14, lip 3)
+/// Plain text action (secondary links): ink, medium weight, 44pt tall.
+struct TextLinkStyle: ButtonStyle {
+    var color: Color = Palette.ink
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(Typo.bodyBold)
+            .foregroundStyle(color)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+            .opacity(configuration.isPressed ? 0.55 : 1)
+            .sensoryFeedback(.selection, trigger: configuration.isPressed) { _, now in now }
+    }
+}
+
+// MARK: - Option tiles (quiet fill, ink outline when picked, status tint when graded)
 
 enum TileState { case normal, selected, correct, wrong, disabled }
 
@@ -59,17 +75,17 @@ struct TileStyle: ButtonStyle {
     var alignment: Alignment = .leading
 
     func makeBody(configuration: Configuration) -> some View {
-        let (border, fill, text): (Color, Color, Color) = {
+        let (border, fill, text): (Color?, Color, Color) = {
             switch state {
-            case .normal: return (Palette.line, Palette.paper, Palette.ink)
-            case .selected: return (Palette.blue, Palette.blueSoft, Palette.blue)
-            case .correct: return (Palette.green, Palette.greenSoft, Palette.greenText)
-            case .wrong: return (Palette.red, Palette.redSoft, Palette.redText)
-            case .disabled: return (Palette.line, Palette.shelf, Palette.muted.opacity(0.6))
+            case .normal: return (nil, Palette.surfaceDim, Palette.ink)
+            case .selected: return (Palette.ink, Palette.bg, Palette.ink)
+            case .correct: return (Palette.ok, Palette.okSoft, Palette.ok)
+            case .wrong: return (Palette.bad, Palette.badSoft, Palette.bad)
+            case .disabled: return (nil, Palette.surfaceDim, Palette.ink3.opacity(0.7))
             }
         }()
         let pressed = configuration.isPressed && state != .disabled
-        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
         return configuration.label
             .font(Typo.bodyBold)
             .foregroundStyle(text)
@@ -77,12 +93,11 @@ struct TileStyle: ButtonStyle {
             .padding(.horizontal, 16).padding(.vertical, 12)
             .frame(maxWidth: .infinity, minHeight: minHeight, alignment: alignment)
             .background(shape.fill(fill))
-            .overlay(shape.strokeBorder(border, lineWidth: 2))
+            .overlay { if let border { shape.strokeBorder(border, lineWidth: 2) } }
             .contentShape(shape)
-            .offset(y: pressed ? 3 : 0)
-            .background(shape.fill(border).offset(y: 3))
-            .padding(.bottom, 3)
+            .scaleEffect(pressed ? 0.985 : 1)
             .animation(.easeOut(duration: 0.12), value: pressed)
+            .sensoryFeedback(.selection, trigger: pressed) { _, now in now }
     }
 }
 
@@ -95,24 +110,19 @@ struct ChipStyle: ButtonStyle {
     }
 }
 
-// MARK: - Progress bar (14px, shelf track, highlight stripe)
+// MARK: - Progress bar (thin, quiet track, ink fill)
 
 struct ProgressBar: View {
     var value: Double
-    var color: Color = Palette.blue
-    var height: CGFloat = 14
+    var color: Color = Palette.accent
+    var height: CGFloat = 8
 
     var body: some View {
         GeometryReader { geo in
             let w = max(value > 0 ? height : 0, geo.size.width * min(1, max(0, value)))
             ZStack(alignment: .leading) {
-                Capsule().fill(Palette.shelf)
+                Capsule().fill(Palette.surfaceDim)
                 Capsule().fill(color).frame(width: w)
-                    .overlay(alignment: .top) {
-                        Capsule().fill(Color.white.opacity(0.3))
-                            .frame(width: max(0, w - height), height: 4)
-                            .padding(.top, 3)
-                    }
             }
         }
         .frame(height: height)
@@ -127,12 +137,12 @@ struct ProgressBar: View {
 struct GoalRing: View {
     var progress: Double
     var size: CGFloat = 30
-    var lineWidth: CGFloat = 5
+    var lineWidth: CGFloat = 4
     var body: some View {
         ZStack {
-            Circle().stroke(Palette.line, lineWidth: lineWidth)
+            Circle().stroke(Palette.surfaceDim, lineWidth: lineWidth)
             Circle().trim(from: 0, to: min(1, progress))
-                .stroke(Palette.yellow, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                .stroke(Palette.accent, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(-90))
         }
         .frame(width: size, height: size)
@@ -144,14 +154,14 @@ struct GoalRing: View {
 struct LevelRing: View {
     var level: Int
     var diameter: CGFloat
-    var lineWidth: CGFloat = 6
+    var lineWidth: CGFloat = 5
     var body: some View {
         ZStack {
             ForEach(0..<5, id: \.self) { i in
                 let gap = 0.025
                 Circle()
                     .trim(from: Double(i) / 5 + gap, to: Double(i + 1) / 5 - gap)
-                    .stroke(i < level ? Palette.yellow : Palette.line, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                    .stroke(i < level ? Palette.ink : Palette.surfaceDim, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                     .rotationEffect(.degrees(-90))
             }
         }
@@ -170,30 +180,27 @@ struct PathNode: View {
     var pressed: Bool = false
 
     var body: some View {
-        let fill = locked ? Palette.lockedFill : color.fill
-        let lip = locked ? Palette.lockedLip : color.lip
-        let fg = locked ? Palette.muted : color.text
+        let fill = locked ? Palette.surfaceDim : (isCurrent ? Palette.ink : color.fill)
+        let fg = locked ? Palette.ink3 : (isCurrent ? Palette.onAccent : color.text)
         ZStack {
-            LevelRing(level: locked ? 0 : level, diameter: 96, lineWidth: 6)
-            ZStack {
-                Circle().fill(lip).frame(width: 72, height: 72).offset(y: 6)
-                Circle().fill(fill).frame(width: 72, height: 72).offset(y: pressed ? 6 : 0)
-                Group {
-                    if locked {
-                        Image(systemName: "lock.fill").font(.system(size: 24, weight: .bold))
-                    } else if isQuotes {
-                        Image(systemName: "quote.opening").font(.system(size: 28, weight: .black))
-                    } else if level >= 5 {
-                        Image(systemName: "checkmark").font(.system(size: 28, weight: .black))
-                    } else {
-                        Image(systemName: "star.fill").font(.system(size: 28, weight: .black))
-                    }
+            LevelRing(level: locked ? 0 : level, diameter: 94, lineWidth: 5)
+            Circle().fill(fill).frame(width: 72, height: 72)
+                .overlay { if !locked && !isCurrent, let e = color.edge { Circle().strokeBorder(e, lineWidth: 1.5) } }
+            Group {
+                if locked {
+                    Image(systemName: "lock")
+                } else if isQuotes {
+                    Image(systemName: "quote.opening")
+                } else if level >= 5 {
+                    Image(systemName: "checkmark")
+                } else {
+                    Image(systemName: "star")
                 }
-                .foregroundStyle(fg)
-                .offset(y: pressed ? 6 : 0)
             }
-            .offset(y: -3)
+            .font(.system(size: 24, weight: .medium))
+            .foregroundStyle(fg)
         }
+        .scaleEffect(pressed ? 0.96 : 1)
         .frame(width: 100, height: 104)
     }
 }
@@ -203,23 +210,22 @@ struct PathNodeButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         PathNode(color: color, level: level, locked: locked, isQuotes: isQuotes, isCurrent: isCurrent, pressed: configuration.isPressed)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .sensoryFeedback(.impact(weight: .light), trigger: configuration.isPressed) { _, now in now }
     }
 }
 
-/// Small speech-bubble tag above the current node.
+/// Small speech bubble above the current node.
 struct StartTag: View {
     var text = "Start"
     var color: ProjectColor
     var body: some View {
         VStack(spacing: 0) {
             Text(text)
-                .font(Typo.rounded(15, .heavy))
-                .foregroundStyle(color == .yellow ? color.text : color.fill)
-                .padding(.horizontal, 14).padding(.vertical, 8)
-                .background(RoundedRectangle(cornerRadius: 12).fill(Palette.paper))
-                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Palette.line, lineWidth: 2))
-            Triangle().fill(Palette.line).frame(width: 14, height: 8)
-                .overlay(Triangle().fill(Palette.paper).frame(width: 9, height: 5).offset(y: -1.5))
+                .font(Typo.smallBold)
+                .foregroundStyle(Palette.onAccent)
+                .padding(.horizontal, 14).padding(.vertical, 7)
+                .background(Capsule().fill(Palette.ink))
+            Triangle().fill(Palette.ink).frame(width: 12, height: 6)
         }
     }
 }
@@ -242,17 +248,17 @@ struct BookSpine: View {
     var badge: Int = 0
 
     var body: some View {
-        let band = color == .yellow ? Color.black.opacity(0.12) : Color.white.opacity(0.28)
+        let band = color.text.opacity(0.22)
         ZStack {
-            RoundedRectangle(cornerRadius: 6, style: .continuous).fill(color.lip).offset(y: 4)
             RoundedRectangle(cornerRadius: 6, style: .continuous).fill(color.fill)
+                .overlay { if let e = color.edge { RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(e, lineWidth: 1.5) } }
             VStack(spacing: 0) {
                 band.frame(height: 3).padding(.top, 14)
                 Spacer()
                 band.frame(height: 3).padding(.bottom, 30)
             }
             Text(title)
-                .font(Typo.rounded(15, .heavy))
+                .font(Typo.geist(15, .semibold, relativeTo: .subheadline))
                 .foregroundStyle(color.text)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
@@ -265,7 +271,7 @@ struct BookSpine: View {
                 Spacer()
                 if let a = author, !a.isEmpty {
                     Text(lastName(a))
-                        .font(Typo.rounded(9, .bold))
+                        .font(Typo.geist(9, .semibold, relativeTo: .caption2))
                         .foregroundStyle(color.text.opacity(0.85))
                         .lineLimit(1).minimumScaleFactor(0.6)
                         .padding(.horizontal, 4)
@@ -287,8 +293,9 @@ struct BookSpine: View {
 struct SpineButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .offset(y: configuration.isPressed ? 3 : 0)
+            .offset(y: configuration.isPressed ? 2 : 0)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .sensoryFeedback(.impact(weight: .light), trigger: configuration.isPressed) { _, now in now }
     }
 }
 
@@ -364,15 +371,14 @@ struct Panel<Content: View>: View {
         content
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Palette.paper))
-            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Palette.line, lineWidth: 2))
+            .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Palette.surfaceDim))
     }
 }
 
 struct SectionLabel: View {
     var text: String
     var body: some View {
-        Text(text).font(Typo.small).foregroundStyle(Palette.muted)
+        Text(text).font(Typo.small).foregroundStyle(Palette.ink3)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
@@ -384,8 +390,8 @@ struct IconButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: 19, weight: .bold))
-                .foregroundStyle(Palette.muted)
+                .font(.system(size: 19, weight: .regular))
+                .foregroundStyle(Palette.ink2)
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
         }

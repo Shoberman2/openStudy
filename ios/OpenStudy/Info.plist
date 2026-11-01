@@ -19,6 +19,17 @@
 			<key>CFBundleURLSchemes</key><array><string>openstudy</string></array>
 		</dict>
 	</array>
+	<key>RevenueCatAPIKey</key><string>$(REVENUECAT_API_KEY)</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Geist-Regular.ttf</string>
+		<string>Geist-Medium.ttf</string>
+		<string>Geist-SemiBold.ttf</string>
+		<string>Geist-Bold.ttf</string>
+		<string>GeistMono-Regular.ttf</string>
+		<string>GeistMono-Medium.ttf</string>
+		<string>GeistMono-SemiBold.ttf</string>
+	</array>
 	<key>OpenStudyServer</key><string>$(OPENSTUDY_SERVER)</string>
 	<key>NSPhotoLibraryUsageDescription</key><string>OpenStudy looks through your photos for notes, book pages and slides, and reads the ones you pick, so it can turn them into lessons. Images stay on this iPhone.</string>
 	<key>NSCameraUsageDescription</key><string>OpenStudy uses the camera to scan notes, slides and whiteboards so it can turn them into lessons.</string>
