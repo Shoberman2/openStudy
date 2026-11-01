@@ -26,9 +26,12 @@ struct SignInView: View {
             .padding(.horizontal, 8)
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    Text(mode == .create ? "Create your account" : "Sign in").font(Typo.title).foregroundStyle(Palette.ink)
-                    Text("Your account holds your subscription. Your notes and lessons stay on this iPhone.")
+                    Text(mode == .create ? "Create Your Account" : "Sign In").font(Typo.title).tracking(Typo.tracking(for: 24)).foregroundStyle(Palette.ink)
+                    Text("Your account holds your subscription. Your notes stay on this iPhone.")
                         .font(Typo.body).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
+                    AppleSignInButton { m in
+                        if let m { message = m } else { onDone() }
+                    }
                     field("Email") {
                         TextField("you@example.com", text: $email)
                             .keyboardType(.emailAddress)
@@ -51,15 +54,15 @@ struct SignInView: View {
                         Text(notice).font(Typo.small).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
                     }
                     Button(busy ? "One moment..." : mode == .create ? "Create account" : "Sign in") { Task { await submit() } }
-                        .buttonStyle(.chunky).disabled(busy)
+                        .buttonStyle(.pill).disabled(busy)
                     Button(mode == .create ? "I already have an account" : "I need an account") {
                         mode = mode == .create ? .signIn : .create
                         message = nil; notice = nil
                     }
-                    .font(Typo.bodyBold).foregroundStyle(Palette.blue).frame(maxWidth: .infinity)
+                    .buttonStyle(TextLinkStyle()).frame(maxWidth: .infinity)
                     if mode == .signIn {
                         Button("Forgot password?") { Task { await reset() } }
-                            .font(Typo.bodyBold).foregroundStyle(Palette.muted).frame(maxWidth: .infinity).disabled(busy)
+                            .buttonStyle(TextLinkStyle(color: Palette.ink2)).frame(maxWidth: .infinity).disabled(busy)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -81,8 +84,7 @@ struct SignInView: View {
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .padding(.horizontal, 14).padding(.vertical, 12)
-                .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Palette.shelf))
-                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Palette.line, lineWidth: 2))
+                .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Palette.surfaceDim))
         }
     }
 

@@ -93,7 +93,7 @@ struct ConnectionsSection: View {
                             .buttonStyle(.chunky(.secondary, height: 44))
                     }
                     .padding(14)
-                    .background(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Palette.line, lineWidth: 2))
+                    .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Palette.surfaceDim))
                 }
             }
         }

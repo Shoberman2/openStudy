@@ -284,8 +284,7 @@ struct PageRow: View {
             Spacer(minLength: 0)
         }
         .padding(14)
-        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Palette.paper))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Palette.line, lineWidth: 2))
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Palette.surfaceDim))
     }
 }
 

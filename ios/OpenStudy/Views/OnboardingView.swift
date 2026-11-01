@@ -87,6 +87,7 @@ struct OnboardingView: View {
                 .padding(.bottom, 12)
             }
             .scrollBounceBehavior(.basedOnSize)
+            .clipped()
             .onChange(of: lines) { _, _ in withAnimation(Motion.slide) { proxy.scrollTo("end", anchor: .bottom) } }
             .onChange(of: typing) { _, _ in withAnimation(Motion.slide) { proxy.scrollTo("end", anchor: .bottom) } }
         }
@@ -102,7 +103,18 @@ struct OnboardingView: View {
         }
         .background(Palette.bg.ignoresSafeArea())
         .sensoryFeedback(.selection, trigger: tapCount)
-        .onAppear { if lines.isEmpty { lines = [Line(owl: true, text: Self.question(.bringing))] } }
+        .onAppear {
+            if lines.isEmpty { lines = [Line(owl: true, text: Self.question(.bringing))] }
+            #if DEBUG
+            if DebugLaunch.value("-onboardingStep") == "account" {
+                lines += [Line(owl: false, text: "Books I'm reading"), Line(owl: true, text: Self.question(.goals)),
+                          Line(owl: false, text: "Remember the big ideas"), Line(owl: true, text: Self.question(.daily)),
+                          Line(owl: false, text: "10 min a day"), Line(owl: true, text: Self.question(.account))]
+                step = .account
+                if DebugLaunch.args.contains("-openEmail") { signingIn = true }
+            }
+            #endif
+        }
         .sheet(isPresented: $signingIn) {
             SignInView(onDone: {
                 signingIn = false

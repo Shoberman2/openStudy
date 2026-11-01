@@ -462,8 +462,7 @@ struct ExplainView: View {
                 .focused(typing)
                 .disabled(comparing)
                 .padding(16)
-                .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Palette.shelf))
-                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Palette.line, lineWidth: 2))
+                .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Palette.surfaceDim))
             if comparing {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("From your notes").font(Typo.small).foregroundStyle(Palette.muted)

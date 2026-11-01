@@ -258,8 +258,7 @@ struct GroupCard: View {
             }
         }
         .padding(16)
-        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Palette.paper))
-        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Palette.line, lineWidth: 2))
+        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Palette.surfaceDim))
     }
 }
 
@@ -301,7 +300,7 @@ struct CategoryField: View {
             .accessibilityLabel("Pick a category")
         }
         .padding(.horizontal, 12).padding(.vertical, 6)
-        .background(RoundedRectangle(cornerRadius: 12).strokeBorder(Palette.line, lineWidth: 2))
+        .background(RoundedRectangle(cornerRadius: 12).fill(Palette.bg))
     }
 }
 

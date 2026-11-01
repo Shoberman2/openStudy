@@ -132,7 +132,7 @@ struct LessonCardList: View {
                         Spacer(minLength: 0)
                     }
                     .padding(10)
-                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Palette.line, lineWidth: 2))
+                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Palette.surfaceDim))
                 }
                 if cards.count > Self.maxRows {
                     Text("And \(cards.count - Self.maxRows) more.").font(Typo.small).foregroundStyle(Palette.muted)
