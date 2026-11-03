@@ -3,17 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "predev": "node scripts/copy-sample.mjs",
+    "predev": "node scripts/copy-sample.mjs && node scripts/build-widget.mjs",
     "dev": "next dev",
-    "prebuild": "node scripts/copy-sample.mjs",
+    "prebuild": "node scripts/copy-sample.mjs && node scripts/build-widget.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "pretest": "node scripts/copy-sample.mjs",
+    "pretest": "node scripts/copy-sample.mjs && node scripts/build-widget.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "mcp:stdio": "node scripts/build-widget.mjs && tsx --conditions=react-server src/mcp/stdio.ts",
+    "mcp:exercise": "tsx --conditions=react-server scripts/mcp-exercise.mts",
     "notes:export": "node scripts/export-notes.mjs",
-    "dev:notes": "node scripts/copy-sample.mjs && OPENSTUDY_LOCAL_NOTES=1 next dev -H 127.0.0.1"
+    "dev:notes": "node scripts/copy-sample.mjs && node scripts/build-widget.mjs && OPENSTUDY_LOCAL_NOTES=1 next dev -H 127.0.0.1"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",
@@ -23,6 +25,7 @@
     "@supabase/supabase-js": "2.117.2",
     "idb-keyval": "^6.3.0",
     "jszip": "^3.10.2",
+    "katex": "^0.19.1",
     "lucide-react": "^1.58.0",
     "mcp-handler": "^2.3.0",
     "next": "16.4.2",
@@ -35,16 +38,20 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@modelcontextprotocol/client": "^2.4.0",
     "@tailwindcss/turbopack": "^4",
+    "@types/katex": "^0.16.8",
     "@types/node": "^22.20.5",
     "@types/pg": "8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "esbuild": "^0.28.2",
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
     "pg": "8.23.1",
     "playwright-core": "^1.64.1",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5",
     "vitest": "^5.0.5"
   }

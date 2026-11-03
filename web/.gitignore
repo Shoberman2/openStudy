@@ -42,3 +42,4 @@ next-env.d.ts
 src/data/sample-library.json
 src/data/categories.json
 public/pdf.worker.min.mjs
+src/mcp/widget-bundle.generated.ts

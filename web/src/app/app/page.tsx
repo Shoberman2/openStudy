@@ -159,6 +159,18 @@ export default function Home() {
           </div>
         </section>
 
+        <section className="card mt-5 p-4 sm:p-5" aria-label="Chat">
+          <div className="flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="font-extrabold">Chat</p>
+              <p className="text-[15px] text-muted">Ask anything. Get graphs, worked steps and quizzes.</p>
+            </div>
+            <Link href="/app/chat" className="btn btn-sm btn-secondary">
+              Open chat
+            </Link>
+          </div>
+        </section>
+
         {askPages.length > 0 && (
           <div className="mt-5">
             <AskBox lib={lib} pages={askPages} scope="all" label="Ask my notes" update={update} />

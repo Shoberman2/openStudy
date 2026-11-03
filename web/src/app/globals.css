@@ -462,3 +462,136 @@ a.spine:hover {
 /* Scrollbar hiding for horizontal shelves */
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* ---------- Visual chat (spec 15): compact pills, words only, no separators ---------- */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 0;
+  background: var(--ink);
+  color: var(--paper);
+  font-weight: 600;
+  font-size: 15px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 120ms ease-out, opacity 120ms ease-out, background-color 120ms ease-out;
+}
+.pill:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+.pill:focus-visible,
+.choice:focus-visible,
+.reply-card button:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 2px;
+}
+.pill:disabled {
+  opacity: 0.4;
+  cursor: default;
+  transform: none;
+}
+.pill-ghost {
+  background: var(--shelf);
+  color: var(--ink);
+}
+.choice {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 2px solid transparent;
+  background: var(--shelf);
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 120ms ease-out, background-color 120ms ease-out;
+}
+.choice:disabled {
+  cursor: default;
+}
+.choice[aria-pressed="true"] {
+  border-color: var(--ink);
+}
+.choice.is-right {
+  border-color: var(--green);
+  background: var(--green-soft);
+}
+.choice.is-wrong {
+  border-color: var(--red);
+  background: var(--red-soft);
+}
+.reply-card {
+  border-radius: 20px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  padding: 18px;
+}
+.user-bubble {
+  background: var(--shelf);
+  border-radius: 20px;
+  padding: 10px 16px;
+  max-width: 85%;
+}
+.slider {
+  width: 100%;
+  accent-color: var(--ink);
+  height: 28px;
+}
+.mono {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+}
+.prose-math .katex-display {
+  margin: 0.4em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 0;
+}
+.flip {
+  perspective: 1200px;
+}
+.flip-inner {
+  position: relative;
+  display: grid;
+  transition: transform 320ms ease-out;
+  transform-style: preserve-3d;
+}
+.flip-inner.is-flipped {
+  transform: rotateY(180deg);
+}
+.flip-face {
+  grid-area: 1 / 1;
+  backface-visibility: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  min-height: 180px;
+  border-radius: 16px;
+  background: var(--shelf);
+}
+.flip-back {
+  transform: rotateY(180deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .flip-inner {
+    transition: none;
+  }
+}
+.plot-tick {
+  font-size: 17px;
+}
+/* The graph scales down on a phone, so its labels scale up to stay readable. */
+@media (max-width: 560px) {
+  .plot-tick {
+    font-size: 26px;
+  }
+}

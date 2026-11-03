@@ -574,3 +574,28 @@ Goal: about 6 in 10 questions are multiple choice about ideas, 2 in 10 fill in a
 - Prompts: gist **"These lines come from one page. Which idea goes with them?"**, odd **"Three of these belong together. Which one doesn't?"**.
 - **Practice**: first exercise mc; then per card one draw r: r >= 0.85 and a tf-ready concept card: tf; r >= 0.65 and a key word: bank; else mc (13.7). **Review your misses**: position mod 4 = 1 bank on a key word, 3 tf on a concept card, else mc. **Practice test**: position mod 4 = 1 type on a key word, 3 tf on a concept card, else mc; definitions and quotes as before. **Practice both**: every third a concept tf, else mc.
 - Concept rules (13.3): Why skips a cause half ending in "not" ("not because X, but because Y"); If/when drops a leading "then" from the answer; any rule's match is skipped when the sentence has "not ..., but" and the answer holds "not"; Effect skips a cause half holding is, are, was, were, that, which or who, and an answer that starts with a pronoun.
+
+## 15. v9: visual chat and the study MCP (web only; iOS is not affected)
+
+Rubric and pipeline detail live in `docs/question-quality.md`, client setup in `docs/mcp-setup.md`. Code: `web/src/engine/tutor/`, `web/src/mcp/`.
+
+### 15.1 Blocks
+A tutor reply is an ordered list of typed blocks (`blocks.ts`): text, formula, plot, diagram, steps, flashcards, quiz, quiz_request, followups. Every block from a model is validated with Zod. A bad block is dropped, and bad LaTeX in a formula becomes plain text.
+
+### 15.2 Rendering
+Plots are generic: any expression, parsed by `expr.ts` and never by eval, with sliders for its parameters. Math is KaTeX. Text is a small markdown subset read into tokens, never HTML. Steps reveal one at a time and ask the learner to try first, checking numeric attempts. Concept maps lay out in rows fitted to the real width.
+
+### 15.3 Question quality
+Every question passes `runPipeline`: generate, deterministic validator, rubric self-critique, regenerate. Items that never pass are dropped. A chat model cannot write quiz questions directly: it emits quiz_request.
+
+### 15.4 Adaptivity
+Per concept, from the last 5 answers: at least 3 answers needed, 80 percent up a level, 40 percent down, else hold, always within 1 to 5, starting at 2. The learner sees the reason. "Harder", "easier" and "level N" override. Web attempts live in localStorage under `openstudy-mastery-v1`.
+
+### 15.5 Demo mode
+With no key, or when the model fails, replies are labelled Demo mode and come from the built-in packs, the plotter and the quadratic solver. An unknown topic is told so. Nothing is invented.
+
+### 15.6 Study plans
+`buildStudyPlan` is deterministic: weakest concepts first, then spaced reviews 1, 3, 7 and 14 days after the first session.
+
+### 15.7 Study MCP
+`/mcp` (streamable HTTP) and `mcp:stdio`, tools generate_quiz, explain_concept, make_flashcards, get_study_plan, grade_answer, with MCP Apps widgets for quiz, flashcards and explanation. Public HTTP callers get Demo mode unless they hold `OPENSTUDY_STUDY_MCP_TOKEN` or the owner sets `OPENSTUDY_STUDY_MCP_PUBLIC_AI=1`. Separate from the owner analytics MCP in 12.4.
