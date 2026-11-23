@@ -293,6 +293,11 @@ try {
   check("no console errors", real.length === 0, real.slice(0, 3).join(" | "));
 } catch (e) {
   check("flow finished without an exception", false, String(e).split("\n")[0]);
+  // Leave evidence for the failing step: a screenshot and the page text, outside the repo.
+  const stamp = Date.now();
+  await page.screenshot({ path: `/tmp/openstudy-e2e-fail-${stamp}.png` }).catch(() => undefined);
+  const text = await page.locator("body").innerText().catch(() => "");
+  console.log(`  at ${page.url()}\n  screen: /tmp/openstudy-e2e-fail-${stamp}.png\n  text: ${text.replace(/\s+/g, " ").slice(0, 400)}`);
 } finally {
   await browser.close();
 }

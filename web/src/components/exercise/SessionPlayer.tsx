@@ -37,6 +37,10 @@ export function SessionPlayer({ exercises, mode = "full", sourceFor, onGraded, o
   const [result, setResult] = useState<CheckResult | null>(null);
   const [pending, setPending] = useState<SessionState | null>(null);
   const [sourceOpen, setSourceOpen] = useState(false);
+  // A missed exercise comes back with the same id (mistakes re-queue). Counting attempts gives every
+  // showing a fresh view, so the last try's filled blanks or selection never linger while the answer
+  // has been cleared (that left Check disabled with no way forward).
+  const [attempt, setAttempt] = useState(0);
   const ex = current(state);
   const full = mode === "full";
 
@@ -64,6 +68,7 @@ export function SessionPlayer({ exercises, mode = "full", sourceFor, onGraded, o
     if (!pending) return;
     setResult(null);
     setAnswer(null);
+    setAttempt((n) => n + 1);
     setState(pending);
     setPending(null);
     if (isFinished(pending)) {
@@ -116,7 +121,7 @@ export function SessionPlayer({ exercises, mode = "full", sourceFor, onGraded, o
     <div className={full ? "mx-auto w-full max-w-[640px] px-4 pt-6 pb-48 sm:pt-10" : "px-5 pt-4 pb-5 sm:px-6"}>
       <p className="kicker mb-3">{instructionFor(ex)}</p>
       <ExerciseView
-        key={ex.id}
+        key={`${ex.id}:${attempt}`}
         ex={ex}
         result={result}
         onAnswer={setAnswer}
