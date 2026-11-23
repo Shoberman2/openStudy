@@ -80,7 +80,7 @@ export default function ProfilePage() {
             {initial ?? <UserRound size={34} strokeWidth={2.5} />}
           </div>
           <div className="min-w-0 flex-1">
-            <label className="kicker" htmlFor="profile-name">
+            <label className="text-[15px] font-bold text-muted" htmlFor="profile-name">
               Your name
             </label>
             <input
@@ -93,25 +93,24 @@ export default function ProfilePage() {
               onBlur={saveName}
               onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
             />
-            {account.email && <p className="mt-1.5 truncate text-[14px] font-bold text-muted">{account.email}</p>}
-            {since && <p className="mt-1 text-[14px] font-bold text-muted">Studying since {since}</p>}
+            {account.email && <p className="mt-1.5 truncate text-[15px] text-muted">{account.email}</p>}
+            {since && <p className="mt-1 text-[15px] text-muted">Studying since {since}</p>}
           </div>
         </section>
 
         <section className="mt-8">
           <h2 className="mb-3 text-[20px] font-black">Your progress</h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-6 sm:grid-cols-3">
             {[
-              ["Total XP", String(stats.xp)],
               ["Streak", `${stats.streak} day${stats.streak === 1 ? "" : "s"}`],
               ["Longest streak", `${stats.longestStreak} day${stats.longestStreak === 1 ? "" : "s"}`],
-              ["Projects", String(stats.projects)],
+              ["Study sets", String(stats.projects)],
               ["Cards learned", String(stats.cardsLearned)],
               ["Sessions", String(stats.sessions)],
             ].map(([k, v]) => (
-              <div key={k} className="rounded-[16px] border-2 border-line p-4" style={{ boxShadow: "0 3px 0 var(--line)" }}>
-                <p className="text-[13px] font-extrabold text-muted">{k}</p>
-                <p className="mt-1 text-[22px] font-black">{v}</p>
+              <div key={k}>
+                <p className="text-[15px] font-bold text-muted">{k}</p>
+                <p className="num mt-1 text-[24px] font-black">{v}</p>
               </div>
             ))}
           </div>
@@ -120,9 +119,9 @@ export default function ProfilePage() {
         <section className="mt-9">
           <h2 className="mb-3 text-[20px] font-black">Subscription</h2>
           {account.billing === "off" ? (
-            <p className="rounded-[16px] border-2 border-line p-4 font-semibold text-muted">Accounts and subscriptions are not set up on this server yet. Everything is unlocked.</p>
+            <p className="rounded-[16px] bg-shelf p-4 font-semibold text-muted">Accounts and subscriptions are not set up on this server yet. Everything is unlocked.</p>
           ) : (
-            <div className="rounded-[16px] border-2 border-line p-4">
+            <div className="rounded-[16px] bg-shelf p-4">
               <p className="text-[18px] font-extrabold">{account.signedIn ? subscriptionLine(account.entitlement) : "Sign in to start your free trial or use your subscription."}</p>
               {account.offline && <p className="mt-1 text-[14px] font-bold text-muted">Offline. Showing your last known status.</p>}
               {msg && <p className="mt-2 text-[15px] font-semibold text-muted">{msg}</p>}

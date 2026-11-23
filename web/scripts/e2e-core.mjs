@@ -39,7 +39,8 @@ const check = (name, ok, detail = "") => {
 };
 
 const browser = await chromium.launch({ headless: HEADLESS });
-const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+const WIDTH = Number(process.env.E2E_WIDTH ?? 1280);
+const ctx = await browser.newContext({ viewport: { width: WIDTH, height: WIDTH < 600 ? 844 : 900 } });
 // Protected Vercel previews: E2E_VERCEL_AUTH=1 with VERCEL_OIDC_TOKEN (vercel env pull) sends the
 // short-lived token, only to the preview's own origin, as Vercel's Trusted Sources header.
 if (process.env.E2E_VERCEL_AUTH === "1" && process.env.VERCEL_OIDC_TOKEN) {
@@ -51,10 +52,34 @@ const errors = [];
 page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
 page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
 
+// E2E_SHOTS=<dir> saves a screenshot of each key screen, for the design check at 390 and 1440 px.
+const shot = async (name) => {
+  if (!process.env.E2E_SHOTS) return;
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: `${process.env.E2E_SHOTS}/${WIDTH}-${name}.png`, fullPage: true });
+};
 const click = (name) => page.getByRole("button", { name, exact: true }).click();
 const textOf = async () => (await page.locator("body").innerText()).replace(/\s+/g, " ");
 
 // All reads/writes use the isolated Playwright browser context created above.
+// The stored project (title, category), read from IndexedDB: the category is no longer shown (17.2).
+const storedProject = (projectId) => page.evaluate(async (projectId) => {
+  const db = await new Promise((resolve, reject) => {
+    const req = indexedDB.open("openstudy");
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  try {
+    return await new Promise((resolve, reject) => {
+      const req = db.transaction("library", "readonly").objectStore("library").get("library-v1");
+      req.onsuccess = () => resolve(req.result.projects.find((p) => p.id === projectId));
+      req.onerror = () => reject(req.error);
+    });
+  } finally {
+    db.close();
+  }
+}, projectId);
+
 const fixture = (projectId, makeReady = false) => page.evaluate(async ({ projectId, makeReady }) => {
   const db = await new Promise((resolve, reject) => {
     const req = indexedDB.open("openstudy");
@@ -95,17 +120,13 @@ try {
   // 2. Onboarding (spec 6.2 / 8.6).
   await page.goto(`${BASE}/app`);
   await page.waitForURL(/\/app\/welcome/);
+  // Three screens (spec 17.2): what you study, minutes a day, add notes.
+  await shot("welcome");
   await page.getByRole("button", { name: /^Classes/ }).click();
   await click("Continue");
-  await page.getByRole("button", { name: /^Not yet/ }).click();
+  await page.getByRole("button", { name: /^10 minutes a day/ }).click();
   await click("Continue");
-  await page.getByRole("button", { name: "Know the facts cold" }).click();
-  await click("Continue");
-  await page.getByRole("button", { name: /^Type it from memory/ }).click();
-  await click("Continue");
-  await page.getByRole("button", { name: /^Regular/ }).click();
-  await click("Continue");
-  await page.getByRole("button", { name: /^Import files/ }).click();
+  await page.getByRole("button", { name: /^Upload files/ }).click();
   await page.waitForURL(/\/app\/import/);
   check("onboarding", true);
 
@@ -117,12 +138,11 @@ try {
   // 4. Sort and create (spec 3.3 / 9.6). Accounts off or comped: no paywall in the way.
   await page.getByRole("link", { name: "Sort pages" }).click();
   await page.waitForURL(/\/app\/sort/);
-  await page.getByRole("button", { name: /^Create (project|all)/ }).first().waitFor();
-  // The category is an editable field, so read input values, not page text.
+  await page.getByRole("button", { name: /^Create (study set|all)/ }).first().waitFor();
+  await shot("sort");
   const fields = await page.locator("input").evaluateAll((els) => els.map((e) => e.value));
-  check("sort suggests a Computer Science project", fields.includes("Computer Science"), fields.filter(Boolean).join(", "));
-  check("sort uses the file name for the project title", fields.includes("R-basics"));
-  await page.getByRole("button", { name: /^Create (project|all)/ }).first().click();
+  check("sort uses the file name for the project title", fields.includes("R-basics"), fields.filter(Boolean).join(", "));
+  await page.getByRole("button", { name: /^Create (study set|all)/ }).first().click();
   await page.waitForURL((u) => /\/app(\/p\/[^/]+)?$/.test(u.pathname), { timeout: 20_000 });
   const paywalled = (await textOf()).includes("Start free trial");
   check("project created without a dead-end paywall", !paywalled);
@@ -132,43 +152,45 @@ try {
   await page.locator('a[href^="/app/p/"]').first().waitFor();
   const projectHref = await page.locator('a[href^="/app/p/"]').first().getAttribute("href");
   const projectId = projectHref.split("/").pop();
+  check("R notes are filed under Computer Science", (await storedProject(projectId))?.category === "Computer Science");
   await page.goto(`${BASE}${projectHref}`);
-  await page.getByText(/Opens when 2 lessons reach level 3/).waitFor();
+  await page.getByText(/Opens when 2 topics reach level 3/).waitFor();
   await page.goto(`${BASE}${projectHref.replace("/app/p/", "/app/test/")}`);
   const back = page.getByRole("link", { name: "Back to project" });
-  const locked = page.getByText("Reach level 3 in 2 lessons to take your practice test.");
+  const locked = page.getByText("Reach level 3 in 2 topics to take your practice test.");
   await locked.or(page.getByRole("button", { name: "Next", exact: true })).first().waitFor();
   const directTestLocked = await locked.isVisible() && await back.isVisible();
   check("direct practice test link respects the project lock", directTestLocked);
   if (directTestLocked) await back.click();
   else await page.goto(`${BASE}${projectHref}`);
-  await page.locator('section[aria-label="Lesson path"] button').first().waitFor();
+  await page.locator('ul[aria-label="Topics"] button').first().waitFor();
   await page.waitForTimeout(500);
+  await shot("focus-sheet");
   const everything = page.getByRole("button", { name: "Everything", exact: true });
   if (await everything.isVisible().catch(() => false)) await everything.click();
   const [, secondLessonId] = await fixture(projectId);
   await page.goto(`${BASE}/app/learn/${secondLessonId}`);
-  const lessonLocked = page.getByText("Finish the previous lesson to start this one.");
-  await lessonLocked.or(page.getByRole("button", { name: "Check", exact: true })).first().waitFor();
-  const directLessonLocked = await lessonLocked.isVisible();
-  check("direct lesson link respects the path lock", directLessonLocked);
-  if (directLessonLocked) await page.getByRole("link", { name: "Back to the path" }).click();
-  else await page.goto(`${BASE}${projectHref}`);
-  await page.locator('section[aria-label="Lesson path"] button').first().click();
-  await page.locator('a[href^="/app/learn/"]').first().waitFor();
-  const learnHref = await page.locator('a[href^="/app/learn/"]').first().getAttribute("href");
-  check("lesson path opens a lesson", !!learnHref);
+  // No locks (spec 17): any topic opens straight into a drill.
+  await page.getByRole("button", { name: "Check", exact: true }).waitFor({ timeout: 20_000 });
+  check("any topic opens directly, no locks", true);
+  await page.goto(`${BASE}${projectHref}`);
+  await page.locator('ul[aria-label="Topics"] button').first().click();
+  const sheetStart = page.getByRole("dialog").locator('a[href^="/app/learn/"]');
+  await sheetStart.first().waitFor();
+  const learnHref = await sheetStart.first().getAttribute("href");
+  check("a topic row opens its lesson", !!learnHref);
 
   // 6. Play the lesson to the end. Unknown questions get a guess; the feedback panel shows the
   //    right answer, which is remembered for when the question comes back (mistakes re-queue).
   await page.goto(`${BASE}${learnHref}`);
   await page.getByRole("button", { name: "Check", exact: true }).waitFor({ timeout: 20_000 });
+  await shot("lesson");
   const memory = new Map();
   let syntaxPrompts = 0;
   let done = false;
   for (let step = 0; step < 120 && !done; step++) {
     const body = await textOf();
-    if (/XP earned/.test(body) && /Accuracy/.test(body)) {
+    if (/ done /.test(body) && /Accuracy/.test(body) && /Time/.test(body) && !(await page.locator('[role="status"]').count())) {
       done = true;
       break;
     }
@@ -228,15 +250,36 @@ try {
     await page.getByRole("button", { name: "Continue", exact: true }).click();
   }
   check("lesson plays to the end", done);
+  await shot("complete");
   check("syntax questions asked about the code", syntaxPrompts > 0, `${syntaxPrompts} seen`);
   await click("Continue");
 
-  // 7. Progress shows on Home.
+  // 7. Progress shows: today's lesson is checked off on Home, the streak counts it in Profile.
   await page.goto(`${BASE}/app`);
-  await page.getByText(/\d+ XP/).first().waitFor();
-  const home = await textOf();
-  const xp = Number(home.match(/(\d+) XP/)?.[1] ?? 0);
-  check("XP recorded on Home", xp > 0, `${xp} XP`);
+  await page.getByRole("heading", { name: "Today" }).waitFor();
+  check("Home checks off today's lesson", (await page.getByLabel("Done").count()) > 0);
+  await shot("home");
+  await page.goto(`${BASE}${projectHref}`);
+  await page.locator('ul[aria-label="Topics"] button').first().waitFor();
+  await shot("project");
+  await page.goto(`${BASE}/app`);
+  check("Home shows no XP counter", !/\d+ XP/.test(await textOf()));
+  await page.goto(`${BASE}/app/profile`);
+  await page.getByText("Streak").first().waitFor();
+  check("streak counts the session in Profile", /Streak\s*1 day/.test(await textOf()));
+  if (process.env.E2E_SHOTS) {
+    await page.goto(`${BASE}/app/settings`);
+    await page.getByRole("radio", { name: "Dark" }).click();
+    await shot("settings-dark");
+    await page.goto(`${BASE}/app`);
+    await page.getByRole("heading", { name: "Today" }).waitFor();
+    await shot("home-dark");
+    await page.goto(`${BASE}/`);
+    await page.getByText("Anything you want to learn").first().waitFor();
+    check("landing stays light after choosing dark", (await page.evaluate(() => document.documentElement.dataset.theme)) !== "dark");
+    await page.goto(`${BASE}/app/settings`);
+    await page.getByRole("radio", { name: "Light" }).click();
+  }
 
   // 8. Put the isolated browser fixture at the eligibility threshold and make one review due.
   await fixture(projectId, true);

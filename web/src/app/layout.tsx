@@ -16,15 +16,19 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#101012" },
-  ],
+  themeColor: "#ffffff",
 };
+
+// Applies a dark mode the person chose in Settings, before paint, on app pages only. The landing
+// page and legal pages always stay light. Key shared with web/src/lib/theme.ts.
+const THEME_SCRIPT = `try{if(location.pathname.startsWith("/app")&&localStorage.getItem("openstudy.theme")==="dark")document.documentElement.dataset.theme="dark"}catch(e){}`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${nunito.variable} ${newsreader.variable} ${caveat.variable} antialiased`}>
+    <html lang="en" className={`${nunito.variable} ${newsreader.variable} ${caveat.variable} antialiased`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="min-h-dvh">{children}</body>
     </html>
   );

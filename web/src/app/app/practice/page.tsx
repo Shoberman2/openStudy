@@ -7,8 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Exercise } from "@/engine/exercises";
 import { buildConnection, buildPractice, nextDueDate } from "@/engine/session";
 import type { Grade } from "@/engine/types";
-import { localDay, relativeTime } from "@/engine/util";
-import { displayStreak } from "@/engine/xp";
+import { relativeTime } from "@/engine/util";
 import { applyGrades, finishPractice } from "@/lib/actions";
 import { useLibrary } from "@/lib/store";
 import { PlusGate } from "@/components/app/PlusGate";
@@ -59,15 +58,11 @@ function PracticePageSession() {
 
   if (!ready || !exercises) return <Loading />;
   if (done) {
-    const now = new Date();
     return (
       <SessionComplete
         title="Review done"
-        xp={done.xp}
         accuracy={done.s.accuracy}
         seconds={done.s.seconds}
-        streak={displayStreak(lib.stats, now)}
-        goal={{ today: lib.stats.dayXP[localDay(now)] ?? 0, target: lib.profile.dailyGoalXP }}
         onContinue={() => router.push("/app")}
       />
     );

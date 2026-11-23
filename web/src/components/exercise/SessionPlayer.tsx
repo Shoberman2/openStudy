@@ -1,7 +1,7 @@
 "use client";
 
 import { isCode } from "@/engine/code";
-import { BookOpen, CircleCheck, CircleX, Flame, X } from "lucide-react";
+import { BookOpen, CircleCheck, CircleX, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { checkAnswer, type Answer, type CheckResult, type Exercise } from "@/engine/exercises";
 import { answerCurrent, current, isFinished, progress, startSession, type SessionState } from "@/engine/session";
@@ -119,7 +119,8 @@ export function SessionPlayer({ exercises, mode = "full", sourceFor, onGraded, o
 
   const body = (
     <div className={full ? "mx-auto w-full max-w-[640px] px-4 pt-6 pb-48 sm:pt-10" : "px-5 pt-4 pb-5 sm:px-6"}>
-      <p className="kicker mb-3">{instructionFor(ex)}</p>
+      {/* A plain question needs no "Choose the right answer" line; other instructions say what to do. */}
+      {instructionFor(ex) !== "Choose the right answer" && <p className="kicker mb-3">{instructionFor(ex)}</p>}
       <ExerciseView
         key={`${ex.id}:${attempt}`}
         ex={ex}
@@ -165,7 +166,6 @@ export function SessionPlayer({ exercises, mode = "full", sourceFor, onGraded, o
           <div className="flex-1">
             <ProgressBar value={progress(shown)} color="green" label="Progress" />
           </div>
-          <Combo n={shown.combo} />
         </div>
         {body}
         {footer}
@@ -184,22 +184,11 @@ export function SessionPlayer({ exercises, mode = "full", sourceFor, onGraded, o
           <div className="flex-1">
             <ProgressBar value={progress(shown)} color="green" label="Lesson progress" />
           </div>
-          <Combo n={shown.combo} />
         </div>
       </header>
       {body}
       <div className="fixed inset-x-0 bottom-0 z-30">{footer}</div>
       {sheet}
-    </div>
-  );
-}
-
-function Combo({ n }: { n: number }) {
-  if (n < 3) return <div className="w-[52px]" aria-hidden />;
-  return (
-    <div key={n} className="anim-pop flex w-[52px] items-center justify-end gap-1 font-black text-[var(--yellow-lip)]" aria-label={`${n} in a row`}>
-      <Flame size={22} strokeWidth={2.5} fill="var(--yellow)" className="text-yellow" />
-      {n}
     </div>
   );
 }

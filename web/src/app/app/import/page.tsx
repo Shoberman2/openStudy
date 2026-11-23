@@ -57,7 +57,7 @@ function ImportInner() {
 
   return (
     <>
-      <BackHeader href="/app" title="Import pages" />
+      <BackHeader href="/app" title="Add notes" />
       <Page>
         <div className="grid grid-cols-2 gap-2 rounded-[16px] bg-shelf p-1.5" role="tablist">
           {(["files", "notes"] as const).map((m) => (
@@ -75,7 +75,7 @@ function ImportInner() {
         <AppleNotes update={update} />
         <div className="mt-6">{mode === "files" ? <Files update={update} /> : <Notes update={update} />}</div>
         {inbox > 0 && (
-          <div className="mt-8 flex items-center justify-between gap-3 rounded-[16px] border-2 border-line p-4">
+          <div className="mt-8 flex items-center justify-between gap-3 rounded-[16px] bg-shelf p-4">
             <p className="font-bold">
               {inbox} page{inbox === 1 ? "" : "s"} ready to sort
             </p>
@@ -115,7 +115,7 @@ function AppleNotes({ update }: { update: (fn: (l: Library) => Library) => void 
   };
 
   return (
-    <section className="mb-6 flex flex-wrap items-center gap-4 rounded-[16px] border-2 border-line p-4" data-testid="apple-notes">
+    <section className="mb-6 flex flex-wrap items-center gap-4 rounded-[16px] bg-shelf p-4" data-testid="apple-notes">
       <span className="flex h-12 w-12 flex-none items-center justify-center rounded-[14px] bg-shelf text-blue">
         <NotebookText size={24} strokeWidth={2.5} />
       </span>
@@ -253,9 +253,9 @@ function Files({ update }: { update: (fn: (l: Library) => Library) => void }) {
         <span className="flex h-14 w-14 items-center justify-center rounded-[16px] bg-paper text-blue" style={{ boxShadow: "0 3px 0 var(--line)" }}>
           <Upload size={28} strokeWidth={2.5} />
         </span>
-        <span className="mt-4 max-w-[420px] text-[20px] font-black leading-tight">Drop anything: screenshots, photos of notes or a whiteboard, PDFs, slides, docs.</span>
+        <span className="mt-4 max-w-[420px] text-[20px] font-black leading-tight">Drop your notes, slides, PDFs, docs or photos.</span>
         <span className="mt-2 max-w-[380px] text-[15px] text-muted">
-          Text is read on this device. Keynote or Google Slides? Export to .pptx or .pdf first. Apple Notes: on a Mac, run <code className="font-bold">npm run notes:export</code> and drop apple-notes.json here.
+          Read on this device. From Keynote or Google Slides, export to .pptx or .pdf first.
         </span>
         <span className="btn btn-sm mt-5">
           <Upload size={18} strokeWidth={2.5} /> Choose files
@@ -290,7 +290,7 @@ function Files({ update }: { update: (fn: (l: Library) => Library) => void }) {
             {list.map((it) => {
               const Icon = KIND_ICON[it.kind];
               return (
-                <li key={it.id} className="flex items-center gap-3 rounded-[14px] border-2 border-line p-2.5" data-testid="import-item">
+                <li key={it.id} className="flex items-center gap-3 rounded-[14px] bg-shelf p-2.5" data-testid="import-item">
                   {it.previewUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={it.previewUrl} alt="" className={`h-12 w-12 flex-none rounded-[10px] border-2 border-line object-cover ${it.status === "skipped" || it.status === "empty" ? "opacity-40" : ""}`} />
@@ -389,11 +389,11 @@ function Notes({ update }: { update: (fn: (l: Library) => Library) => void }) {
   return (
     <div>
       <p className="text-muted">
-        Paste class notes or excerpts. From Apple Books, the <span className="font-bold text-ink">Excerpt From</span> line tells us the book.
+        Paste class notes, code or book excerpts.
       </p>
       <textarea
-        className="input serif mt-4 min-h-[260px] !font-normal !text-[17px] leading-relaxed"
-        placeholder={"“The only way to get the best of an argument is to avoid it.”\n\nExcerpt From\nHow to Win Friends and Influence People\nDale Carnegie\nThis material may be protected by copyright."}
+        className="input mt-4 min-h-[260px] !font-normal !text-[17px] leading-relaxed"
+        placeholder={"head(df) returns the first six rows of a data frame.\nBinary search runs in O(log n) time on a sorted list."}
         value={text}
         aria-label="Pasted notes"
         onChange={(e) => {

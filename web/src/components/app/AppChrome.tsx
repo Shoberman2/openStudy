@@ -4,33 +4,22 @@ import { ArrowLeft, Settings, UserRound } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { avatarInitial } from "@/engine/profile";
-import { displayStreak, goalProgress } from "@/engine/xp";
-import { localDay } from "@/engine/util";
 import { useLibrary } from "@/lib/store";
-import { Logo, Ring, StreakPill, XpPill } from "@/components/ui/basics";
+import { Logo } from "@/components/ui/basics";
 
 export function AppHeader() {
   const { lib } = useLibrary();
-  const now = new Date();
-  const today = lib.stats.dayXP[localDay(now)] ?? 0;
   const initial = avatarInitial(lib.profile.name);
   return (
-    <header className="sticky top-0 z-20 border-b-2 border-line bg-paper">
+    <header className="sticky top-0 z-20 bg-paper/90 backdrop-blur">
       <div className="mx-auto flex h-16 w-full max-w-[640px] items-center justify-between gap-3 px-4">
         <Logo href="/app" />
-        <div className="flex items-center gap-4 text-[16px] sm:gap-5">
-          <StreakPill streak={displayStreak(lib.stats, now)} />
-          <span className="hidden whitespace-nowrap min-[380px]:block">
-            <XpPill xp={lib.stats.xp} />
-          </span>
-          <span title={`${today} of ${lib.profile.dailyGoalXP} XP today`} aria-label={`Daily goal ${today} of ${lib.profile.dailyGoalXP} XP`}>
-            <Ring value={goalProgress(lib.stats, lib.profile.dailyGoalXP, now)} size={34} stroke={5} />
-          </span>
-          <Link href="/app/settings" aria-label="Settings" className="hidden rounded-full p-1.5 text-muted hover:bg-shelf min-[420px]:block">
-            <Settings size={22} strokeWidth={2.5} />
+        <div className="flex items-center gap-2">
+          <Link href="/app/settings" aria-label="Settings" className="flex h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-shelf">
+            <Settings size={22} strokeWidth={2.25} />
           </Link>
-          <Link href="/app/profile" aria-label="Profile" className="-mr-1 flex h-[34px] w-[34px] items-center justify-center rounded-full bg-shelf text-[16px] font-black text-ink hover:bg-line">
-            {initial ?? <UserRound size={20} strokeWidth={2.5} className="text-muted" />}
+          <Link href="/app/profile" aria-label="Profile" className="flex h-11 w-11 items-center justify-center rounded-full bg-shelf text-[16px] font-black text-ink hover:bg-line">
+            {initial ?? <UserRound size={20} strokeWidth={2.25} className="text-muted" />}
           </Link>
         </div>
       </div>
@@ -40,7 +29,7 @@ export function AppHeader() {
 
 export function BackHeader({ href, title, right }: { href: string; title?: string; right?: ReactNode }) {
   return (
-    <header className="sticky top-0 z-20 border-b-2 border-line bg-paper">
+    <header className="sticky top-0 z-20 bg-paper/90 backdrop-blur">
       <div className="mx-auto flex h-16 w-full max-w-[640px] items-center gap-3 px-4">
         <Link href={href} aria-label="Back" className="-ml-1.5 rounded-full p-1.5 text-muted hover:bg-shelf">
           <ArrowLeft size={24} strokeWidth={2.75} />

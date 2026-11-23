@@ -1,15 +1,16 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { Check } from "lucide-react";
 
-export function OptionTile({ selected, onClick, icon, label, sub }: { selected: boolean; onClick: () => void; icon: ReactNode; label: string; sub?: string }) {
+/** One choice: words, an optional line under them, and a check when picked (no icon box). */
+export function OptionTile({ selected, onClick, label, sub }: { selected: boolean; onClick: () => void; label: string; sub?: string }) {
   return (
     <button className="tile" aria-pressed={selected} onClick={onClick}>
-      <span className={`flex h-11 w-11 flex-none items-center justify-center rounded-[12px] ${selected ? "bg-blue text-white" : "bg-shelf text-ink"}`}>{icon}</span>
-      <span className="min-w-0">
+      <span className="min-w-0 flex-1">
         <span className="block">{label}</span>
-        {sub && <span className={`block text-[14px] font-semibold ${selected ? "opacity-80" : "text-muted"}`}>{sub}</span>}
+        {sub && <span className={`block text-[15px] font-semibold ${selected ? "opacity-80" : "text-muted"}`}>{sub}</span>}
       </span>
+      {selected && <Check size={20} strokeWidth={3} className="flex-none" aria-hidden />}
     </button>
   );
 }

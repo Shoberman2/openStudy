@@ -25,22 +25,21 @@
   color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #101012;
-    --shelf: #18181b;
-    --ink: #f3f3f3;
-    --muted: #a0a0a6;
-    --line: #2a2a2e;
-    --blue-soft: #1b2550;
-    --red-soft: #3a1513;
-    --green-soft: #10301f;
-    --yellow-soft: #33290d;
-    --ink-lip: #bdbdbd;
-    --line-strong: #3a3a3f;
-    --page-paper: #17171a;
-    color-scheme: dark;
-  }
+/* Dark mode is a choice in Settings (spec 17.2); the app opens light even on a dark device. */
+:root[data-theme="dark"] {
+  --paper: #101012;
+  --shelf: #18181b;
+  --ink: #f3f3f3;
+  --muted: #a0a0a6;
+  --line: #2a2a2e;
+  --blue-soft: #1b2550;
+  --red-soft: #3a1513;
+  --green-soft: #10301f;
+  --yellow-soft: #33290d;
+  --ink-lip: #bdbdbd;
+  --line-strong: #3a3a3f;
+  --page-paper: #17171a;
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -102,24 +101,26 @@ body {
   gap: 8px;
   height: 52px;
   padding: 0 22px;
-  border-radius: 16px;
+  /* Flat pills (spec 17.2): no raised lip, a 1px lift on hover. */
+  border-radius: 999px;
   border: 0;
   background: var(--fill);
   color: var(--fg);
   font-weight: 700;
   font-size: 17px;
-  box-shadow: 0 4px 0 var(--lip);
   transform: translateY(0);
-  transition: transform 120ms ease-out, box-shadow 120ms ease-out, background-color 150ms ease-out;
+  transition: transform 150ms ease-out, background-color 150ms ease-out, opacity 150ms ease-out;
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
   text-decoration: none;
-  margin-bottom: 4px;
+}
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
 }
 .btn:active:not(:disabled) {
-  transform: translateY(4px);
-  box-shadow: 0 0 0 var(--lip);
+  transform: translateY(0);
+  opacity: 0.88;
 }
 .btn:focus-visible,
 .tile:focus-visible,
@@ -150,7 +151,6 @@ body {
   --fill: transparent;
   --lip: transparent;
   --fg: var(--blue);
-  box-shadow: none;
 }
 .btn:disabled {
   --fill: var(--shelf);
@@ -160,15 +160,9 @@ body {
   cursor: default;
 }
 .btn-sm {
-  height: 40px;
-  border-radius: 12px;
-  padding: 0 14px;
-  font-size: 15px;
-  box-shadow: 0 3px 0 var(--lip);
-  margin-bottom: 3px;
-}
-.btn-sm:active:not(:disabled) {
-  transform: translateY(3px);
+  height: 44px;
+  padding: 0 18px;
+  font-size: 16px;
 }
 .btn-block {
   width: 100%;
@@ -187,40 +181,32 @@ body {
   border-radius: 14px;
   background: var(--paper);
   color: var(--ink);
-  box-shadow: 0 3px 0 var(--line);
   font-weight: 700;
   font-size: 17px;
-  transition: transform 120ms ease-out, box-shadow 120ms ease-out, border-color 120ms, background-color 120ms;
+  transition: transform 120ms ease-out, border-color 120ms, background-color 120ms;
   cursor: pointer;
-  margin-bottom: 3px;
 }
 .tile:active:not(:disabled) {
-  transform: translateY(3px);
-  box-shadow: 0 0 0 var(--line);
+  transform: scale(0.99);
 }
 .tile[aria-pressed="true"],
 .tile.is-selected {
   border-color: var(--blue);
   background: var(--blue-soft);
-  box-shadow: 0 3px 0 var(--blue);
   color: var(--blue);
 }
-@media (prefers-color-scheme: dark) {
-  .tile[aria-pressed="true"],
-  .tile.is-selected {
-    color: #a9bdff;
-  }
+:root[data-theme="dark"] .tile[aria-pressed="true"],
+:root[data-theme="dark"] .tile.is-selected {
+  color: #a9bdff;
 }
 .tile.is-correct {
   border-color: var(--green);
   background: var(--green-soft);
-  box-shadow: 0 3px 0 var(--green);
   color: var(--green);
 }
 .tile.is-wrong {
   border-color: var(--red);
   background: var(--red-soft);
-  box-shadow: 0 3px 0 var(--red);
   color: var(--red);
 }
 .tile:disabled {
@@ -228,8 +214,6 @@ body {
 }
 .tile.is-done {
   opacity: 0.35;
-  box-shadow: none;
-  transform: translateY(3px);
 }
 
 /* Word chips (word bank, order) */
@@ -242,22 +226,17 @@ body {
   border-radius: 12px;
   background: var(--paper);
   color: var(--ink);
-  box-shadow: 0 3px 0 var(--line);
   font-weight: 700;
   font-size: 17px;
   cursor: pointer;
-  transition: transform 120ms ease-out, box-shadow 120ms ease-out;
-  margin-bottom: 3px;
+  transition: transform 120ms ease-out;
 }
 .chip:active:not(:disabled) {
-  transform: translateY(3px);
-  box-shadow: 0 0 0 var(--line);
+  transform: scale(0.97);
 }
 .chip.is-used {
   background: var(--shelf);
   color: transparent;
-  box-shadow: none;
-  transform: translateY(3px);
   cursor: default;
 }
 .chip.is-used * {

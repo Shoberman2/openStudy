@@ -16,8 +16,7 @@ import { Ring } from "@/components/ui/basics";
 import { SessionPlayer, type SessionSummary } from "@/components/exercise/SessionPlayer";
 import { TestPlayer, type TestAnswer } from "@/components/exercise/TestPlayer";
 import { SessionComplete } from "@/components/exercise/SessionComplete";
-import { localDay } from "@/engine/util";
-import { addXP, displayStreak } from "@/engine/xp";
+import { addXP } from "@/engine/xp";
 
 function TestPageSession() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -78,15 +77,11 @@ function TestPageSession() {
       </div>
     );
   if (reviewDone) {
-    const now = new Date();
     return (
       <SessionComplete
         title="Misses reviewed"
-        xp={reviewDone.xp}
         accuracy={reviewDone.s.accuracy}
         seconds={reviewDone.s.seconds}
-        streak={displayStreak(lib.stats, now)}
-        goal={{ today: lib.stats.dayXP[localDay(now)] ?? 0, target: lib.profile.dailyGoalXP }}
         onContinue={() => router.push(`/app/p/${project.id}`)}
       />
     );
@@ -173,7 +168,7 @@ export default function TestPage() {
   if (project && readyLessonCount(lib.lessons.filter((l) => l.projectId === projectId)) < PRACTICE_TEST_READY_LESSONS) {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-4 p-6 text-center">
-        <p className="font-bold text-muted">Reach level {READY_LEVEL} in {PRACTICE_TEST_READY_LESSONS} lessons to take your practice test.</p>
+        <p className="font-bold text-muted">Reach level {READY_LEVEL} in {PRACTICE_TEST_READY_LESSONS} topics to take your practice test.</p>
         <Link href={`/app/p/${project.id}`} className="btn">
           Back to project
         </Link>

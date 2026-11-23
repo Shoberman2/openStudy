@@ -1,6 +1,5 @@
 "use client";
 
-import { Download, RotateCcw, Sparkles, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { emptyLibrary, exportLibrary, mergeLibrary, normalizeLibrary, weekStats } from "@/engine/library";
@@ -9,6 +8,7 @@ import { localDay } from "@/engine/util";
 import { smartOrganizeOn } from "@/lib/ai";
 import { setSharingUsage, sharingUsage } from "@/lib/events";
 import { useLibrary } from "@/lib/store";
+import { useThemeSetting } from "@/lib/theme";
 import { BackHeader, Loading, Page } from "@/components/app/AppChrome";
 
 const STUDYING: [Bringing, string][] = [
@@ -29,10 +29,10 @@ const PRACTICE: [PracticePref, string][] = [
   ["flash", "Flashcards"],
 ];
 const DAILY: [DailyGoal, string][] = [
-  [10, "Casual, 10 XP"],
-  [20, "Regular, 20 XP"],
-  [30, "Serious, 30 XP"],
-  [50, "Intense, 50 XP"],
+  [10, "5 min"],
+  [20, "10 min"],
+  [30, "15 min"],
+  [50, "20 min"],
 ];
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -59,6 +59,7 @@ export default function SettingsPage() {
   const router = useRouter();
   const [smart, setSmart] = useState<boolean | null>(null);
   const [msg, setMsg] = useState("");
+  const [theme, setTheme] = useThemeSetting();
   // Read after hydration: the server can't see this device's choice.
   const stored = useSyncExternalStore(noSubscribe, sharingUsage, () => null);
   const [chosen, setShare] = useState<boolean | null>(null);
@@ -88,7 +89,7 @@ export default function SettingsPage() {
       if (raw?.version !== 1) throw new Error("version");
       const incoming = normalizeLibrary(raw);
       update((l) => mergeLibrary(l, incoming));
-      setMsg(`Merged ${incoming.projects.length} book${incoming.projects.length === 1 ? "" : "s"} and ${incoming.cards.length} cards.`);
+      setMsg(`Merged ${incoming.projects.length} study set${incoming.projects.length === 1 ? "" : "s"} and ${incoming.cards.length} cards.`);
     } catch {
       setMsg("That file is not an OpenStudy library.");
     }
@@ -98,17 +99,33 @@ export default function SettingsPage() {
     <>
       <BackHeader href="/app" title="Settings" />
       <Page>
+        <Section title="Appearance">
+          <div className="grid max-w-[320px] grid-cols-2 gap-1 rounded-full bg-shelf p-1" role="radiogroup" aria-label="Appearance">
+            {(["light", "dark"] as const).map((t) => (
+              <button
+                key={t}
+                role="radio"
+                aria-checked={theme === t}
+                onClick={() => setTheme(t)}
+                className={`h-10 rounded-full text-[16px] font-extrabold ${theme === t ? "bg-paper text-ink shadow-sm" : "text-muted"}`}
+              >
+                {t === "light" ? "Light" : "Dark"}
+              </button>
+            ))}
+          </div>
+        </Section>
+
         <Section title="Your week">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
             {[
               ["Days active", `${week.daysActive} of 7`],
               ["Sessions", String(week.sessions)],
               ["Accuracy", week.accuracy === null ? "None yet" : `${Math.round(week.accuracy * 100)}%`],
               ["Cards due", String(week.due)],
             ].map(([k, v]) => (
-              <div key={k} className="rounded-[16px] border-2 border-line p-4" style={{ boxShadow: "0 3px 0 var(--line)" }}>
-                <p className="text-[13px] font-extrabold text-muted">{k}</p>
-                <p className="mt-1 text-[22px] font-black">{v}</p>
+              <div key={k}>
+                <p className="text-[15px] font-bold text-muted">{k}</p>
+                <p className="num mt-1 text-[24px] font-black">{v}</p>
               </div>
             ))}
           </div>
@@ -144,7 +161,7 @@ export default function SettingsPage() {
           </div>
         </Section>
 
-        <Section title="Daily goal">
+        <Section title="Time each day">
           <div className="flex flex-wrap gap-2.5">
             {DAILY.map(([v, label]) => (
               <Chip key={v} on={p.dailyGoalXP === v} onClick={() => update((l) => ({ ...l, profile: { ...l.profile, dailyGoalXP: v } }))}>
@@ -154,22 +171,14 @@ export default function SettingsPage() {
           </div>
         </Section>
 
-        <Section title="Smart organize">
-          <div className="card flex items-start gap-3 p-4">
-            <Sparkles size={22} strokeWidth={2.5} className={smart ? "text-blue" : "text-muted"} />
-            <div>
-              <p className="font-extrabold">Smart organize: {smart === null ? "checking" : smart ? "on" : "off"}</p>
-              <p className="text-[15px] text-muted">
-                {smart
-                  ? "Sorting and lesson building use Claude on the server."
-                  : "Everything runs offline on this device. Set ANTHROPIC_API_KEY on the server to turn it on."}
-              </p>
-            </div>
-          </div>
-        </Section>
+        {smart && (
+          <Section title="Smart organize">
+            <p className="text-[16px] text-muted">On. Sorting, lesson building and Ask use Claude on the server.</p>
+          </Section>
+        )}
 
         <Section title="Usage data">
-          <div className="card flex items-start justify-between gap-4 p-4">
+          <div className="flex items-start justify-between gap-4 rounded-[16px] bg-shelf p-4">
             <div>
               <p className="font-extrabold">Share usage data</p>
               <p className="text-[15px] text-muted">Counts and categories only, never your notes. It shows us what to build next.</p>
@@ -192,24 +201,24 @@ export default function SettingsPage() {
         <Section title="Library">
           <div className="grid gap-3 sm:grid-cols-2">
             <button className="btn btn-secondary btn-block" onClick={doExport}>
-              <Download size={20} strokeWidth={2.5} /> Export library
+              Export library
             </button>
             <label className="btn btn-secondary btn-block">
-              <Upload size={20} strokeWidth={2.5} /> Import library
+              Import library
               <input type="file" accept="application/json,.json" className="sr-only" data-testid="library-input" onChange={(e) => void doImport(e.target.files?.[0])} />
             </label>
           </div>
           {msg && <p className="anim-fade mt-3 font-bold text-green">{msg}</p>}
-          <p className="mt-3 text-[14px] text-muted">The export is a JSON file you can open in the iPhone app. Screenshot images stay on this device.</p>
+          <p className="mt-3 text-[15px] text-muted">The export is a JSON file you can open in the iPhone app. Screenshot images stay on this device.</p>
           <button
             className="btn btn-red mt-6"
             onClick={() => {
-              if (!confirm("Delete every book, page and lesson on this device?")) return;
+              if (!confirm("Delete every study set, page and lesson on this device?")) return;
               replace(emptyLibrary());
               router.replace("/app/welcome");
             }}
           >
-            <RotateCcw size={20} strokeWidth={2.5} /> Reset everything
+            Reset everything
           </button>
         </Section>
       </Page>

@@ -1,11 +1,10 @@
 "use client";
 
-import { BookPlus, Check, Layers, LoaderCircle, Quote, Lightbulb, MoreHorizontal, Sparkles, Trash2 } from "lucide-react";
+import { Check, LoaderCircle, MoreHorizontal } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { BuildResult, QuoteDraft } from "@/engine/builder";
-import { CATEGORY_NAMES } from "@/engine/categories";
 import { LOOSE_NOTES, UNSORTED } from "@/engine/grouping";
 import { matchingProject } from "@/engine/identity";
 import { detectionSummary } from "@/engine/summary";
@@ -65,7 +64,6 @@ export default function SortPage() {
   const { lib, ready, update } = useLibrary();
   const router = useRouter();
   const [groups, setGroups] = useState<Group[] | null>(null);
-  const [smart, setSmart] = useState(false);
   const [creating, setCreating] = useState<Group | null>(null);
   const [movePage, setMovePage] = useState<{ pageId: string; from: string } | null>(null);
   const [bulk, setBulk] = useState<{ i: number; n: number; title: string } | null>(null);
@@ -81,9 +79,8 @@ export default function SortPage() {
     if (!ready || started.current) return;
     started.current = true;
     const shelf = [...new Set(lib.projects.map((p) => p.category).filter((c): c is string => !!c))];
-    void suggestGroups(inbox, shelf).then(({ groups: g, smart: s }) => {
+    void suggestGroups(inbox, shelf).then(({ groups: g }) => {
       setGroups(g.map((x) => ({ key: x.key, title: x.title, author: x.author ?? "", pageIds: x.pageIds, type: x.type ?? "book", category: x.category ?? "" })));
-      setSmart(s);
       if (g.length) update((l) => logEvent(l, "sort_done", sortDoneProps(g)));
     });
   }, [ready, inbox, lib.projects, update]);
@@ -157,8 +154,6 @@ export default function SortPage() {
 
   // Unsorted and "Loose notes" stay here for the user to decide (spec 9.6).
   const todo = (visible ?? []).filter((g) => g.title.trim() && g.title !== UNSORTED && g.title !== LOOSE_NOTES);
-  const todoCategories = new Set(todo.map((g) => g.category.trim().toLowerCase()).filter(Boolean)).size;
-  const knownCategories = [...new Set([...lib.projects.map((p) => p.category ?? ""), ...(visible ?? []).map((g) => g.category), ...CATEGORY_NAMES].filter(Boolean))];
 
   // "Create all" (spec 9.6): every group but Unsorted, one at a time, no per-project questions.
   const createAll = async () => {
@@ -230,22 +225,18 @@ export default function SortPage() {
         ) : (
           <>
             <h2 className="text-[26px] font-black leading-tight tracking-tight">
-              {visible.length} suggested project{visible.length === 1 ? "" : "s"}
+              {visible.length} study set{visible.length === 1 ? "" : "s"}
             </h2>
-            <p className="mt-2 text-[17px] font-extrabold" data-testid="sort-summary">
-              {detectionSummary(visible.map((g) => ({ title: g.title, type: g.type, pages: g.pageIds.length })))}
-            </p>
-            <p className="mt-1 text-muted">
-              Check the titles, move any page that landed in the wrong pile, then create the project.
-              {smart ? " Sorted with smart organize." : ""}
-            </p>
-            {smart && (
-              <p className="mt-2 inline-flex items-center gap-1.5 text-[14px] font-bold text-blue">
-                <Sparkles size={16} /> Smart organize on
+            {visible.length > 1 && (
+              <p className="mt-2 text-[17px] font-extrabold" data-testid="sort-summary">
+                {detectionSummary(visible.map((g) => ({ title: g.title, type: g.type, pages: g.pageIds.length })))}
               </p>
             )}
+            <p className="mt-1 text-muted">
+              Check the names and move any page that landed in the wrong set.
+            </p>
             {todo.length >= 2 && (
-              <section className="mt-5 rounded-[16px] border-2 border-line bg-shelf p-4" data-testid="create-all">
+              <section className="mt-5 rounded-[16px] bg-shelf p-4" data-testid="create-all">
                 {bulk ? (
                   <div aria-live="polite">
                     <p className="font-extrabold">
@@ -256,14 +247,9 @@ export default function SortPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-[15px] font-bold text-muted">
-                      Books, classes and topics, sorted into {todoCategories} {todoCategories === 1 ? "category" : "categories"}.
-                    </p>
-                    <button className="btn" onClick={() => plusFirst("create_all", () => void createAll())}>
-                      <Layers size={20} strokeWidth={2.5} /> Create all {todo.length} projects
-                    </button>
-                  </div>
+                  <button className="btn btn-block" onClick={() => plusFirst("create_all", () => void createAll())}>
+                    Create all {todo.length} study sets
+                  </button>
                 )}
               </section>
             )}
@@ -272,20 +258,10 @@ export default function SortPage() {
                 const match = matchingProject(lib.projects, g.title.trim(), g.author);
                 const wordCount = g.pageIds.every((id) => byId.get(id)?.words?.length) ? wordEntries(g.pageIds.map((id) => byId.get(id)!)).length : 0;
                 return (
-                  <section key={g.key} className="card p-4 sm:p-5" data-testid="sort-group">
+                  <section key={g.key} className="rounded-[20px] bg-shelf p-4 sm:p-5" data-testid="sort-group">
                     <div className="grid gap-2 sm:grid-cols-[1fr_200px]">
-                      <input className="input !py-2.5 !text-[18px] !font-extrabold" value={g.title} aria-label="Book title" onChange={(e) => edit(g.key, { title: e.target.value })} />
+                      <input className="input !py-2.5 !text-[18px] !font-extrabold" value={g.title} aria-label="Title" onChange={(e) => edit(g.key, { title: e.target.value })} />
                       <input className="input !py-2.5" value={g.author} placeholder="Author" aria-label="Author" onChange={(e) => edit(g.key, { author: e.target.value })} />
-                    </div>
-                    <div className="mt-2">
-                      <input
-                        className="input !py-2 !text-[15px] font-bold"
-                        value={g.category}
-                        placeholder="Category"
-                        aria-label="Category"
-                        list="sort-categories"
-                        onChange={(e) => setGroups((gs) => gs!.map((x) => (x.key === g.key ? { ...x, category: e.target.value } : x)))}
-                      />
                     </div>
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                       <p className="text-[14px] font-bold text-muted">
@@ -340,20 +316,20 @@ export default function SortPage() {
                         </button>
                       ) : (
                         <button className="btn btn-block" onClick={() => plusFirst("create_project", () => setCreating(g))} disabled={!g.title.trim()}>
-                          <BookPlus size={20} strokeWidth={2.5} /> Create project
+                          Create study set
                         </button>
                       )}
                       {lib.projects.length > 0 ? (
                         <select
                           className="input !h-[52px] !py-0 font-bold"
-                          aria-label="Merge into existing project"
+                          aria-label="Add to an existing study set"
                           value=""
                           onChange={(e) => {
                             const p = lib.projects.find((x) => x.id === e.target.value);
                             if (p) void addToExisting(g, p);
                           }}
                         >
-                          <option value="">Merge into a project</option>
+                          <option value="">Add to a study set</option>
                           {lib.projects.map((p) => (
                             <option key={p.id} value={p.id}>
                               {p.title}
@@ -374,11 +350,6 @@ export default function SortPage() {
         )}
       </Page>
 
-      <datalist id="sort-categories">
-        {knownCategories.map((c) => (
-          <option key={c} value={c} />
-        ))}
-      </datalist>
 
       <Sheet open={!!movePage} onClose={() => setMovePage(null)} label="Move page">
         {movePage && (
@@ -403,7 +374,7 @@ export default function SortPage() {
                   setMovePage(null);
                 }}
               >
-                <Trash2 size={20} strokeWidth={2.5} /> Discard page
+                Discard page
               </button>
             </div>
           </>
@@ -495,11 +466,10 @@ function CreateFlow({
     <Sheet open onClose={onClose} label="Create project">
       {step === "focus" && (
         <div className="anim-fade">
-          <p className="kicker">{pages.length} pages</p>
-          <h3 className="mt-1 pr-8 text-[24px] font-black leading-tight">How do you want to study {title}?</h3>
+          <h3 className="pr-8 text-[24px] font-black leading-tight">How do you want to study {title}?</h3>
           <div className="mt-5 grid grid-cols-1 gap-3">
-            <OptionTile icon={<Lightbulb size={24} strokeWidth={2.5} />} label="Big ideas" sub="Themes and key facts" selected={focus === "ideas"} onClick={() => void choose("ideas")} />
-            <OptionTile icon={<Quote size={24} strokeWidth={2.5} />} label="Ideas and exact quotes" sub="Also learn the best lines word for word" selected={focus === "ideas+quotes"} onClick={() => void choose("ideas+quotes")} />
+            <OptionTile label="Big ideas" sub="Themes and key facts" selected={focus === "ideas"} onClick={() => void choose("ideas")} />
+            <OptionTile label="Ideas and exact quotes" sub="Also learn the best lines word for word" selected={focus === "ideas+quotes"} onClick={() => void choose("ideas+quotes")} />
           </div>
         </div>
       )}
