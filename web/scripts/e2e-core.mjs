@@ -54,6 +54,37 @@ page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
 const click = (name) => page.getByRole("button", { name, exact: true }).click();
 const textOf = async () => (await page.locator("body").innerText()).replace(/\s+/g, " ");
 
+// All reads/writes use the isolated Playwright browser context created above.
+const fixture = (projectId, makeReady = false) => page.evaluate(async ({ projectId, makeReady }) => {
+  const db = await new Promise((resolve, reject) => {
+    const req = indexedDB.open("openstudy");
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  try {
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction("library", makeReady ? "readwrite" : "readonly");
+      const store = tx.objectStore("library");
+      let lessonIds;
+      tx.oncomplete = () => resolve(lessonIds);
+      tx.onerror = () => reject(tx.error);
+      const req = store.get("library-v1");
+      req.onsuccess = () => {
+        const lib = req.result;
+        const lessons = lib.lessons.filter((l) => l.projectId === projectId).sort((a, b) => a.order - b.order);
+        lessonIds = lessons.map((l) => l.id);
+        if (!makeReady) return;
+        for (const l of lessons.slice(0, 2)) l.level = 3;
+        const c = lib.cards.find((card) => card.projectId === projectId);
+        c.srs = { ...c.srs, state: "review", due: new Date(0).toISOString() };
+        store.put(lib, "library-v1");
+      };
+    });
+  } finally {
+    db.close();
+  }
+}, { projectId, makeReady });
+
 try {
   // 1. Landing.
   const t0 = Date.now();
@@ -90,6 +121,7 @@ try {
   // The category is an editable field, so read input values, not page text.
   const fields = await page.locator("input").evaluateAll((els) => els.map((e) => e.value));
   check("sort suggests a Computer Science project", fields.includes("Computer Science"), fields.filter(Boolean).join(", "));
+  check("sort uses the file name for the project title", fields.includes("R-basics"));
   await page.getByRole("button", { name: /^Create (project|all)/ }).first().click();
   await page.waitForURL((u) => /\/app(\/p\/[^/]+)?$/.test(u.pathname), { timeout: 20_000 });
   const paywalled = (await textOf()).includes("Start free trial");
@@ -99,11 +131,29 @@ try {
   await page.goto(`${BASE}/app`);
   await page.locator('a[href^="/app/p/"]').first().waitFor();
   const projectHref = await page.locator('a[href^="/app/p/"]').first().getAttribute("href");
+  const projectId = projectHref.split("/").pop();
   await page.goto(`${BASE}${projectHref}`);
+  await page.getByText(/Opens when 2 lessons reach level 3/).waitFor();
+  await page.goto(`${BASE}${projectHref.replace("/app/p/", "/app/test/")}`);
+  const back = page.getByRole("link", { name: "Back to project" });
+  const locked = page.getByText("Reach level 3 in 2 lessons to take your practice test.");
+  await locked.or(page.getByRole("button", { name: "Next", exact: true })).first().waitFor();
+  const directTestLocked = await locked.isVisible() && await back.isVisible();
+  check("direct practice test link respects the project lock", directTestLocked);
+  if (directTestLocked) await back.click();
+  else await page.goto(`${BASE}${projectHref}`);
   await page.locator('section[aria-label="Lesson path"] button').first().waitFor();
   await page.waitForTimeout(500);
   const everything = page.getByRole("button", { name: "Everything", exact: true });
   if (await everything.isVisible().catch(() => false)) await everything.click();
+  const [, secondLessonId] = await fixture(projectId);
+  await page.goto(`${BASE}/app/learn/${secondLessonId}`);
+  const lessonLocked = page.getByText("Finish the previous lesson to start this one.");
+  await lessonLocked.or(page.getByRole("button", { name: "Check", exact: true })).first().waitFor();
+  const directLessonLocked = await lessonLocked.isVisible();
+  check("direct lesson link respects the path lock", directLessonLocked);
+  if (directLessonLocked) await page.getByRole("link", { name: "Back to the path" }).click();
+  else await page.goto(`${BASE}${projectHref}`);
   await page.locator('section[aria-label="Lesson path"] button').first().click();
   await page.locator('a[href^="/app/learn/"]').first().waitFor();
   const learnHref = await page.locator('a[href^="/app/learn/"]').first().getAttribute("href");
@@ -147,7 +197,12 @@ try {
     } else if (await page.locator("button.chip:not(.is-used)").first().isVisible().catch(() => false)) {
       const chips = await page.locator("button.chip:not(.is-used)").all();
       let picked = false;
-      for (const c of chips) if (known && (await c.innerText()).trim() === known) (await c.click(), (picked = true));
+      for (const c of chips) {
+        if (known && (await c.innerText()).trim() === known) {
+          await c.click();
+          picked = true;
+        }
+      }
       if (!picked) await chips[0].click();
       const checkBtn = page.getByRole("button", { name: "Check", exact: true });
       if (await checkBtn.isEnabled()) await checkBtn.click();
@@ -157,7 +212,10 @@ try {
       let picked = false;
       for (const t of tiles) {
         const label = (await t.innerText()).replace(/^\d\s*/, "").trim();
-        if (known && label === known) (await t.click(), (picked = true));
+        if (known && label === known) {
+          await t.click();
+          picked = true;
+        }
       }
       if (!picked && tiles[0]) await tiles[0].click();
       await click("Check");
@@ -180,7 +238,49 @@ try {
   const xp = Number(home.match(/(\d+) XP/)?.[1] ?? 0);
   check("XP recorded on Home", xp > 0, `${xp} XP`);
 
-  // 8. Pages that must always load.
+  // 8. Put the isolated browser fixture at the eligibility threshold and make one review due.
+  await fixture(projectId, true);
+  await page.evaluate(() => localStorage.setItem("os-debug", "1"));
+  await page.goto(`${BASE}/app/plan`);
+  const today = page.getByTestId("plan-day").first();
+  await today.getByRole("heading", { name: "Today" }).waitFor();
+  const review = today.getByRole("link", { name: /Review 1 card/ });
+  await review.waitFor();
+  check("today's plan links to due practice", (await review.getAttribute("href")) === "/app/practice");
+  await review.click();
+  await page.getByRole("button", { name: "Check", exact: true }).waitFor();
+  check("practice opens a due review", true);
+  await page.goto(`${BASE}${projectHref}`);
+  await page.getByTestId("practice-test").click();
+  await page.getByRole("progressbar", { name: "Test progress" }).waitFor();
+  check("practice test opens at two ready lessons", true);
+
+  // Complete the test with one deliberate miss and open the focused review.
+  const advance = page.getByRole("button", { name: /^(Next|Finish test)$/ });
+  let previous;
+  for (let i = 0; i < 20; i++) {
+    await page.waitForFunction((last) => window.__osEx && window.__osEx.id !== last, previous);
+    const ex = await page.evaluate(() => window.__osEx);
+    previous = ex.id;
+    if (ex.type === "type" || ex.type === "term-type") {
+      await page.getByLabel("Your answer").fill(i === 0 ? "not-a-correct-answer" : ex.answer);
+    } else if (ex.type === "tf") {
+      await page.getByRole("button", { name: (ex.truth !== (i === 0)) ? /True/ : /False/ }).click();
+    } else {
+      const answer = i === 0 ? ex.options.find((o) => o !== ex.answer) ?? ex.answer : ex.answer;
+      await page.locator("button.tile").getByText(answer, { exact: true }).first().click();
+    }
+    const last = await advance.innerText() === "Finish test";
+    await advance.click();
+    if (last) break;
+  }
+  await page.getByRole("heading", { name: "Practice test done" }).waitFor();
+  check("practice test scores each lesson", await page.getByRole("region", { name: "Accuracy by lesson" }).locator("li").count() === 2);
+  await click("Review your misses");
+  await page.getByRole("button", { name: "Check", exact: true }).waitFor();
+  check("practice test opens review of misses", true);
+
+  // 9. Pages that must always load.
   for (const p of ["/app/plan", "/app/practice", "/app/profile", "/app/settings", "/app/import", "/privacy", "/terms"]) {
     const r = await page.goto(`${BASE}${p}`);
     check(`GET ${p}`, !!r && r.ok());

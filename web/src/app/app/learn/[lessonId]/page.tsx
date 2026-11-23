@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Exercise } from "@/engine/exercises";
-import { logEvent } from "@/engine/library";
+import { logEvent, projectLessons, unlockedIds } from "@/engine/library";
 import { buildSession, conceptExercises } from "@/engine/session";
 import type { Card, Grade } from "@/engine/types";
 import { applyWrittenConcepts, needsWrittenConcepts, writerInput, writerPages } from "@/engine/written";
@@ -126,9 +126,19 @@ export default function LearnPage() {
   if (!ready) return <Loading />;
   const lesson = lib.lessons.find((l) => l.id === lessonId);
   const project = lesson ? lib.projects.find((p) => p.id === lesson.projectId) : undefined;
+  if (project && !unlockedIds(projectLessons(lib, project.id)).has(lessonId)) {
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-4 p-6 text-center">
+        <p className="font-bold text-muted">Finish the previous lesson to start this one.</p>
+        <Link href={`/app/p/${project.id}`} className="btn">
+          Back to the path
+        </Link>
+      </div>
+    );
+  }
   return (
     <PlusGate locked={!!project && !project.sample} from="lesson">
-      <LearnPageSession />
+      <LearnPageSession key={lessonId} />
     </PlusGate>
   );
 }

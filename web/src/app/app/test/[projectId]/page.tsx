@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Exercise } from "@/engine/exercises";
 import { logEvent } from "@/engine/library";
+import { PRACTICE_TEST_READY_LESSONS, READY_LEVEL, readyLessonCount } from "@/engine/plan";
 import { buildFromCards, buildPracticeTest, scoreTest, type TestResult } from "@/engine/session";
 import type { Grade } from "@/engine/types";
 import { applyGrades, finishPractice } from "@/lib/actions";
@@ -169,9 +170,19 @@ export default function TestPage() {
   const { lib, ready } = useLibrary();
   if (!ready) return <Loading />;
   const project = lib.projects.find((p) => p.id === projectId);
+  if (project && readyLessonCount(lib.lessons.filter((l) => l.projectId === projectId)) < PRACTICE_TEST_READY_LESSONS) {
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-4 p-6 text-center">
+        <p className="font-bold text-muted">Reach level {READY_LEVEL} in {PRACTICE_TEST_READY_LESSONS} lessons to take your practice test.</p>
+        <Link href={`/app/p/${project.id}`} className="btn">
+          Back to project
+        </Link>
+      </div>
+    );
+  }
   return (
     <PlusGate locked={!!project && !project.sample} from="test">
-      <TestPageSession />
+      <TestPageSession key={projectId} />
     </PlusGate>
   );
 }
