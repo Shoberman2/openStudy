@@ -17,7 +17,7 @@ export type PlanItem =
   | { kind: "lesson"; minutes: number; projectId: string; lessonId: string; title: string; projectTitle: string; weak?: boolean; done?: boolean }
   | { kind: "test"; minutes: number; projectId: string; projectTitle: string; done?: boolean };
 
-export type PlanDay = { date: string; budget: number; used: number; items: PlanItem[]; goals: string[] };
+export type PlanDay = { date: string; budget: number; used: number; overBy?: number; items: PlanItem[]; goals: string[] };
 export type Feasibility = { projectId: string; title: string; goalDate: string; neededMinutes: number };
 export type Plan = { days: PlanDay[]; feasibility: Feasibility[] };
 
@@ -85,14 +85,6 @@ export function buildPlan(lib: Library, now: Date = new Date()): Plan {
     }
   }
 
-  const unlocked = (s: SimLesson) => {
-    if (s.l.kind === "quotes") return true;
-    const prev = lib.lessons
-      .filter((x) => x.projectId === s.l.projectId && x.kind === "theme" && x.order < s.l.order)
-      .sort((a, b) => b.order - a.order)[0];
-    return !prev || (sim.get(prev.id)?.level ?? 0) >= 1;
-  };
-
   const days: PlanDay[] = [];
   const readyBy = new Map<string, boolean>(); // projectId -> all lessons ready by goal-1
   for (let i = 0; i < nDays; i++) {
@@ -116,7 +108,7 @@ export function buildPlan(lib: Library, now: Date = new Date()): Plan {
       items.push({ kind: "review", minutes: Math.max(1, Math.round(minutes)), cards: n });
     }
 
-    // 2. Practice tests on goal-1, goal-3 and goal-7.
+    // 2. Practice tests on goal-1, goal-3 and goal-7, even if the budget is spent.
     for (const p of goals) {
       const toGoal = dayDiff(d, p.goalDate!);
       if (toGoal !== 1 && toGoal !== 3 && toGoal !== 7) continue;
@@ -143,7 +135,7 @@ export function buildPlan(lib: Library, now: Date = new Date()): Plan {
         const tight = toGoal >= 0 && toGoal <= 2;
         const cands = [...sim.values()]
           .filter((s) => s.l.projectId === p.id && (s.level < READY_LEVEL || s.weak) && s.level < MASTERED_LEVEL)
-          .filter((s) => !scheduledToday.has(s.l.id) && unlocked(s))
+          .filter((s) => !scheduledToday.has(s.l.id))
           .filter((s) => !s.last || dayDiff(s.last, d) >= (tight ? 1 : 2))
           .sort((a, b) => Number(b.weak) - Number(a.weak) || a.l.order - b.l.order);
         const s = cands[0];
@@ -168,7 +160,8 @@ export function buildPlan(lib: Library, now: Date = new Date()): Plan {
         readyBy.set(p.id, [...sim.values()].filter((s) => s.l.projectId === p.id).every((s) => s.level >= READY_LEVEL));
       }
     }
-    days.push({ date: d, budget, used, items, goals: goals.filter((p) => p.goalDate === d).map((p) => p.id) });
+    const overBy = Math.round((used - budget) * 10) / 10;
+    days.push({ date: d, budget, used, ...(overBy > 0 ? { overBy } : {}), items, goals: goals.filter((p) => p.goalDate === d).map((p) => p.id) });
   }
 
   // Feasibility: can every lesson reach ready by goal-1 at the current daily minutes?

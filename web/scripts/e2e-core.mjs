@@ -148,12 +148,9 @@ try {
   if (await everything.isVisible().catch(() => false)) await everything.click();
   const [, secondLessonId] = await fixture(projectId);
   await page.goto(`${BASE}/app/learn/${secondLessonId}`);
-  const lessonLocked = page.getByText("Finish the previous lesson to start this one.");
-  await lessonLocked.or(page.getByRole("button", { name: "Check", exact: true })).first().waitFor();
-  const directLessonLocked = await lessonLocked.isVisible();
-  check("direct lesson link respects the path lock", directLessonLocked);
-  if (directLessonLocked) await page.getByRole("link", { name: "Back to the path" }).click();
-  else await page.goto(`${BASE}${projectHref}`);
+  await page.getByRole("button", { name: "Check", exact: true }).waitFor();
+  check("second lesson opens before the first lesson is complete", await page.getByRole("progressbar", { name: "Lesson progress" }).isVisible());
+  await page.goto(`${BASE}${projectHref}`);
   await page.locator('section[aria-label="Lesson path"] button').first().click();
   await page.locator('a[href^="/app/learn/"]').first().waitFor();
   const learnHref = await page.locator('a[href^="/app/learn/"]').first().getAttribute("href");
@@ -165,6 +162,7 @@ try {
   await page.getByRole("button", { name: "Check", exact: true }).waitFor({ timeout: 20_000 });
   const memory = new Map();
   let syntaxPrompts = 0;
+  let typedCode = false;
   let done = false;
   for (let step = 0; step < 120 && !done; step++) {
     const body = await textOf();
@@ -174,6 +172,7 @@ try {
     }
     const key = body.split(/ 1 /)[0].slice(0, 160);
     if (/Pick what it does|Which code|Write the code/.test(body)) syntaxPrompts++;
+    if (/Write the code/.test(body)) typedCode = true;
     const known = memory.get(key);
     if (/^.{0,40}Match the pairs/.test(body)) {
       const tiles = await page.locator("button.tile").all();
@@ -229,6 +228,7 @@ try {
   }
   check("lesson plays to the end", done);
   check("syntax questions asked about the code", syntaxPrompts > 0, `${syntaxPrompts} seen`);
+  check("first session asks for typed code", typedCode);
   await click("Continue");
 
   // 7. Progress shows on Home.
