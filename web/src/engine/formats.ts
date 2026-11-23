@@ -195,12 +195,13 @@ export function readTextFile(name: string, content: string): FileResult {
 
 /** "Lecture_04 - Enzymes.pptx" -> "Enzymes"; "bio101-week3-notes.pdf" -> "Bio101". */
 export function cleanFileTitle(name: string): string {
-  let t = name.replace(/\.[a-z0-9]{1,5}$/i, "").replace(/[_]+/g, " ");
+  const stem = name.replace(/\.(?:markdown|[a-z0-9]{1,5})$/i, "").replace(/_+/g, " ");
+  let t = stem;
   t = t.replace(/\b(lecture|lec|week|wk|slides?|notes?|chapter|ch|unit|session|class|part)\s*[-#.]?\s*\d+[a-z]?\b/gi, " ");
   t = t.replace(/\b(lecture|lec|slides?|notes?|handout|final|draft|v\d+)\b/gi, " ");
   t = t.replace(/^[\s\-:.,]+|[\s\-:.,]+$/g, "").replace(/\s*[-:]\s*[-:]\s*/g, " - ").replace(/\s+/g, " ").trim();
   t = t.replace(/^[-:]\s*/, "").replace(/\s*[-:]$/, "").replace(/\s+:\s*/g, ": ").replace(/^[:\s]+/, "");
-  if (!t) t = name.replace(/\.[a-z0-9]{1,5}$/i, "").replace(/[_]+/g, " ").trim();
+  if (!t) t = stem.trim();
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
 

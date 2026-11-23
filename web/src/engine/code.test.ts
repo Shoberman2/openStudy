@@ -16,6 +16,7 @@ The pipe operator %>% passes the result on its left into the function on its rig
 mean(x, na.rm = TRUE) computes the mean while ignoring missing values.
 install.packages("dplyr") downloads a package from CRAN once.
 group_by() followed by summarise() computes one summary row per group.
+NA marks a missing value in R.
 ggplot(df, aes(x = age, y = income)) + geom_point() draws a scatter plot.
 `;
 
@@ -46,9 +47,26 @@ describe("syntax cards (spec 16)", () => {
     expect(detectCodeDefinition("c() combines values into a vector, for example c(1, 2, 3).")?.definition).toBe("Combines values into a vector");
   });
 
+  it.each([
+    ["NA marks a missing value in R.", "NA"],
+    ["NULL is the object that represents absence in R.", "NULL"],
+    ["TRUE represents a logical value in R.", "TRUE"],
+    ["FALSE represents a boolean value in R.", "FALSE"],
+    ["None represents an absent value in Python.", "None"],
+    ["NaN represents a missing numeric value.", "NaN"],
+    ["Inf represents an infinite numeric value.", "Inf"],
+    ["group_by() followed by summarise() computes one summary row per group.", "group_by() followed by summarise()"],
+  ])("detects syntax in %s", (line, term) => {
+    expect(detectCodeDefinition(line)?.term).toBe(term);
+    expect(isCode(term)).toBe(true);
+  });
+
   it("leaves plain sentences alone", () => {
     expect(detectCodeDefinition("Binary search only works when the list is sorted.")).toBeNull();
     expect(detectCodeDefinition("Mitochondria: the organelle that produces most of the cell's ATP")).toBeNull();
+    expect(detectCodeDefinition("DNA stores genetic information.")).toBeNull();
+    expect(detectCodeDefinition("NA stands for North America in the survey.")).toBeNull();
+    expect(detectCodeDefinition("None of the participants could answer.")).toBeNull();
     expect(isCode("Data frame")).toBe(false);
     expect(isCode("%>%")).toBe(true);
   });
@@ -65,7 +83,7 @@ describe("syntax cards (spec 16)", () => {
     const res = buildProject({ title: "R", type: "class" }, pages);
     const cards = res.lessons.flatMap((l) => l.cards);
     const terms = cards.filter((c) => c.term).map((c) => c.term);
-    expect(terms).toEqual(expect.arrayContaining(["<-", "c()", "head(df)", "$", "%>%", "mean(x, na.rm = TRUE)", 'install.packages("dplyr")']));
+    expect(terms).toEqual(expect.arrayContaining(["<-", "c()", "head(df)", "$", "%>%", "mean(x, na.rm = TRUE)", 'install.packages("dplyr")', "NA", "group_by() followed by summarise()"]));
     // The old detector split "aes(x = age" on "=" and made a term out of half a call.
     expect(terms.some((t) => /\(.*[^)]$/.test(t!))).toBe(false);
     // "_____by()" style blanks inside names.
@@ -80,6 +98,8 @@ describe("syntax cards (spec 16)", () => {
     expect(checkTyped("install.packages('dplyr')", 'install.packages("dplyr")')).toBe("correct");
     expect(checkTyped("mean(x, na.rm = true)", "mean(x, na.rm = TRUE)")).toBe("close");
     expect(checkTyped("tail(df)", "head(df)")).toBe("wrong");
+    expect(checkTyped("na", "NA")).toBe("close");
+    expect(checkTyped("No", "NA")).toBe("wrong");
     expect(normalizeCode(" head( df ) ")).toBe("head(df)");
   });
 

@@ -1,5 +1,5 @@
 // Offline lesson builder (spec section 4). Deterministic.
-import { onlyInCode } from "./code";
+import { isCode, onlyInCode } from "./code";
 import { centroid, cosine, norm, sum, tfidf, type Vec } from "./tfidf";
 import { STOPWORDS, containsTerm, normalizeForDedupe, replaceTerm, splitSentences, stem, tokens, truncate, words, wordCount } from "./text";
 import { clamp, titleCase } from "./util";
@@ -257,23 +257,57 @@ export function projectTerms(all: Sent[], surfaces: Map<string, string>): string
     .filter((x) => x.length >= 4);
 }
 
-/** Highest TF-IDF-sum sentences, each with its best cloze word (spec 4.6). Returned in reading order. */
+// Common explanatory predicates. A suffix such as -s alone cannot distinguish
+// "runs" from useful plural nouns such as "arrays".
+const CLOZE_VERBS = new Set(
+  "run runs establish establishes grow grows work works stop stops pick picks partition partitions return returns take takes use uses need needs require requires tell tells show shows find finds give gives make makes produce produces compute computes allow allows become becomes combine combines keep keeps mark marks store stores hold holds contain contains".split(" "),
+);
+export const isClozeVerb = (word: string): boolean => CLOZE_VERBS.has(word.toLowerCase());
+
+function clozeTerm(s: Sent): string | undefined {
+  // Keep complexity notation intact, including its case and parentheses.
+  const notation = s.text.match(/(?<![\p{L}\p{N}_.])(?:[OΘΩ]\([\w\s+*^./-]+\)|Big O)(?![\p{L}\p{N}_])/u);
+  if (notation) return notation[0];
+
+  const candidates = new Map<string, { rank: number; weight: number }>();
+  const add = (term: string, rank: number, weight: number) => {
+    if (!onlyInCode(s.text, term) && (!candidates.has(term) || candidates.get(term)!.rank < rank)) {
+      candidates.set(term, { rank, weight });
+    }
+  };
+  s.toks.forEach((tk, i) => {
+    if (tk.surface.length < 4) return;
+    const term = exactSurface(s.text, tk.surface);
+    if (!term) return;
+    const rank = isClozeVerb(term) || shapeClass(term) === "ly" ? 0 : isWeak(tk.surface) ? 1 : 2;
+    const weight = (s.vec.get(tk.stem) ?? 0) * (i === 0 && s.text.startsWith(term) ? 0.6 : 1);
+    add(term, rank, weight);
+  });
+
+  const property = s.text.match(/\b(?:is|are|be) ([a-z]{4,})(?=[.!?]?$)/i)?.[1];
+  if (property && ["ed", "adj"].includes(shapeClass(property))) add(property, 6, 0);
+
+  // An article followed by up to three content words is often a noun phrase.
+  // Stop at a predicate, connector or punctuation so the blank retains the idea.
+  for (const article of s.text.matchAll(/\b(a|an|the) +([a-z]+(?: +[a-z]+){0,2})/gi)) {
+    const parts = article[2].split(/ +/);
+    const boundary = parts.findIndex((part) => STOPWORDS.has(part.toLowerCase()) || isClozeVerb(part));
+    const phrase = parts.slice(0, boundary < 0 ? parts.length : boundary).join(" ");
+    if (phrase.length < 4 || isWeak(phrase)) continue;
+    const weight = tokens(phrase).reduce((total, t) => total + (s.vec.get(t.stem) ?? 0), 0);
+    const subject = article.index === 0 && boundary > 0 && isClozeVerb(parts[boundary]);
+    add(phrase, subject ? 5 : article[1].toLowerCase() === "the" ? 3 : 4, weight);
+  }
+  return [...candidates].sort(([, a], [, b]) => b.rank - a.rank || b.weight - a.weight)[0]?.[0];
+}
+
+/** Highest TF-IDF-sum sentences, each with its best cloze term. Returned in reading order. */
 export function pickClozes(sents: Sent[], max: number): { s: Sent; cloze: string }[] {
   const ranked = sents.slice().sort((a, b) => sum(b.vec) - sum(a.vec) || a.order - b.order);
   const picks: { s: Sent; cloze: string }[] = [];
   for (const s of ranked) {
     if (picks.length >= max) break;
-    const cands = s.toks
-      .filter((tk) => tk.surface.length >= 4)
-      .map((tk, i) => ({ tk, w: (s.vec.get(tk.stem) ?? 0) * (i === 0 && s.text.toLowerCase().startsWith(tk.surface) ? 0.6 : 1) }))
-      .sort((a, b) => b.w - a.w);
-    let cloze: string | null = null;
-    for (const { tk } of cands) {
-      cloze = exactSurface(s.text, tk.surface);
-      // A word inside code (install.packages, group_by) is a fragment of a name, not the idea.
-      if (cloze && onlyInCode(s.text, cloze)) cloze = null;
-      if (cloze) break;
-    }
+    const cloze = clozeTerm(s);
     if (cloze) picks.push({ s, cloze });
   }
   return picks.sort((a, b) => a.s.order - b.s.order);
@@ -282,7 +316,7 @@ export function pickClozes(sents: Sent[], max: number): { s: Sent; cloze: string
 export function clozeDraft(s: Sent, cloze: string, allClozes: string[], topProjectTerms: string[]): FactDraft {
   const lower = cloze.toLowerCase();
   const fromCards = [...new Set(allClozes.map((c) => c.toLowerCase()))]
-    .filter((c) => c !== lower && !containsTerm(s.text, c))
+    .filter((c) => c !== lower && !isCode(c) && !containsTerm(s.text, c))
     .sort(
       (a, b) =>
         Number(shapeClass(b) === shapeClass(lower)) - Number(shapeClass(a) === shapeClass(lower)) ||
@@ -297,7 +331,7 @@ export function clozeDraft(s: Sent, cloze: string, allClozes: string[], topProje
   }
   const question = replaceTerm(s.text, cloze, "____");
   const atStart = s.text.replace(/^["\u201c'(]+/, "").startsWith(cloze);
-  const answer = atStart ? cloze.toLowerCase() : cloze;
+  const answer = atStart && !isCode(cloze) && !/\p{Lu}/u.test(cloze.slice(1)) ? lower : cloze;
   return {
     pageId: s.pageId,
     statement: s.text,

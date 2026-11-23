@@ -31,7 +31,7 @@ export function checkTyped(input: string, accepted: string | string[]): Verdict 
       const t = normalizeCode(a);
       if (!u) continue;
       if (u === t) return "correct";
-      if (normalizeAnswer(input) === normalizeAnswer(a) && normalizeAnswer(a)) best = "close";
+      if (u.toLowerCase() === t.toLowerCase()) best = "close";
       else if (t.length >= 6 && levenshtein(u.toLowerCase(), t.toLowerCase()) <= Math.max(1, Math.floor(t.length * 0.1))) best = "close";
       continue;
     }

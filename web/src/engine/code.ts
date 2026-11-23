@@ -8,17 +8,19 @@ export type CodeDefinition = { term: string; definition: string };
 
 /** Characters that only show up in code, never in a plain-English term. */
 const CODE_CHARS = /[()[\]{}<>=%$~^|&\\`]|::|->|<-/;
+const CONSTANTS = ["NA", "NULL", "TRUE", "FALSE", "None", "NaN", "Inf"];
 
-/** True when a term is code (a call, an operator or a symbol), so it keeps its exact spelling. */
+/** True when a term is code, so it keeps its exact spelling. */
 export function isCode(term: string | undefined): boolean {
-  return !!term && CODE_CHARS.test(term);
+  return !!term && (CODE_CHARS.test(term) || CONSTANTS.includes(term));
 }
 
 // A call with up to one level of nested parentheses: head(df), install.packages("dplyr"),
 // mean(x, na.rm = TRUE), ggplot(df, aes(x = a)) + geom_point(), obj.append(x).
 const CALL = String.raw`[A-Za-z_.][\w.]*\((?:[^()]|\([^()]*\))*\)`;
-const CHAIN = String.raw`${CALL}(?:\s*(?:\+|%>%|\|>|\.)\s*${CALL})*`;
-const LEAD_CALL = new RegExp(String.raw`^(${CHAIN})\s+(is|are|means|[a-z]+s)\s+(.+)$`);
+const CHAIN = String.raw`${CALL}(?:\s*(?:\+|%>%|\|>|\.|\bfollowed\s+by\b)\s*${CALL})*`;
+const LEAD_CODE = new RegExp(String.raw`^(${CHAIN}|${CONSTANTS.join("|")})\s+(is|are|means|[a-z]+s)\s+(.+)$`);
+const CODE_CONTEXT = /\b(?:in R|RStudio|Python|NumPy|pandas|programming|sentinel|missing values?|logical values?|boolean|numeric values?|infinite values?|not a number|null object)\b/i;
 // "The pipe operator %>% passes ...", "The $ operator selects ...".
 const NAMED_OP = /^the\s+(?:([a-z]+(?:\s[a-z]+)?)\s+operator\s+(\S+)|(\S+)\s+operator)\s+(?:in\s+\w+\s+)?(is|are|means|[a-z]+s)\s+(.+)$/i;
 // "The assignment operator in R is <-".
@@ -42,8 +44,8 @@ function cleanDefinition(def: string, term: string): string | null {
 /** A syntax definition, or null when the sentence does not lead with code. */
 export function detectCodeDefinition(line: string): CodeDefinition | null {
   const s = line.trim().replace(/^[-*•\s]+/, "");
-  const lead = s.match(LEAD_CALL);
-  if (lead && !SKIP_VERBS.has(lead[2].toLowerCase())) {
+  const lead = s.match(LEAD_CODE);
+  if (lead && !SKIP_VERBS.has(lead[2]) && (!CONSTANTS.includes(lead[1]) || CODE_CONTEXT.test(lead[3]))) {
     const verb = lead[2];
     const rest = /^(is|are|means)$/i.test(verb) ? lead[3] : `${verb} ${lead[3]}`;
     const definition = cleanDefinition(rest, lead[1]);

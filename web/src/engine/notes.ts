@@ -1,4 +1,5 @@
 // Notes app text parsing (spec 3.2).
+import { detectCodeDefinition } from "./code";
 import { wordCount } from "./text";
 
 export type ParsedExcerpt = {
@@ -48,7 +49,7 @@ function splitPlain(text: string): ParsedExcerpt[] {
   const out: ParsedExcerpt[] = [];
   blocks.forEach((b, i) => {
     const lines = b.split("\n").map((l) => l.trim()).filter(Boolean);
-    if (i === 0 && lines.length && lines[0].length < 60 && !/[.!?]$/.test(lines[0])) {
+    if (i === 0 && lines.length && lines[0].length < 60 && !/[.!?]$/.test(lines[0]) && !detectCodeDefinition(lines[0])) {
       title = lines[0].replace(/^#+\s*/, "");
       lines.shift();
     }
