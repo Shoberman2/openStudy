@@ -319,9 +319,9 @@ const COMPLEXITY_LADDER = ["O(1)", "O(log n)", "O(n)", "O(n log n)", "O(n^2)", "
 const NOTATION = /^(?:[OΘΩ]\(.+\)|big o)$/i;
 const squash = (t: string) => t.replace(/\s+/g, "").toLowerCase();
 
-function complexityDistractors(s: Sent, cloze: string): string[] {
+export function complexityDistractors(statement: string, cloze: string): string[] {
   const at = COMPLEXITY_LADDER.findIndex((c) => squash(c) === squash(cloze));
-  const inSentence = (c: string) => squash(s.text).includes(squash(c));
+  const inSentence = (c: string) => squash(statement).includes(squash(c));
   return COMPLEXITY_LADDER.filter((c) => squash(c) !== squash(cloze) && !inSentence(c))
     .map((c, i) => ({ c, d: at < 0 ? i : Math.abs(COMPLEXITY_LADDER.indexOf(c) - at) }))
     .sort((a, b) => a.d - b.d || COMPLEXITY_LADDER.indexOf(a.c) - COMPLEXITY_LADDER.indexOf(b.c))
@@ -332,7 +332,7 @@ function complexityDistractors(s: Sent, cloze: string): string[] {
 export function clozeDraft(s: Sent, cloze: string, allClozes: string[], topProjectTerms: string[]): FactDraft {
   const lower = cloze.toLowerCase();
   if (/^[OΘΩ]\(/.test(cloze)) {
-    const distractors = complexityDistractors(s, cloze);
+    const distractors = complexityDistractors(s.text, cloze);
     return {
       pageId: s.pageId,
       statement: s.text,

@@ -32,7 +32,7 @@ export default function Home() {
   const today = plan?.days[0];
   const open = today?.items.filter((it) => !it.done) ?? [];
   const planned = Math.round(today?.items.reduce((s, x) => s + x.minutes, 0) ?? 0);
-  const over = today ? Math.max(0, Math.round(today.used - today.budget)) : 0;
+  const over = Math.round(today?.overBy ?? 0);
 
   return (
     <>

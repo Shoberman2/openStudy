@@ -603,6 +603,15 @@ Goal: notes from programming classes (R/RStudio, Python, algorithms) teach the c
 
 Agreed by Claude and GPT-6.2-Sol after two rounds (2026-11-23): OpenStudy is a daily 10-minute drill on a student's own class material. iOS is not changed yet.
 
+### 17.1 engine (web only)
+
+- Theme and class lessons at levels 0 and 1 use one special slot for `term-type` if a definition card has already appeared in recognition. Prefer code when it can be shown first and recalled later. Give the arguments for a syntax example when the definition does not supply them. If no card fits, use the original slot. Levels 2 and up use the 13.8 slot plan.
+- Typed code compares tokens, preserving identifier case, operator boundaries and string contents. Equivalent spacing and simple quote styles pass. A single trailing semicolon on a call or constant passes. Changing an argument, adding another statement or using a different call requires another try. The case hint for a standalone constant stays.
+- Class and other lessons use concept questions, definitions and meaningful key-word or complexity blanks. Skip whole-page questions, weak blank choices and duplicate prompts on the same card. Shorten a lesson toward five questions when the sources are thin. With fewer than five eligible exercises, serve only the ones the material supports. Book projects keep their question forms and legacy projects are treated as books. Practice builders can apply the same project-specific policy through `SessionProjectOptions`.
+- All lessons can be opened. `currentLesson(projectLessons(lib, projectId))` returns one next-up suggestion. The planner considers lessons without a prerequisite and retains its spacing and weak-lesson priority.
+- Practice tests still require two lessons at level 3 or higher. The plan schedules eligible tests at goal minus 7, 3 and 1 days even when the budget is spent. `PlanDay.overBy` is present only when scheduled minutes exceed the budget and gives the extra minutes.
+- XP, streaks, reviews and completion events keep their existing bookkeeping. The library format and iOS behavior stay the same.
+
 ### 17.2 UI (web)
 - **Home**: "Today" first (the day's plan items, the minutes planned against the daily minutes, and "Over by N min to stay on track for your exam." when exam-date tests push the day over budget: the exam schedule wins). One primary button, "Start today's practice", opens the first item not done; "Done for today." when all are done. Then "Study sets" as plain rows (title; topics, exam date, "Next up: <topic>"), and an "Add notes" link. With no study sets: "Add Your Notes" and one button. Removed from Home: the book-spine shelf and category clusters, the Continue card (it pointed at the same lesson as the plan), the daily goal ring, the Practice card (due reviews are a plan item), Ask my notes (it lives on each study set), Connections.
 - **Header**: logo, Settings, Profile. No streak, XP or goal ring, and no line under it.

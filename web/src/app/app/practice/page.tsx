@@ -29,8 +29,12 @@ function PracticePageSession() {
     const q = new URLSearchParams(window.location.search);
     const a = q.get("a");
     const b = q.get("b");
-    setExercises(a && b ? buildConnection(a, b, lib.cards, new Date()) : buildPractice(lib.cards, new Date()));
-  }, [ready, lib.cards]);
+    // Class and other study sets use the drill rules (spec 17.1), books keep theirs.
+    const projectTypes = new Map(lib.projects.map((p) => [p.id, p.type]));
+    setExercises(
+      a && b ? buildConnection(a, b, lib.cards, new Date(), Math.random, 10, { projectTypes }) : buildPractice(lib.cards, new Date(), Math.random, 12, { projectTypes }),
+    );
+  }, [ready, lib.cards, lib.projects]);
 
   const sourceFor = useCallback(
     (ex: Exercise): Source | null => {

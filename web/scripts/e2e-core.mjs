@@ -172,7 +172,7 @@ try {
   await page.goto(`${BASE}/app/learn/${secondLessonId}`);
   // No locks (spec 17): any topic opens straight into a drill.
   await page.getByRole("button", { name: "Check", exact: true }).waitFor({ timeout: 20_000 });
-  check("any topic opens directly, no locks", true);
+  check("any topic opens directly, no locks", await page.getByRole("progressbar", { name: "Lesson progress" }).isVisible());
   await page.goto(`${BASE}${projectHref}`);
   await page.locator('ul[aria-label="Topics"] button').first().click();
   const sheetStart = page.getByRole("dialog").locator('a[href^="/app/learn/"]');
@@ -187,6 +187,7 @@ try {
   await shot("lesson");
   const memory = new Map();
   let syntaxPrompts = 0;
+  let typedCode = false;
   let done = false;
   for (let step = 0; step < 120 && !done; step++) {
     const body = await textOf();
@@ -196,6 +197,7 @@ try {
     }
     const key = body.split(/ 1 /)[0].slice(0, 160);
     if (/Pick what it does|Which code|Write the code/.test(body)) syntaxPrompts++;
+    if (/Write the code/.test(body)) typedCode = true;
     const known = memory.get(key);
     if (/^.{0,40}Match the pairs/.test(body)) {
       const tiles = await page.locator("button.tile").all();
@@ -252,6 +254,7 @@ try {
   check("lesson plays to the end", done);
   await shot("complete");
   check("syntax questions asked about the code", syntaxPrompts > 0, `${syntaxPrompts} seen`);
+  check("first session asks for typed code", typedCode);
   await click("Continue");
 
   // 7. Progress shows: today's lesson is checked off on Home, the streak counts it in Profile.

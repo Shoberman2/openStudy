@@ -32,7 +32,7 @@ function TestPageSession() {
     if (!ready || built.current || !project) return;
     built.current = true;
     const lessons = lib.lessons.filter((l) => l.projectId === project.id);
-    setExercises(buildPracticeTest(lessons, lib.cards.filter((c) => c.projectId === project.id)));
+    setExercises(buildPracticeTest(lessons, lib.cards.filter((c) => c.projectId === project.id), Math.random, 20, { projectType: project.type }));
   }, [ready, project, lib.lessons, lib.cards]);
 
   const onDone = useCallback(
@@ -137,7 +137,7 @@ function TestPageSession() {
               Back to project
             </Link>
             {missed.length > 0 && (
-              <button className="btn sm:min-w-[200px]" onClick={() => setReview(buildFromCards(missed, lib.cards.filter((c) => c.projectId === project.id)))}>
+              <button className="btn sm:min-w-[200px]" onClick={() => setReview(buildFromCards(missed, lib.cards.filter((c) => c.projectId === project.id), Math.random, { projectType: project.type }))}>
                 Review your misses
               </button>
             )}
