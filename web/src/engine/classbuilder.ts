@@ -88,6 +88,15 @@ export function detectDefinition(line: string): Definition | null {
   return null;
 }
 
+// A short technical subject followed by what it does can be tested in both directions.
+function proceduralDefinition(line: string): Definition | null {
+  const match = line.match(/^(.+?\b(?:search|sort|stack|case|notation))\s+((?:repeatedly )?(?:describes|finds|checks|splits|picks|stores|stops)\s+.+)$/i);
+  if (!match) return null;
+  const term = cleanTerm(match[1]);
+  const definition = cleanDef(match[2]);
+  return term && definition ? { term, definition } : null;
+}
+
 function definitionQuestion(term: string, definition: string): string {
   if (isCode(term)) return `What does ${term} do?`;
   // Internal capitals and names such as Python retain their source casing.
@@ -297,7 +306,7 @@ export function buildClass(project: { title: string; author?: string; type?: Pro
   const unitDefs = units.map((u) => {
     const ds: { d: Definition; s: Sent }[] = [];
     for (const s of u.sents) {
-      const d = detectDefinition(s.text);
+      const d = detectDefinition(s.text) ?? proceduralDefinition(s.text);
       if (!d || seenTerms.has(d.term.toLowerCase())) continue;
       seenTerms.add(d.term.toLowerCase());
       ds.push({ d, s });

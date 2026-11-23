@@ -268,11 +268,11 @@ export function genType(card: Card): Exercise {
   return { id: exId(), cardIds: [card.id], projectId: card.projectId, type: "type", prompt: factQuestion(card), accepted, answer };
 }
 
-export function genMatch(cards: Card[], ctx: GenCtx): Exercise | null {
+export function genMatch(cards: Card[], ctx: GenCtx, fullDefinitions = false): Exercise | null {
   const defs = cards.filter((c) => c.term && c.definition);
   if (defs.length >= 4) {
     const picked = defs.slice(0, 4);
-    const pairs = picked.map((c) => ({ key: c.id, term: c.term!, clue: truncate(c.definition!, 70) }));
+    const pairs = picked.map((c) => ({ key: c.id, term: c.term!, clue: fullDefinitions ? c.definition! : truncate(c.definition!, 70) }));
     return {
       id: exId(),
       cardIds: picked.map((c) => c.id),
@@ -334,9 +334,14 @@ export function genDefMC(card: Card, ctx: GenCtx): Exercise | null {
   return { id: exId(), cardIds: [card.id], projectId: card.projectId, type: "def-mc", term: card.term!, answer: card.definition!, options: shuffle([card.definition!, ...others], ctx.rand) };
 }
 
-export function genTermType(card: Card): Exercise | null {
+export function genTermType(card: Card, hintAtArguments = false): Exercise | null {
   if (!isDefinition(card)) return null;
-  return { id: exId(), cardIds: [card.id], projectId: card.projectId, type: "term-type", definition: card.definition!, accepted: [card.term!], answer: card.term! };
+  const term = card.term!;
+  const args = hintAtArguments && term.match(/^[\w.]+\(([^()]+)\)$/)?.[1];
+  const definition = args && !card.definition!.includes(args)
+    ? `${card.definition!.replace(/[.\s]+$/, "")}. Use ${args} inside the parentheses.`
+    : card.definition!;
+  return { id: exId(), cardIds: [card.id], projectId: card.projectId, type: "term-type", definition, accepted: [term], answer: term };
 }
 
 export function genExplain(card: Card, ctx: GenCtx): Exercise {
