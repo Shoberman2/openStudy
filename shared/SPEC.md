@@ -598,3 +598,14 @@ Goal: notes from programming classes (R/RStudio, Python, algorithms) teach the c
 - Configured but unreachable (for example a paused Supabase project): `GET /api/config` answers `{billing: false, reason: "unreachable"}`, `GET /api/me` answers 503 `billing_off`, and `POST /api/events` answers 503 without storing.
 - The web client asks `/api/config` once per page load before using Supabase. Only a definite `billing: false` turns accounts off (everything unlocked, as with billing off in 11.5); if the request itself fails the client keeps the 11.5 offline grace. While accounts are off, usage events stay on the device (the cursor does not move) and go out once accounts are back. Sign in and Plus pages say accounts or subscriptions "are not available right now. Everything is unlocked." instead of showing a form that can only fail.
 - The Supabase browser client and the zip reader (.pptx/.docx) load on first use, not with every page.
+
+## 17. Drill-first study
+
+### 17.1 engine (web only)
+
+- Theme and class lessons at levels 0 and 1 use one special slot for `term-type` if a definition card has already appeared in recognition. Prefer code when it can be shown first and recalled later. Give the arguments for a syntax example when the definition does not supply them. If no card fits, use the original slot. Levels 2 and up use the 13.8 slot plan.
+- Typed code compares tokens, preserving identifier case, operator boundaries and string contents. Equivalent spacing and simple quote styles pass. A single trailing semicolon on a call or constant passes. Changing an argument, adding another statement or using a different call requires another try. The case hint for a standalone constant stays.
+- Class and other lessons use concept questions, definitions and meaningful key-word or complexity blanks. Skip whole-page questions, weak blank choices and duplicate prompts on the same card. Shorten a lesson toward five questions when the sources are thin. With fewer than five eligible exercises, serve only the ones the material supports. Book projects keep their question forms and legacy projects are treated as books. Practice builders can apply the same project-specific policy through `SessionProjectOptions`.
+- All lessons can be opened. `currentLesson(projectLessons(lib, projectId))` returns one next-up suggestion. The planner considers lessons without a prerequisite and retains its spacing and weak-lesson priority.
+- Practice tests still require two lessons at level 3 or higher. The plan schedules eligible tests at goal minus 7, 3 and 1 days even when the budget is spent. `PlanDay.overBy` is present only when scheduled minutes exceed the budget and gives the extra minutes.
+- XP, streaks, reviews and completion events keep their existing bookkeeping. The library format and iOS behavior stay the same.
