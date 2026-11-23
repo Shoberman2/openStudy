@@ -313,10 +313,38 @@ export function pickClozes(sents: Sent[], max: number): { s: Sent; cloze: string
   return picks.sort((a, b) => a.s.order - b.s.order);
 }
 
+// Running times in the order textbooks list them. A complexity blank only makes sense
+// against other complexities ("O(log n)" vs "pivot" gives the answer away).
+const COMPLEXITY_LADDER = ["O(1)", "O(log n)", "O(n)", "O(n log n)", "O(n^2)", "O(2^n)", "O(n!)"];
+const NOTATION = /^(?:[OΘΩ]\(.+\)|big o)$/i;
+const squash = (t: string) => t.replace(/\s+/g, "").toLowerCase();
+
+function complexityDistractors(s: Sent, cloze: string): string[] {
+  const at = COMPLEXITY_LADDER.findIndex((c) => squash(c) === squash(cloze));
+  const inSentence = (c: string) => squash(s.text).includes(squash(c));
+  return COMPLEXITY_LADDER.filter((c) => squash(c) !== squash(cloze) && !inSentence(c))
+    .map((c, i) => ({ c, d: at < 0 ? i : Math.abs(COMPLEXITY_LADDER.indexOf(c) - at) }))
+    .sort((a, b) => a.d - b.d || COMPLEXITY_LADDER.indexOf(a.c) - COMPLEXITY_LADDER.indexOf(b.c))
+    .slice(0, 3)
+    .map((x) => x.c);
+}
+
 export function clozeDraft(s: Sent, cloze: string, allClozes: string[], topProjectTerms: string[]): FactDraft {
   const lower = cloze.toLowerCase();
+  if (/^[OΘΩ]\(/.test(cloze)) {
+    const distractors = complexityDistractors(s, cloze);
+    return {
+      pageId: s.pageId,
+      statement: s.text,
+      cloze,
+      question: replaceTerm(s.text, cloze, "____"),
+      answer: cloze,
+      distractors,
+      falseStatement: distractors[0] ? replaceTerm(s.text, cloze, distractors[0]) : s.text,
+    };
+  }
   const fromCards = [...new Set(allClozes.map((c) => c.toLowerCase()))]
-    .filter((c) => c !== lower && !isCode(c) && !containsTerm(s.text, c))
+    .filter((c) => c !== lower && !isCode(c) && !NOTATION.test(c) && !containsTerm(s.text, c))
     .sort(
       (a, b) =>
         Number(shapeClass(b) === shapeClass(lower)) - Number(shapeClass(a) === shapeClass(lower)) ||
@@ -327,7 +355,7 @@ export function clozeDraft(s: Sent, cloze: string, allClozes: string[], topProje
   for (const t of topProjectTerms) {
     if (distractors.length >= 3) break;
     const tl = t.toLowerCase();
-    if (tl !== lower && !distractors.includes(tl) && !containsTerm(s.text, tl)) distractors.push(tl);
+    if (tl !== lower && !NOTATION.test(tl) && !distractors.includes(tl) && !containsTerm(s.text, tl)) distractors.push(tl);
   }
   const question = replaceTerm(s.text, cloze, "____");
   const atStart = s.text.replace(/^["\u201c'(]+/, "").startsWith(cloze);

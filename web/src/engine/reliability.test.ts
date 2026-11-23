@@ -28,6 +28,32 @@ describe("offline study content", () => {
     expect(blanks.slice(3)).toEqual(["sorted", "base case", "pivot"]);
   });
 
+  it("offers other running times, not other words, for a complexity blank", () => {
+    const text = [
+      "Binary search runs in O(log n) time on a sorted list.",
+      "Simple search checks every element, so it takes O(n) time.",
+      "Quicksort takes O(n log n) time on average but O(n^2) time in the worst case.",
+      "The base case stops a recursive algorithm from calling itself.",
+      "Quicksort picks a pivot and partitions the remaining elements.",
+      "Big O establishes a worst case run time for an algorithm.",
+    ];
+    const cards = buildOffline({ title: "Algorithms" }, text.map((line, i) => ({ id: String(i), text: line }))).lessons.flatMap((l) => l.cards);
+    const complexity = /^O\(/;
+    for (const c of cards.filter((x) => x.cloze && complexity.test(x.cloze))) {
+      expect(c.distractors).toHaveLength(3);
+      for (const d of c.distractors!) {
+        expect(d).toMatch(complexity);
+        // Never a running time the sentence itself states (it would be a second right answer).
+        expect(c.statement.replace(/\s/g, "")).not.toContain(d.replace(/\s/g, ""));
+      }
+    }
+    expect(cards.find((c) => c.cloze === "O(log n)")?.distractors).toEqual(["O(1)", "O(n)", "O(n log n)"]);
+    // Plain-word blanks never offer notation as a wrong answer.
+    for (const c of cards.filter((x) => x.cloze && !complexity.test(x.cloze))) {
+      for (const d of c.distractors ?? []) expect(d).not.toMatch(/^(o\(|big o$)/i);
+    }
+  });
+
   it.each([
     ["Data frame", "A table where every column is a vector", "What is a data frame?"],
     ["Data frame", "Two-dimensional structure with named columns", "What does data frame mean?"],
