@@ -1,4 +1,5 @@
 // Offline lesson builder (spec section 4). Deterministic.
+import { onlyInCode } from "./code";
 import { centroid, cosine, norm, sum, tfidf, type Vec } from "./tfidf";
 import { STOPWORDS, containsTerm, normalizeForDedupe, replaceTerm, splitSentences, stem, tokens, truncate, words, wordCount } from "./text";
 import { clamp, titleCase } from "./util";
@@ -269,6 +270,8 @@ export function pickClozes(sents: Sent[], max: number): { s: Sent; cloze: string
     let cloze: string | null = null;
     for (const { tk } of cands) {
       cloze = exactSurface(s.text, tk.surface);
+      // A word inside code (install.packages, group_by) is a fragment of a name, not the idea.
+      if (cloze && onlyInCode(s.text, cloze)) cloze = null;
       if (cloze) break;
     }
     if (cloze) picks.push({ s, cloze });

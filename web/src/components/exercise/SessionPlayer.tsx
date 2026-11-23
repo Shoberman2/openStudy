@@ -1,5 +1,6 @@
 "use client";
 
+import { isCode } from "@/engine/code";
 import { BookOpen, CircleCheck, CircleX, Flame, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { checkAnswer, type Answer, type CheckResult, type Exercise } from "@/engine/exercises";
@@ -216,7 +217,7 @@ function Feedback({ result, source, onSource, onContinue, full }: { result: Chec
         {!ok && !result.diff && (
           <p className="mt-2 font-bold text-red">
             <span className="opacity-80">Correct answer: </span>
-            {result.solution}
+            <span className={isCode(result.solution) ? "code" : undefined}>{result.solution}</span>
           </p>
         )}
         {result.diff && (

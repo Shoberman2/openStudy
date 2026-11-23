@@ -1,4 +1,5 @@
 // Exercise generation from cards (spec 5.1) and checking of answers (spec 5.3).
+import { isCode } from "./code";
 import { checkTyped, scoreQuote, type DiffToken, type Verdict } from "./check";
 import { STOPWORDS, containsTerm, normalizeAnswer, replaceTerm, tokens, truncate, wordCount } from "./text";
 import type { Card, Grade } from "./types";
@@ -76,7 +77,9 @@ function factQuestion(card: Card): string {
   // A definition card's answer is its term, so asking "What is <term>?" would give it away: show the definition.
   if (card.term && card.definition && normalizeAnswer(factAnswer(card)) === normalizeAnswer(card.term)) {
     const d = card.definition.replace(/[.\s]+$/, "");
-    return `Which term means: ${/^[A-Z][a-z]/.test(d) ? d.charAt(0).toLowerCase() + d.slice(1) : d}?`;
+    const lower = /^[A-Z][a-z]/.test(d) ? d.charAt(0).toLowerCase() + d.slice(1) : d;
+    if (isCode(card.term)) return /^(the|a|an)\s/i.test(lower) ? `Which code is ${lower}?` : `Which code ${lower}?`;
+    return `Which term means: ${lower}?`;
   }
   return card.question?.trim() || blankedStatement(card);
 }

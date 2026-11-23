@@ -2,6 +2,7 @@
 
 import { RotateCcw } from "lucide-react";
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { isCode } from "@/engine/code";
 import type { Answer, CheckResult, Exercise, Segment } from "@/engine/exercises";
 import { wordCount } from "@/engine/text";
 import { PictureFrame, SourceThumb } from "@/components/app/SourceImage";
@@ -35,9 +36,9 @@ export function instructionFor(ex: Exercise): string {
     case "apply":
       return "How would you use this?";
     case "def-mc":
-      return "Pick the definition";
+      return isCode(ex.term) ? "Pick what it does" : "Pick the definition";
     case "term-type":
-      return "Type the term";
+      return isCode(ex.answer) ? "Write the code" : "Type the term";
     case "explain":
       return "Explain it in your own words";
     case "q-bank1":
@@ -158,7 +159,7 @@ function MultipleChoice({ ex, result, onAnswer, compact }: P<"mc">) {
               }}
             >
               <KeyHint n={i + 1} />
-              <span>{o}</span>
+              <span className={isCode(o) ? "code" : undefined}>{o}</span>
             </button>
           );
         })}
@@ -255,7 +256,7 @@ function WordBank({ ex, result, onAnswer, compact }: P<"bank" | "q-bank1" | "q-b
       <div className="flex flex-wrap gap-2.5">
         {ex.options.map((o, oi) => (
           <button key={oi} disabled={!!result} className={`chip ${slots.includes(oi) ? "is-used" : ""}`} onClick={() => pick(oi)}>
-            <span>{o}</span>
+            <span className={isCode(o) ? "code" : undefined}>{o}</span>
           </button>
         ))}
       </div>
@@ -345,7 +346,7 @@ function MatchPairs({ ex, result, onSubmit }: P<"match">) {
               tryPair(k, clue);
             }}
           >
-            {byKey.get(k)!.term}
+            <span className={isCode(byKey.get(k)!.term) ? "code" : undefined}>{byKey.get(k)!.term}</span>
           </button>
         ))}
       </div>
@@ -433,7 +434,15 @@ function DefinitionChoice({ ex, result, onAnswer, compact }: P<"def-mc">) {
   return (
     <div className="space-y-5">
       <Prompt compact={compact}>
-        What does <span className="text-blue">{ex.term}</span> mean?
+        {isCode(ex.term) ? (
+          <>
+            What does <span className="code text-blue">{ex.term}</span> do?
+          </>
+        ) : (
+          <>
+            What does <span className="text-blue">{ex.term}</span> mean?
+          </>
+        )}
       </Prompt>
       <div className="grid grid-cols-1 gap-2.5">
         {ex.options.map((o, i) => {
@@ -470,18 +479,19 @@ function TermType({ ex, result, onAnswer, onSubmit, compact }: P<"term-type">) {
   return (
     <div className="space-y-5">
       <div className="card p-5">
-        <p className="kicker mb-1.5">Definition</p>
+        <p className="kicker mb-1.5">{isCode(ex.answer) ? "What it does" : "Definition"}</p>
         <Prompt compact={compact}>{ex.definition}</Prompt>
       </div>
       <input
         ref={ref}
-        className={`input ${result ? (result.verdict === "wrong" ? "!border-red" : "!border-green") : ""}`}
+        className={`input ${isCode(ex.answer) ? "code" : ""} ${result ? (result.verdict === "wrong" ? "!border-red" : "!border-green") : ""}`}
         value={v}
         disabled={!!result}
         autoComplete="off"
         autoCapitalize="off"
+        autoCorrect="off"
         spellCheck={false}
-        placeholder="The term"
+        placeholder={isCode(ex.answer) ? "The code" : "The term"}
         aria-label="Your answer"
         onChange={(e) => {
           setV(e.target.value);

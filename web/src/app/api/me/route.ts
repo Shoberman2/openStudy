@@ -1,11 +1,11 @@
 // The signed-in account and its entitlement (spec 11.4). DELETE removes the account.
-import { adminClient, billingEnabled, billingOff, entitlementOf, readRow, unauthorized, userFromRequest } from "@/lib/server/billing";
+import { accountsOn, adminClient, billingEnabled, billingOff, entitlementOf, readRow, unauthorized, userFromRequest } from "@/lib/server/billing";
 import { cancelStripeSubscriptions } from "@/lib/server/stripe";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
-  if (!billingEnabled()) return billingOff();
+  if (!(await accountsOn())) return billingOff();
   const user = await userFromRequest(req);
   if (!user) return unauthorized();
   try {

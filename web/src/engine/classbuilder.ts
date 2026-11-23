@@ -1,4 +1,5 @@
 // Lessons for class material and definition cards (spec 8.4).
+import { detectCodeDefinition, isCode } from "./code";
 import { conceptCards } from "./concepts";
 import {
   absorbSmall,
@@ -52,7 +53,7 @@ function cleanTerm(t: string): string | null {
   const ws = term.split(/\s+/).filter(Boolean);
   if (!ws.length || ws.length > 5) return null;
   if (NOT_TERMS.has(ws[0].toLowerCase())) return null;
-  if (!/^[\p{L}]/u.test(term) || /[.!?]/.test(term)) return null;
+  if (!/^[\p{L}]/u.test(term) || /[.!?]/.test(term) || isCode(term) || /[,"]/.test(term)) return null;
   return term.charAt(0).toUpperCase() + term.slice(1);
 }
 
@@ -68,6 +69,8 @@ function cleanDef(d: string): string | null {
  * "Term is/are/means/refers to definition", "Term (abbr) is ..." (term 1..5 words, definition 4..40 words).
  */
 export function detectDefinition(line: string): Definition | null {
+  const code = detectCodeDefinition(line);
+  if (code) return code;
   const s = line.trim();
   const sep = s.match(/^([^:=\u2013\u2014]{1,60}?)\s*(?::|=|\s[-\u2013\u2014]\s)\s*(.+)$/);
   if (sep) {
@@ -100,7 +103,7 @@ export function defDraft(d: Definition, pageId: string | undefined, allTerms: st
     definition,
     statement: `${d.term}: ${bare}.`,
     cloze: d.term,
-    question: `What is ${/^[A-Z]{2,}/.test(d.term) ? d.term : d.term.charAt(0).toLowerCase() + d.term.slice(1)}?`,
+    question: isCode(d.term) ? `What does ${d.term} do?` : `What is ${/^[A-Z]{2,}/.test(d.term) ? d.term : d.term.charAt(0).toLowerCase() + d.term.slice(1)}?`,
     answer: d.term,
     distractors: others,
     falseStatement: others[0] ? `${others[0]}: ${bare}.` : `${d.term}: ${bare}.`,
@@ -288,7 +291,8 @@ export function buildClass(project: { title: string; author?: string; type?: Pro
     const used = new Set(unitDefs[i].map((x) => x.s));
     return pickClozes(u.sents.filter((s) => !used.has(s)), 24 - unitDefs[i].length);
   });
-  const allClozes = [...unitClozes.flat().map((x) => x.cloze), ...allTerms];
+  // Code terms never stand in as wrong answers for a plain-word blank.
+  const allClozes = [...unitClozes.flat().map((x) => x.cloze), ...allTerms.filter((t) => !isCode(t))];
 
   const usedTitles = new Set<string>();
   const lessons: LessonDraft[] = units.map((u, i) => {

@@ -1,4 +1,5 @@
 // Answer checking (spec 5.3).
+import { isCode, normalizeCode } from "./code";
 import { normalizeAnswer } from "./text";
 
 export type Verdict = "correct" | "close" | "wrong";
@@ -21,11 +22,21 @@ export function levenshtein(a: string, b: string): number {
 /** Typed answer vs one or more accepted answers. */
 export function checkTyped(input: string, accepted: string | string[]): Verdict {
   const user = normalizeAnswer(input);
-  if (!user) return "wrong";
+  if (!user && !input.trim()) return "wrong";
   let best: Verdict = "wrong";
   for (const a of Array.isArray(accepted) ? accepted : [accepted]) {
+    if (isCode(a)) {
+      // Code keeps its symbols and case (%>% and <- would normalize to nothing): only spacing and quote style may differ.
+      const u = normalizeCode(input);
+      const t = normalizeCode(a);
+      if (!u) continue;
+      if (u === t) return "correct";
+      if (normalizeAnswer(input) === normalizeAnswer(a) && normalizeAnswer(a)) best = "close";
+      else if (t.length >= 6 && levenshtein(u.toLowerCase(), t.toLowerCase()) <= Math.max(1, Math.floor(t.length * 0.1))) best = "close";
+      continue;
+    }
     const target = normalizeAnswer(a);
-    if (!target) continue;
+    if (!target || !user) continue;
     if (user === target) return "correct";
     const tol = Math.max(1, Math.floor(target.length * 0.15));
     if (levenshtein(user, target) <= tol) best = "close";

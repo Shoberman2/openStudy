@@ -91,6 +91,7 @@ describe("routes", () => {
   afterEach(() => {
     process.env = { ...saved };
     vi.doUnmock("@supabase/supabase-js");
+    vi.unstubAllGlobals();
   });
 
   it("answer 503 billing_off when Supabase is not configured", async () => {
@@ -100,7 +101,7 @@ describe("routes", () => {
     expect(r.status).toBe(503);
     expect(await r.json()).toEqual({ error: "billing_off" });
     const cfg = await import("@/app/api/config/route");
-    expect(await cfg.GET().json()).toEqual({ billing: false });
+    expect(await (await cfg.GET()).json()).toEqual({ billing: false });
   });
 
   it("/api/me: 401 without a token, comp for the owner's email", async () => {
@@ -118,6 +119,7 @@ describe("routes", () => {
         from: () => ({ select: () => ({ eq: (_c: string, id: string) => ({ maybeSingle: async () => ({ data: rows[id] ?? null, error: null }) }) }) }),
       }),
     }));
+    vi.stubGlobal("fetch", async () => new Response("{}", { status: 200 }));
     const { GET } = await import("@/app/api/me/route");
     expect((await GET(new Request("http://x/api/me"))).status).toBe(401);
     expect((await GET(new Request("http://x/api/me", { headers: { Authorization: "Bearer nope" } }))).status).toBe(401);
@@ -125,5 +127,25 @@ describe("routes", () => {
     expect(owner).toEqual({ user: { id: "u-owner", email: "Shoberman@icloud.com" }, entitlement: { active: true, status: "comp", source: "comp" } });
     const paid = await (await GET(new Request("http://x/api/me", { headers: { Authorization: "Bearer paid" } }))).json();
     expect(paid.entitlement).toMatchObject({ status: "trialing", source: "apple" });
+  });
+
+  it("treats accounts as off when Supabase is configured but down (paused project)", async () => {
+    Object.assign(process.env, {
+      NEXT_PUBLIC_SUPABASE_URL: "https://paused.supabase.co",
+      SUPABASE_SECRET_KEY: "sk",
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "pk",
+    });
+    vi.stubGlobal("fetch", async () => {
+      throw new TypeError("fetch failed: getaddrinfo ENOTFOUND");
+    });
+    const cfg = await import("@/app/api/config/route");
+    expect(await (await cfg.GET()).json()).toEqual({ billing: false, reason: "unreachable" });
+    const me = await import("@/app/api/me/route");
+    const r = await me.GET(new Request("http://x/api/me", { headers: { Authorization: "Bearer t" } }));
+    expect(r.status).toBe(503);
+    expect(await r.json()).toEqual({ error: "billing_off" });
+    const ev = await import("@/app/api/events/route");
+    const body = { installId: "123e4567-e89b-12d3-a456-426614174000", platform: "web", events: [{ t: new Date().toISOString(), name: "app_open" }] };
+    expect((await ev.POST(new Request("http://x/api/events", { method: "POST", body: JSON.stringify(body) }))).status).toBe(503);
   });
 });

@@ -3,7 +3,6 @@
 // Supabase Auth on the web and the account's entitlement (spec 11.4, 11.5, 12.1). Sign in is by
 // email and password, with no emails to wait for. The library itself stays local; the account
 // exists for the subscription.
-import { createBrowserClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { offlineEntitlement, type CachedEntitlement } from "@/engine/billing";
 import type { Entitlement } from "@/engine/profile";
@@ -14,10 +13,12 @@ const CACHE_KEY = "openstudy.entitlement";
 
 export const authConfigured = (): boolean => !!(URL_ && KEY);
 
-let client: SupabaseClient | null = null;
-export function supabase(): SupabaseClient | null {
+// Loaded on first use: the Supabase client is the largest script in the app, and most screens
+// only need it once someone has an account.
+let client: Promise<SupabaseClient> | null = null;
+export async function supabase(): Promise<SupabaseClient | null> {
   if (!authConfigured()) return null;
-  client ??= createBrowserClient(URL_!, KEY!);
+  client ??= import("@supabase/ssr").then(({ createBrowserClient }) => createBrowserClient(URL_!, KEY!));
   return client;
 }
 
@@ -25,7 +26,7 @@ export type Me = { userId: string; email?: string; entitlement: Entitlement };
 export type MeResult = { kind: "off" } | { kind: "signed-out" } | { kind: "me"; me: Me; offline?: boolean };
 
 export async function accessToken(): Promise<string | null> {
-  const sb = supabase();
+  const sb = await supabase();
   if (!sb) return null;
   const { data } = await sb.auth.getSession();
   return data.session?.access_token ?? null;
@@ -49,10 +50,25 @@ function writeCache(c: CachedEntitlement | null) {
   }
 }
 
+let accountsCheck: Promise<boolean> | null = null;
+/**
+ * Asks /api/config once per page load. Only a definite "billing: false" turns accounts off; if the
+ * request itself fails (the visitor is offline) accounts stay on and the cached entitlement applies.
+ */
+export function accountsUp(): Promise<boolean> {
+  accountsCheck ??= fetch("/api/config", { cache: "no-store" })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((c: { billing?: boolean } | null) => c?.billing !== false)
+    .catch(() => true);
+  return accountsCheck;
+}
+
 /** The signed-in account and its entitlement, using the cached state when the server is unreachable. */
 export async function fetchMe(): Promise<MeResult> {
-  const sb = supabase();
-  if (!sb) return { kind: "off" };
+  if (!authConfigured()) return { kind: "off" };
+  // The server says whether accounts are actually up (a paused database means they are off).
+  if (!(await accountsUp())) return { kind: "off" };
+  const sb = (await supabase())!;
   const { data } = await sb.auth.getSession();
   const session = data.session;
   if (!session) return { kind: "signed-out" };
@@ -82,7 +98,7 @@ export type AuthMode = "create" | "signin";
 
 /** Creates an account or signs in. Returns an error message, or null when signed in. */
 export async function passwordAuth(mode: AuthMode, email: string, password: string): Promise<string | null> {
-  const sb = supabase();
+  const sb = await supabase();
   if (!sb) return "Accounts are not set up on this server yet.";
   if (mode === "create" && password.length < 8) return "Use at least 8 characters.";
   try {
@@ -129,7 +145,7 @@ export async function requestPasswordReset(email: string): Promise<"sent" | "off
 
 /** Finishes a reset link: signs in with its token, then sets the new password. */
 export async function setNewPassword(tokenHash: string, password: string): Promise<string | null> {
-  const sb = supabase();
+  const sb = await supabase();
   if (!sb) return "Accounts are not set up on this server yet.";
   if (password.length < 8) return "Use at least 8 characters.";
   const { error } = await sb.auth.verifyOtp({ type: "recovery", token_hash: tokenHash });
@@ -140,7 +156,7 @@ export async function setNewPassword(tokenHash: string, password: string): Promi
 
 export async function signOut(): Promise<void> {
   writeCache(null);
-  await supabase()?.auth.signOut();
+  await (await supabase())?.auth.signOut();
 }
 
 async function authedPost(path: string, method = "POST"): Promise<Response | null> {

@@ -14,7 +14,9 @@ export function itemHref(item: PlanItem): string {
 function label(item: PlanItem): { title: string; sub: string } {
   if (item.kind === "review") return { title: `Review ${item.cards} card${item.cards === 1 ? "" : "s"}`, sub: "Spaced review across everything" };
   if (item.kind === "test") return { title: "Practice test", sub: item.projectTitle };
-  return { title: item.title, sub: item.weak ? `${item.projectTitle}, missed on your last test` : item.projectTitle };
+  if (item.weak) return { title: item.title, sub: `${item.projectTitle}, missed on your last test` };
+  // A lesson named like its project (one file, first heading) would print the same line twice.
+  return { title: item.title, sub: item.projectTitle.trim().toLowerCase() === item.title.trim().toLowerCase() ? "" : item.projectTitle };
 }
 
 export function PlanRow({ item, lib, interactive = true }: { item: PlanItem; lib: Library; interactive?: boolean }) {
@@ -29,7 +31,7 @@ export function PlanRow({ item, lib, interactive = true }: { item: PlanItem; lib
       </span>
       <span className="min-w-0 flex-1">
         <span className={`block truncate font-extrabold ${item.done ? "text-muted line-through decoration-2" : ""}`}>{title}</span>
-        <span className="block truncate text-[13px] font-semibold text-muted">{sub}</span>
+        {sub && <span className="block truncate text-[13px] font-semibold text-muted">{sub}</span>}
       </span>
       <span className="flex-none text-[13px] font-extrabold text-muted">{item.minutes} min</span>
     </>
