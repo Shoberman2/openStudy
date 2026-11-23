@@ -4,6 +4,7 @@
 //
 // Usage: npm run build && npx next start -p 3100   (in another terminal)
 //        npm run e2e                                (or E2E_URL=https://<preview> npm run e2e)
+//        Protected preview: E2E_VERCEL_AUTH=1 E2E_URL=https://<preview> node --env-file=.env.local scripts/e2e-core.mjs
 // Uses playwright-core with the Chromium that Playwright installed (npx playwright install chromium).
 import { chromium } from "playwright-core";
 
@@ -39,6 +40,12 @@ const check = (name, ok, detail = "") => {
 
 const browser = await chromium.launch({ headless: HEADLESS });
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+// Protected Vercel previews: E2E_VERCEL_AUTH=1 with VERCEL_OIDC_TOKEN (vercel env pull) sends the
+// short-lived token, only to the preview's own origin, as Vercel's Trusted Sources header.
+if (process.env.E2E_VERCEL_AUTH === "1" && process.env.VERCEL_OIDC_TOKEN) {
+  const token = process.env.VERCEL_OIDC_TOKEN;
+  await ctx.route(`${BASE}/**`, (route) => route.continue({ headers: { ...route.request().headers(), "x-vercel-trusted-oidc-idp-token": token } }));
+}
 const page = await ctx.newPage();
 const errors = [];
 page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
@@ -79,6 +86,7 @@ try {
   // 4. Sort and create (spec 3.3 / 9.6). Accounts off or comped: no paywall in the way.
   await page.getByRole("link", { name: "Sort pages" }).click();
   await page.waitForURL(/\/app\/sort/);
+  await page.getByRole("button", { name: /^Create (project|all)/ }).first().waitFor();
   // The category is an editable field, so read input values, not page text.
   const fields = await page.locator("input").evaluateAll((els) => els.map((e) => e.value));
   check("sort suggests a Computer Science project", fields.includes("Computer Science"), fields.filter(Boolean).join(", "));
@@ -89,17 +97,22 @@ try {
 
   // 5. Project screen: answer the focus sheet, open the first lesson.
   await page.goto(`${BASE}/app`);
+  await page.locator('a[href^="/app/p/"]').first().waitFor();
   const projectHref = await page.locator('a[href^="/app/p/"]').first().getAttribute("href");
   await page.goto(`${BASE}${projectHref}`);
+  await page.locator('section[aria-label="Lesson path"] button').first().waitFor();
+  await page.waitForTimeout(500);
   const everything = page.getByRole("button", { name: "Everything", exact: true });
   if (await everything.isVisible().catch(() => false)) await everything.click();
   await page.locator('section[aria-label="Lesson path"] button').first().click();
+  await page.locator('a[href^="/app/learn/"]').first().waitFor();
   const learnHref = await page.locator('a[href^="/app/learn/"]').first().getAttribute("href");
   check("lesson path opens a lesson", !!learnHref);
 
   // 6. Play the lesson to the end. Unknown questions get a guess; the feedback panel shows the
   //    right answer, which is remembered for when the question comes back (mistakes re-queue).
   await page.goto(`${BASE}${learnHref}`);
+  await page.getByRole("button", { name: "Check", exact: true }).waitFor({ timeout: 20_000 });
   const memory = new Map();
   let syntaxPrompts = 0;
   let done = false;
@@ -162,6 +175,7 @@ try {
 
   // 7. Progress shows on Home.
   await page.goto(`${BASE}/app`);
+  await page.getByText(/\d+ XP/).first().waitFor();
   const home = await textOf();
   const xp = Number(home.match(/(\d+) XP/)?.[1] ?? 0);
   check("XP recorded on Home", xp > 0, `${xp} XP`);
@@ -171,7 +185,8 @@ try {
     const r = await page.goto(`${BASE}${p}`);
     check(`GET ${p}`, !!r && r.ok());
   }
-  const health = await (await page.request.get(`${BASE}/api/health`)).json();
+  await page.goto(`${BASE}/api/health`);
+  const health = JSON.parse(await page.locator("body").innerText());
   check("/api/health answers", typeof health.ai === "boolean", JSON.stringify(health));
 
   const real = errors.filter((e) => !/favicon/i.test(e));
