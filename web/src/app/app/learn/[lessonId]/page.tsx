@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Exercise } from "@/engine/exercises";
 import { logEvent } from "@/engine/library";
+import { addDays, localDay } from "@/engine/util";
 import { buildSession, conceptExercises } from "@/engine/session";
 import type { Card, Grade } from "@/engine/types";
 import { applyWrittenConcepts, needsWrittenConcepts, writerInput, writerPages } from "@/engine/written";
@@ -70,9 +71,10 @@ function LearnPageSession() {
         return r.lib;
       });
       setDone({ xp, s });
-      setAskExam(!!project && !project.sample && project.type !== "book" && !project.goalDate);
+      const firstDrill = !lib.lessons.some((l) => l.projectId === project?.id && l.sessions > 0);
+      setAskExam(!!project && !project.sample && project.type !== "book" && !project.goalDate && firstDrill);
     },
-    [update, lessonId, project],
+    [update, lessonId, project, lib.lessons],
   );
 
   if (!ready) return <Loading />;
@@ -101,6 +103,7 @@ function LearnPageSession() {
             <input
               type="date"
               aria-label="Exam date"
+              min={localDay(addDays(new Date(), 1))}
               value={project.goalDate ?? ""}
               onChange={(e) => update((l) => ({ ...l, projects: l.projects.map((x) => (x.id === project.id ? { ...x, goalDate: e.target.value || undefined } : x)) }))}
               className="input mt-3"

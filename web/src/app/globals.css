@@ -195,6 +195,10 @@ body {
   background: var(--blue-soft);
   color: var(--blue);
 }
+/* Blue text on dark grounds needs a lighter blue for AA contrast; fills keep --blue. */
+:root[data-theme="dark"] .text-blue {
+  color: #8ea8ff;
+}
 :root[data-theme="dark"] .tile[aria-pressed="true"],
 :root[data-theme="dark"] .tile.is-selected {
   color: #a9bdff;
@@ -430,14 +434,6 @@ a.spine:hover {
 .spine-green { --c: var(--green); }
 .spine-ink { --c: var(--ink); --c-fg: var(--paper); }
 .spine-yellow::before, .spine-yellow::after { background: rgba(0, 0, 0, 0.12); }
-.spine-add {
-  --c: transparent;
-  --c-fg: var(--muted);
-  border: 2px dashed var(--line-strong);
-  box-shadow: none;
-  justify-content: center;
-}
-.spine-add::before, .spine-add::after { display: none; }
 .shelf-board {
   height: 12px;
   border-radius: 4px;

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { currentLesson, inboxPages, projectLessons } from "@/engine/library";
 import { buildPlan } from "@/engine/plan";
+import { buildPractice } from "@/engine/session";
 import { useLibrary } from "@/lib/store";
 import { AppHeader, Loading, Page } from "@/components/app/AppChrome";
 import { FeasibilityNotice, PlanRow, itemHref } from "@/components/app/PlanRows";
@@ -30,7 +31,12 @@ export default function Home() {
   const projects = lib.projects.slice().sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   const plan = projects.length ? buildPlan(lib, now) : null;
   const today = plan?.days[0];
-  const open = today?.items.filter((it) => !it.done) ?? [];
+  // A due review whose cards yield no playable question would open "Nothing due" and stay on Today.
+  const projectTypes = new Map(lib.projects.map((p) => [p.id, p.type]));
+  const reviewPlayable = !!today?.items.some((it) => it.kind === "review" && !it.done) && buildPractice(lib.cards, now, () => 0.5, 12, { projectTypes }).length > 0;
+  const items = today?.items.filter((it) => it.kind !== "review" || it.done || reviewPlayable) ?? [];
+  const open = items.filter((it) => !it.done);
+  const testToday = items.some((it) => it.kind === "test" && !it.done);
   const planned = Math.round(today?.items.reduce((s, x) => s + x.minutes, 0) ?? 0);
   const over = Math.round(today?.overBy ?? 0);
 
@@ -47,15 +53,15 @@ export default function Home() {
           </Link>
         )}
 
-        {today && today.items.length > 0 ? (
+        {today && items.length > 0 ? (
           <section aria-label="Today">
             <h1 className="text-[32px] font-black leading-tight tracking-tight">Today</h1>
             <p className="mt-1 text-[16px] text-muted">
               About {planned} min of your {today.budget} min
-              {over > 0 ? `. Over by ${over} min to stay on track for your exam.` : "."}
+              {over > 0 ? (testToday ? `. Over by ${over} min to stay on track for your exam.` : `. Over by ${over} min.`) : "."}
             </p>
             <ul className="mt-4 grid grid-cols-1 gap-1">
-              {today.items.map((it, i) => (
+              {items.map((it, i) => (
                 <PlanRow key={i} item={it} lib={lib} />
               ))}
             </ul>

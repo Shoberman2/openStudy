@@ -28,11 +28,11 @@ export function SessionComplete({
         {level !== undefined && <p className="mt-1 text-[17px] text-muted">Level {level} of 5</p>}
         <dl className="mt-10 flex justify-center gap-14">
           <div>
-            <dt className="text-[15px] font-bold text-muted">Accuracy</dt>
+            <dt className="text-[16px] font-bold text-muted">Accuracy</dt>
             <dd className="num mt-1 text-[30px] font-black">{Math.round(accuracy * 100)}%</dd>
           </div>
           <div>
-            <dt className="text-[15px] font-bold text-muted">Time</dt>
+            <dt className="text-[16px] font-bold text-muted">Time</dt>
             <dd className="num mt-1 text-[30px] font-black">
               {mm}:{ss}
             </dd>

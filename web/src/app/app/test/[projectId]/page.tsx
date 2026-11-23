@@ -107,7 +107,7 @@ function TestPageSession() {
             <p className="mt-1 text-muted">{project.title}</p>
           </div>
           <section className="card mt-8 p-5" aria-label="Accuracy by lesson">
-            <h2 className="mb-3 font-black">By lesson</h2>
+            <h2 className="mb-3 font-black">By topic</h2>
             <ul className="grid grid-cols-1 gap-3.5">
               {result.perLesson
                 .slice()
@@ -136,7 +136,7 @@ function TestPageSession() {
             <Link href={`/app/p/${project.id}`} className="btn btn-secondary sm:min-w-[160px]">
               Back to project
             </Link>
-            {missed.length > 0 && (
+            {missed.length > 0 && buildFromCards(missed, lib.cards.filter((c) => c.projectId === project.id), () => 0.5, { projectType: project.type }).length > 0 && (
               <button className="btn sm:min-w-[200px]" onClick={() => setReview(buildFromCards(missed, lib.cards.filter((c) => c.projectId === project.id), Math.random, { projectType: project.type }))}>
                 Review your misses
               </button>

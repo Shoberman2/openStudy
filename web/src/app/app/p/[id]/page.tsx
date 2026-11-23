@@ -50,7 +50,8 @@ export default function ProjectPage() {
   const cardCount = (lid: string) => lib.cards.filter((c) => c.lessonId === lid).length;
   const themes = lessons.filter((l) => l.kind === "theme");
   // Spec 13.5: ask once, right after a set is built.
-  const askFocus = focusOpen || (!project.focusAsked && !project.sample && themes.length >= 2);
+  // Asked once the first drill is done, so creating a set leads straight to questions (17.2).
+  const askFocus = focusOpen || (!project.focusAsked && !project.sample && themes.length >= 2 && lessons.some((l) => l.sessions > 0));
   const focused = themes.filter((l) => (project.focusLessons ?? []).includes(l.id));
   const setType = (t: "book" | "class" | "other") => update((l) => ({ ...l, projects: l.projects.map((x) => (x.id === project.id ? { ...x, type: t } : x)) }));
 
@@ -58,7 +59,6 @@ export default function ProjectPage() {
     <>
       <BackHeader
         href="/app"
-        title={project.title}
         right={
           <button className="rounded-full px-3 py-2 text-[16px] font-bold text-muted hover:bg-shelf hover:text-ink" onClick={() => setDetailsOpen(true)}>
             Details

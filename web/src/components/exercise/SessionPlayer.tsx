@@ -1,7 +1,7 @@
 "use client";
 
 import { isCode } from "@/engine/code";
-import { BookOpen, CircleCheck, CircleX, X } from "lucide-react";
+import { CircleCheck, CircleX, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { checkAnswer, type Answer, type CheckResult, type Exercise } from "@/engine/exercises";
 import { answerCurrent, current, isFinished, progress, startSession, type SessionState } from "@/engine/session";
@@ -115,7 +115,21 @@ export function SessionPlayer({ exercises, mode = "full", sourceFor, onGraded, o
   const shown = pending ?? state;
   const autoChecked = ex?.type === "match" || ex?.type === "flash" || ex?.type === "explain" || ex?.type === "picture";
 
-  if (!ex) return null;
+  if (!ex) {
+    // Nothing playable (an empty build): say so instead of a blank screen.
+    if (!exercises.length)
+      return (
+        <div className="flex min-h-dvh flex-col items-center justify-center gap-4 p-6 text-center">
+          <p className="font-bold text-muted">No questions to practice here yet.</p>
+          {onClose && (
+            <button className="btn" onClick={onClose}>
+              Back
+            </button>
+          )}
+        </div>
+      );
+    return null;
+  }
 
   const body = (
     <div className={full ? "mx-auto w-full max-w-[640px] px-4 pt-6 pb-48 sm:pt-10" : "px-5 pt-4 pb-5 sm:px-6"}>
@@ -136,7 +150,7 @@ export function SessionPlayer({ exercises, mode = "full", sourceFor, onGraded, o
   const footer = result ? (
     <Feedback result={result} source={ex.type === "picture" ? null : source} onSource={() => setSourceOpen(true)} onContinue={next} full={full} />
   ) : (
-    <div className={full ? "border-t-2 border-line bg-paper" : ""}>
+    <div className={full ? "bg-paper" : ""}>
       <div className={full ? "mx-auto flex w-full max-w-[640px] justify-end px-4 py-4 sm:py-6" : "px-5 pb-5 sm:px-6"}>
         {!autoChecked && (
           <button className={`btn btn-green ${full ? "w-full sm:w-auto sm:min-w-[180px]" : "btn-block"}`} disabled={!answer} onClick={() => check()}>
@@ -227,7 +241,6 @@ function Feedback({ result, source, onSource, onContinue, full }: { result: Chec
         <div className={`mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:items-center ${source ? "sm:justify-between" : "sm:justify-end"}`}>
           {source && (
             <button onClick={onSource} className={`flex items-center gap-2 text-left text-[15px] font-bold ${ok ? "text-green" : "text-red"} hover:underline`}>
-              <BookOpen size={18} strokeWidth={2.5} className="flex-none" />
               <span className="line-clamp-1">From {source.book}</span>
             </button>
           )}

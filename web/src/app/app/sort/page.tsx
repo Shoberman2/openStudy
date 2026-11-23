@@ -10,7 +10,7 @@ import { matchingProject } from "@/engine/identity";
 import { detectionSummary } from "@/engine/summary";
 import { wordEntries } from "@/engine/classbuilder";
 import { sortDoneProps } from "@/engine/events";
-import { createProject, extendProject, inboxPages, logEvent, materialize } from "@/engine/library";
+import { createProject, currentLesson, extendProject, inboxPages, logEvent, materialize, projectLessons } from "@/engine/library";
 import type { Library, Page as LibPage, Project, ProjectType } from "@/engine/types";
 import { newId } from "@/engine/util";
 import { buildLessons, smartDefine, suggestGroups } from "@/lib/ai";
@@ -132,8 +132,8 @@ export default function SortPage() {
     let next = groups!.map((g) => ({ ...g, pageIds: g.pageIds.filter((id) => id !== pageId) }));
     if (toKey === "new") {
       const taken = new Set(next.map((g) => g.title.toLowerCase()));
-      let title = "New book";
-      for (let i = 2; taken.has(title.toLowerCase()); i++) title = `New book ${i}`;
+      let title = "New study set";
+      for (let i = 2; taken.has(title.toLowerCase()); i++) title = `New study set ${i}`;
       const from = groups!.find((g) => g.pageIds.includes(pageId));
       next = [...next, { key: `new:${pageId}`, title, author: "", pageIds: [pageId], type: from?.type ?? "book", category: from?.category ?? "" }];
     } else next = next.map((g) => (g.key === toKey ? { ...g, pageIds: [...g.pageIds, pageId] } : g));
@@ -399,7 +399,9 @@ export default function SortPage() {
           onCreate={(projectId, fn) => {
             update(fn);
             setCreating(null);
-            router.push(`/app/p/${projectId}`);
+            // Straight into the first drill (spec 17.2); the set's screen comes after.
+            const first = currentLesson(projectLessons(fn(lib), projectId));
+            router.push(first ? `/app/learn/${first.id}` : `/app/p/${projectId}`);
           }}
         />
       )}

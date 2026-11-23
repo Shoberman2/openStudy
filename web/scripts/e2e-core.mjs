@@ -143,9 +143,10 @@ try {
   const fields = await page.locator("input").evaluateAll((els) => els.map((e) => e.value));
   check("sort uses the file name for the project title", fields.includes("R-basics"), fields.filter(Boolean).join(", "));
   await page.getByRole("button", { name: /^Create (study set|all)/ }).first().click();
-  await page.waitForURL((u) => /\/app(\/p\/[^/]+)?$/.test(u.pathname), { timeout: 20_000 });
+  await page.waitForURL((u) => /\/app(\/p\/[^/]+|\/learn\/[^/]+)?$/.test(u.pathname), { timeout: 20_000 });
   const paywalled = (await textOf()).includes("Start free trial");
   check("project created without a dead-end paywall", !paywalled);
+  check("creating a study set opens its first drill", /\/app\/learn\//.test(new URL(page.url()).pathname));
 
   // 5. Project screen: answer the focus sheet, open the first lesson.
   await page.goto(`${BASE}/app`);
@@ -252,6 +253,7 @@ try {
     await page.getByRole("button", { name: "Continue", exact: true }).click();
   }
   check("lesson plays to the end", done);
+  check("the first drill asks for an exam date", await page.getByText(/^Got an exam for /).isVisible());
   await shot("complete");
   check("syntax questions asked about the code", syntaxPrompts > 0, `${syntaxPrompts} seen`);
   check("first session asks for typed code", typedCode);
@@ -297,6 +299,13 @@ try {
   await page.getByRole("button", { name: "Check", exact: true }).waitFor();
   check("practice opens a due review", true);
   await page.goto(`${BASE}${projectHref}`);
+  // After the first drill the focus question appears once (17.2); answer it like a person would.
+  const focusSheet = page.getByRole("dialog", { name: "Choose a focus" });
+  await focusSheet.waitFor({ timeout: 3000 }).catch(() => undefined);
+  if (await focusSheet.isVisible()) {
+    check("focus is asked after the first drill", true);
+    await focusSheet.getByRole("button", { name: "Everything", exact: true }).click();
+  }
   await page.getByTestId("practice-test").click();
   await page.getByRole("progressbar", { name: "Test progress" }).waitFor();
   check("practice test opens at two ready lessons", true);
