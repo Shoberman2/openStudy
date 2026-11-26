@@ -1,4 +1,5 @@
 // Lessons for class material and definition cards (spec 8.4).
+import { detectCodeDefinition, isCode } from "./code";
 import { conceptCards } from "./concepts";
 import {
   absorbSmall,
@@ -52,7 +53,7 @@ function cleanTerm(t: string): string | null {
   const ws = term.split(/\s+/).filter(Boolean);
   if (!ws.length || ws.length > 5) return null;
   if (NOT_TERMS.has(ws[0].toLowerCase())) return null;
-  if (!/^[\p{L}]/u.test(term) || /[.!?]/.test(term)) return null;
+  if (!/^[\p{L}]/u.test(term) || /[.!?]/.test(term) || isCode(term) || /[,"]/.test(term)) return null;
   return term.charAt(0).toUpperCase() + term.slice(1);
 }
 
@@ -68,6 +69,8 @@ function cleanDef(d: string): string | null {
  * "Term is/are/means/refers to definition", "Term (abbr) is ..." (term 1..5 words, definition 4..40 words).
  */
 export function detectDefinition(line: string): Definition | null {
+  const code = detectCodeDefinition(line);
+  if (code) return code;
   const s = line.trim();
   const sep = s.match(/^([^:=\u2013\u2014]{1,60}?)\s*(?::|=|\s[-\u2013\u2014]\s)\s*(.+)$/);
   if (sep) {
@@ -85,6 +88,24 @@ export function detectDefinition(line: string): Definition | null {
   return null;
 }
 
+function definitionQuestion(term: string, definition: string): string {
+  if (isCode(term)) return `What does ${term} do?`;
+  // Internal capitals and names such as Python retain their source casing.
+  const named = /^\p{Lu}$/u.test(term) || /\p{Lu}/u.test(term.slice(1)) || /^\p{Lu}\S+['’]s\s/u.test(term)
+    || /^(?:Python|Java|Ruby|Rust|Swift|Julia|Excel|Matlab|Stata)$/i.test(term);
+  if (named) return `What is ${term}?`;
+
+  const lower = term.charAt(0).toLowerCase() + term.slice(1);
+  if (/^(a|an)\s/i.test(definition)) {
+    const vowelSound = /^(?:[aeiou]|honest|honor|hour|heir)/.test(lower) && !/^(?:one\b|use|uni(?:t|f|que|vers)|euro)/.test(lower);
+    const article = vowelSound ? "an" : "a";
+    return `What is ${article} ${lower}?`;
+  }
+  if (/[^s]s$/i.test(term) && !/(?:ics|sis|us)$/i.test(term)) return `What are ${lower}?`;
+  if (lower.includes(" ")) return `What does ${lower} mean?`;
+  return `What is ${lower}?`;
+}
+
 /** One definition card (8.4); distractors are the 3 other terms closest in length. */
 export function defDraft(d: Definition, pageId: string | undefined, allTerms: string[]): FactDraft {
   const others = allTerms
@@ -100,7 +121,7 @@ export function defDraft(d: Definition, pageId: string | undefined, allTerms: st
     definition,
     statement: `${d.term}: ${bare}.`,
     cloze: d.term,
-    question: `What is ${/^[A-Z]{2,}/.test(d.term) ? d.term : d.term.charAt(0).toLowerCase() + d.term.slice(1)}?`,
+    question: definitionQuestion(d.term, bare),
     answer: d.term,
     distractors: others,
     falseStatement: others[0] ? `${others[0]}: ${bare}.` : `${d.term}: ${bare}.`,
@@ -163,7 +184,7 @@ function classSentences(pages: ClassPage[]): Omit<Sent, "vec">[] {
     for (const line of lines) {
       for (const s of splitSentences(line.replace(/^\s*(?:[-*•]|\d+[.)])\s+/, ""))) {
         const n = wordCount(s);
-        if (n < (bullets ? 4 : 7) || n > 45) continue;
+        if (n > 45 || (n < (bullets ? 4 : 7) && !detectCodeDefinition(s))) continue;
         const key = normalizeForDedupe(s);
         if (seen.has(key)) continue;
         seen.add(key);
@@ -187,7 +208,7 @@ function fileNumber(name: string): number | null {
 export function lessonTitleFromFile(title: string): string {
   // Course codes belong to the project title, not to each lesson.
   const noCode = title.replace(/\b[A-Z]{2,5}\s?-?\d{2,4}[A-Z]?\b/g, " ");
-  const t = cleanFileTitle(/\.[a-z0-9]{2,5}$/i.test(noCode) ? noCode : noCode + ".x");
+  const t = cleanFileTitle(/\.(?:markdown|[a-z0-9]{2,5})$/i.test(noCode) ? noCode : noCode + ".x");
   return t || cleanFileTitle(title + ".x");
 }
 
@@ -288,7 +309,8 @@ export function buildClass(project: { title: string; author?: string; type?: Pro
     const used = new Set(unitDefs[i].map((x) => x.s));
     return pickClozes(u.sents.filter((s) => !used.has(s)), 24 - unitDefs[i].length);
   });
-  const allClozes = [...unitClozes.flat().map((x) => x.cloze), ...allTerms];
+  // Code terms never stand in as wrong answers for a plain-word blank.
+  const allClozes = [...unitClozes.flat().map((x) => x.cloze), ...allTerms.filter((t) => !isCode(t))];
 
   const usedTitles = new Set<string>();
   const lessons: LessonDraft[] = units.map((u, i) => {

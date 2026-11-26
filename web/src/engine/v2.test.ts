@@ -7,7 +7,7 @@ import { findCourseCode, groupPages, guessType } from "./grouping";
 import { addSample, emptyLibrary, materialize, normalizeLibrary } from "./library";
 import { buildPlan, COST } from "./plan";
 import { buildPracticeTest, buildSession, scoreTest } from "./session";
-import type { Library } from "./types";
+import type { Card, Lesson, Library, Project } from "./types";
 import { addDays, dayDiff, localDay, seeded } from "./util";
 
 // ---------- helpers to build Office files in memory ----------
@@ -244,6 +244,7 @@ describe("study plan", () => {
 
   it("spaces lessons, caps reviews at 40% and schedules practice tests", () => {
     const lib = sampleLib(now);
+    lib.lessons = lib.lessons.map((l) => l.projectId === "smpbio101" ? { ...l, level: 3 } : l);
     // Make 60 cards due today to exercise the review cap.
     const many = Array.from({ length: 60 }, (_, i) => ({ ...lib.cards[i % lib.cards.length], id: `due${i}`, srs: { state: "review" as const, ease: 2.5, interval: 3, due: new Date(2026, 9, 15).toISOString(), reps: 2, lapses: 0 } }));
     const plan = buildPlan({ ...lib, cards: [...lib.cards, ...many] }, now);
@@ -306,5 +307,28 @@ describe("study plan", () => {
     expect(today.items.filter((x) => x.kind === "lesson" && x.lessonId === "lb1")).toHaveLength(1);
     const firstBio = today.items.find((x) => x.kind === "lesson" && x.projectId === "smpbio101" && !x.done);
     expect(firstBio).toMatchObject({ lessonId: "lb2", weak: true });
+  });
+});
+
+describe("study plan availability", () => {
+  const now = new Date(2026, 10, 23, 10);
+
+  it("leaves a review off today's plan while the card is still cooling down", () => {
+    const card: Card = {
+      id: "c", lessonId: "l", projectId: "p", kind: "fact", statement: "Binary search needs a sorted list.",
+      srs: { state: "learning", ease: 2.5, interval: 0, due: new Date(now.getTime() + 600_000).toISOString(), reps: 0, lapses: 0 },
+    };
+    const lib = { ...emptyLibrary(), cards: [card] };
+    expect(buildPlan(lib, now).days[0].items).toEqual([]);
+    const due = new Date(card.srs.due);
+    expect(buildPlan(lib, due).days[0].items).toMatchObject([{ kind: "review", cards: 1 }]);
+  });
+
+  it("plans tests only when two lessons are ready at the start of the day", () => {
+    const project: Project = { id: "p", title: "R", color: "blue", createdAt: now.toISOString(), focus: "ideas", quotesAsked: true, goalDate: "2026-11-26" };
+    const lesson: Lesson = { id: "l", projectId: "p", title: "Vectors", summary: "", kind: "theme", order: 0, level: 3, sessions: 3 };
+    const lib = { ...emptyLibrary(), projects: [project], lessons: [lesson, { ...lesson, id: "l2", order: 1, level: 2 }] };
+    const dates = buildPlan(lib, now).days.filter((d) => d.items.some((i) => i.kind === "test")).map((d) => d.date);
+    expect(dates).toEqual(["2026-11-25"]);
   });
 });

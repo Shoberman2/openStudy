@@ -1,6 +1,7 @@
 // Session builder (spec 5.2) and the in-session state machine (mistake re-queue).
 import type { Verdict } from "./check";
-import { shapeClass } from "./builder";
+import { isClozeVerb, shapeClass } from "./builder";
+import { isCode, onlyInCode } from "./code";
 import { containsTerm, tokens, wordCount } from "./text";
 import { shuffle } from "./util";
 import {
@@ -96,13 +97,15 @@ export function keyBlanks(pool: Card[]): BlankFinder {
   const most = Math.max(2, Math.floor(facts * 0.3));
   const isKey = (stem: string | undefined, surface: string) => {
     const n = stem ? (cardsWith.get(stem) ?? 0) : 0;
-    return n >= 2 && n <= most && surface.length >= 5 && !PLAIN_WORDS.has(surface.toLowerCase());
+    return n >= 2 && n <= most && surface.length >= 5 && !PLAIN_WORDS.has(surface.toLowerCase()) && !isClozeVerb(surface);
   };
   // Every key word in the pool, for wrong answers that read like the right one.
   const keyWords = new Map<string, string>();
   for (const c of pool) {
     if (c.kind !== "fact") continue;
-    for (const t of tokens(c.statement)) if (!keyWords.has(t.stem) && isKey(t.stem, t.surface)) keyWords.set(t.stem, t.surface.toLowerCase());
+    for (const t of tokens(c.statement)) {
+      if (!keyWords.has(t.stem) && isKey(t.stem, t.surface) && !onlyInCode(c.statement, t.surface)) keyWords.set(t.stem, t.surface.toLowerCase());
+    }
   }
   const find = (c: Card): string | undefined => {
     if (isDefinition(c)) return c.term;
@@ -113,10 +116,13 @@ export function keyBlanks(pool: Card[]): BlankFinder {
     if (c.kind !== "fact") return undefined;
     // The card's own blank when it is a key word, else the statement's key word on the most cards.
     const cz = clozeOf(c);
-    if (cz && isKey(tokens(cz)[0]?.stem, cz) && once(tokens(cz)[0]?.stem)) return cz;
+    if (cz && !onlyInCode(c.statement, cz)) {
+      const parts = tokens(cz);
+      if ((isCode(cz) || parts.some((t) => isKey(t.stem, cz))) && parts.every((t) => once(t.stem))) return cz;
+    }
     let best: { word: string; n: number } | undefined;
     for (const t of tokens(c.statement)) {
-      if (!isKey(t.stem, t.surface) || !once(t.stem) || !containsTerm(c.statement, t.surface)) continue;
+      if (!isKey(t.stem, t.surface) || !once(t.stem) || !containsTerm(c.statement, t.surface) || onlyInCode(c.statement, t.surface)) continue;
       // Shared by more cards first, then the longer (more specific) word.
       const n = cardsWith.get(t.stem)! * 100 + t.surface.length;
       if (!best || n > best.n) best = { word: t.surface, n };

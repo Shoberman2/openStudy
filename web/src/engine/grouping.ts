@@ -162,7 +162,10 @@ export function groupPages(pages: GroupPage[]): SuggestedGroup[] {
       units.push({ name, title: t.title, author: t.author, ids: fp.map((p) => p.id) });
       continue;
     }
-    const title = fp[0].sourceTitle?.trim() || fp[0].heading?.trim() || cleanFileTitle(name);
+    const sourceTitle = fp.find((p) => p.sourceTitle?.trim())?.sourceTitle?.trim();
+    const sectionHeadings = new Set(fp.map((p) => titleKey(p.heading)).filter(Boolean));
+    const heading = sectionHeadings.size < 2 ? fp[0].heading?.trim() : undefined;
+    const title = sourceTitle || heading || cleanFileTitle(name);
     units.push({ name, title, ids: fp.map((p) => p.id) });
   }
   // Merge units whose titles overlap (union in import order).

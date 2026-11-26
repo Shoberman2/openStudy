@@ -50,7 +50,9 @@ export async function sendEvents(events: LibEvent[], keepalive = false): Promise
   if (!batch.length) return;
   sending = true;
   try {
-    const { accessToken } = await import("./auth");
+    const { accessToken, accountsUp } = await import("./auth");
+    // Accounts off or down: nothing would store them; keep the cursor so they go once it is back.
+    if (!(await accountsUp())) return;
     const token = await accessToken().catch(() => null);
     const r = await fetch("/api/events", {
       method: "POST",

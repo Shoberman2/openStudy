@@ -14,7 +14,7 @@ function SignIn() {
   const params = useSearchParams();
   const next = params.get("next")?.startsWith("/app") ? params.get("next")! : "/app/profile";
   const { update } = useLibrary();
-  const { reload } = useAccount();
+  const { account, reload } = useAccount();
   const [mode, setMode] = useState<AuthMode>("create");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -53,6 +53,13 @@ function SignIn() {
     return (
       <Page>
         <p className="text-[17px] text-muted">Accounts are not set up on this server yet.</p>
+      </Page>
+    );
+  // Configured but down (spec 16.2): a form here could only fail.
+  if (account?.billing === "off")
+    return (
+      <Page>
+        <p className="text-[17px] text-muted">Accounts are not available right now. Everything is unlocked, and your notes and lessons stay on this device.</p>
       </Page>
     );
 

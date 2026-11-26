@@ -13,6 +13,34 @@ export function billingEnabled(): boolean {
   return !!(supabaseUrl() && serviceKey() && publishableKey());
 }
 
+// Whether Supabase answers at all. A paused or deleted project (its host stops resolving) would
+// otherwise lock every visitor out: sign-in fails and the paywall never clears. Checked at most
+// once a minute per server instance, with a short timeout.
+let reach: { ok: boolean; at: number } | null = null;
+const REACH_TTL_MS = 60_000;
+export async function accountsReachable(): Promise<boolean> {
+  if (!billingEnabled()) return false;
+  if (reach && Date.now() - reach.at < REACH_TTL_MS) return reach.ok;
+  let ok = false;
+  try {
+    const r = await fetch(`${supabaseUrl()}/auth/v1/health`, {
+      headers: { apikey: publishableKey()! },
+      signal: AbortSignal.timeout(2500),
+      cache: "no-store",
+    });
+    ok = r.status < 500;
+  } catch {
+    ok = false;
+  }
+  reach = { ok, at: Date.now() };
+  return ok;
+}
+
+/** Accounts are configured and the account server is up. */
+export async function accountsOn(): Promise<boolean> {
+  return billingEnabled() && (await accountsReachable());
+}
+
 export function billingOff(): Response {
   return Response.json({ error: "billing_off" }, { status: 503 });
 }

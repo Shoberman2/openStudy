@@ -1,5 +1,8 @@
 // File format readers (spec 8.2). Pure: they take bytes or text and return page drafts.
-import JSZip from "jszip";
+import type JSZip from "jszip";
+
+// .pptx and .docx are zip files; the zip reader loads only when one is imported.
+const loadZip = async (data: ArrayBuffer | Uint8Array) => (await import("jszip")).default.loadAsync(data);
 import { parseNotes, stripHtml } from "./notes";
 import type { PageKind, WordEntry } from "./types";
 import { parseWordList, wordListText } from "./words";
@@ -63,7 +66,7 @@ const num = (name: string) => Number(name.match(/(\d+)\.xml$/)?.[1] ?? 0);
 export type Slide = { index: number; heading?: string; body: string[]; notes: string[] };
 
 export async function parsePptxSlides(data: ArrayBuffer | Uint8Array): Promise<{ title?: string; slides: Slide[] }> {
-  const zip = await JSZip.loadAsync(data);
+  const zip = await loadZip(data);
   const names = Object.keys(zip.files)
     .filter((n) => /^ppt\/slides\/slide\d+\.xml$/.test(n))
     .sort((a, b) => num(a) - num(b));
@@ -114,7 +117,7 @@ export async function readPptx(data: ArrayBuffer | Uint8Array): Promise<FileResu
 export type DocPara = { text: string; heading: boolean };
 
 export async function parseDocxParagraphs(data: ArrayBuffer | Uint8Array): Promise<{ title?: string; paras: DocPara[] }> {
-  const zip = await JSZip.loadAsync(data);
+  const zip = await loadZip(data);
   const xml = (await zip.file("word/document.xml")?.async("string")) ?? "";
   const paras: DocPara[] = [];
   for (const m of all(/<w:p(?:\s[^>]*)?>([\s\S]*?)<\/w:p>/, xml)) {
@@ -192,12 +195,13 @@ export function readTextFile(name: string, content: string): FileResult {
 
 /** "Lecture_04 - Enzymes.pptx" -> "Enzymes"; "bio101-week3-notes.pdf" -> "Bio101". */
 export function cleanFileTitle(name: string): string {
-  let t = name.replace(/\.[a-z0-9]{1,5}$/i, "").replace(/[_]+/g, " ");
+  const stem = name.replace(/\.(?:markdown|[a-z0-9]{1,5})$/i, "").replace(/_+/g, " ");
+  let t = stem;
   t = t.replace(/\b(lecture|lec|week|wk|slides?|notes?|chapter|ch|unit|session|class|part)\s*[-#.]?\s*\d+[a-z]?\b/gi, " ");
   t = t.replace(/\b(lecture|lec|slides?|notes?|handout|final|draft|v\d+)\b/gi, " ");
   t = t.replace(/^[\s\-:.,]+|[\s\-:.,]+$/g, "").replace(/\s*[-:]\s*[-:]\s*/g, " - ").replace(/\s+/g, " ").trim();
   t = t.replace(/^[-:]\s*/, "").replace(/\s*[-:]$/, "").replace(/\s+:\s*/g, ": ").replace(/^[:\s]+/, "");
-  if (!t) t = name.replace(/\.[a-z0-9]{1,5}$/i, "").replace(/[_]+/g, " ").trim();
+  if (!t) t = stem.trim();
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
 

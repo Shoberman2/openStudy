@@ -1,12 +1,13 @@
 // Study plan (spec 8.6). Deterministic: recomputed from current state every time it is shown.
 // Only completions are stored (as events); today's completed items are read back from them.
-import { review } from "./srs";
+import { isDue, review } from "./srs";
 import type { Card, Lesson, Library, Project } from "./types";
 import { addDays, dayDiff, localDay } from "./util";
 
 export const COST = { lesson: 4, quotes: 3, test: 8, reviewCard: 0.3 } as const;
 export const GOAL_MINUTES: Record<number, number> = { 10: 5, 20: 10, 30: 15, 50: 20 };
 export const READY_LEVEL = 3;
+export const PRACTICE_TEST_READY_LESSONS = 2;
 export const MASTERED_LEVEL = 5;
 const REVIEW_SHARE = 0.4;
 const MAX_DAYS = 90;
@@ -103,7 +104,10 @@ export function buildPlan(lib: Library, now: Date = new Date()): Plan {
 
     // 1. Reviews first, capped at 40% of the day's minutes; overflow rolls to the next day.
     const reviewCap = Math.max(0, Math.floor((budget * REVIEW_SHARE - (isToday ? reviewMinutesDone : 0)) / COST.reviewCard));
-    const due = lib.cards.filter((c) => srs.get(c.id)!.state !== "new" && dueDay(c) <= d).sort((a, b) => srs.get(a.id)!.due.localeCompare(srs.get(b.id)!.due));
+    const due = lib.cards.filter((c) => {
+      const current = srs.get(c.id)!;
+      return isToday ? isDue(current, now) : current.state !== "new" && dueDay(c) <= d;
+    }).sort((a, b) => srs.get(a.id)!.due.localeCompare(srs.get(b.id)!.due));
     const n = Math.min(due.length, reviewCap);
     if (n > 0) {
       due.slice(0, n).forEach((c) => reviewCard(c, d));
@@ -115,7 +119,9 @@ export function buildPlan(lib: Library, now: Date = new Date()): Plan {
     // 2. Practice tests on goal-1, goal-3 and goal-7.
     for (const p of goals) {
       const toGoal = dayDiff(d, p.goalDate!);
-      if ((toGoal === 1 || toGoal === 3 || toGoal === 7) && !(isToday && testsDoneToday.has(p.id))) {
+      if (toGoal !== 1 && toGoal !== 3 && toGoal !== 7) continue;
+      const lessons = [...sim.values()].filter(({ l }) => l.projectId === p.id);
+      if (readyLessonCount(lessons) >= PRACTICE_TEST_READY_LESSONS && !(isToday && testsDoneToday.has(p.id))) {
         items.push({ kind: "test", minutes: COST.test, projectId: p.id, projectTitle: p.title });
         used += COST.test;
       }
@@ -187,6 +193,10 @@ export function dayLabel(day: string, now: Date = new Date()): string {
   return dayStart(day).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 }
 
-export function lessonReady(l: Lesson): boolean {
+export function lessonReady(l: Pick<Lesson, "level">): boolean {
   return l.level >= READY_LEVEL;
+}
+
+export function readyLessonCount(lessons: Pick<Lesson, "level">[]): number {
+  return lessons.filter(lessonReady).length;
 }

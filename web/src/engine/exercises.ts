@@ -1,4 +1,5 @@
 // Exercise generation from cards (spec 5.1) and checking of answers (spec 5.3).
+import { isCode, normalizeCode } from "./code";
 import { checkTyped, scoreQuote, type DiffToken, type Verdict } from "./check";
 import { STOPWORDS, containsTerm, normalizeAnswer, replaceTerm, tokens, truncate, wordCount } from "./text";
 import type { Card, Grade } from "./types";
@@ -63,6 +64,7 @@ export function clozeOf(card: Card): string | undefined {
 }
 
 function displayTerm(card: Card, term: string): string {
+  if (isCode(term) || /\p{Lu}/u.test(term.slice(1))) return term;
   const s = card.statement.replace(/^["“'(]+/, "");
   return s.startsWith(term) && term.length > 1 && term !== term.toUpperCase() ? term.toLowerCase() : term;
 }
@@ -76,7 +78,9 @@ function factQuestion(card: Card): string {
   // A definition card's answer is its term, so asking "What is <term>?" would give it away: show the definition.
   if (card.term && card.definition && normalizeAnswer(factAnswer(card)) === normalizeAnswer(card.term)) {
     const d = card.definition.replace(/[.\s]+$/, "");
-    return `Which term means: ${/^[A-Z][a-z]/.test(d) ? d.charAt(0).toLowerCase() + d.slice(1) : d}?`;
+    const lower = /^[A-Z][a-z]/.test(d) ? d.charAt(0).toLowerCase() + d.slice(1) : d;
+    if (isCode(card.term)) return /^(the|a|an)\s/i.test(lower) ? `Which code is ${lower}?` : `Which code ${lower}?`;
+    return `Which term means: ${lower}?`;
   }
   return card.question?.trim() || blankedStatement(card);
 }
@@ -125,13 +129,13 @@ function longWords(text: string): WordTok[] {
 
 export type GenCtx = { pool: Card[]; rand: () => number; projectTitle?: string; lessonTitle?: string; isKey?: (c: Card) => boolean };
 
-function otherAnswers(card: Card, ctx: GenCtx, want: number, short: boolean): string[] {
-  const mine = short ? clozeOf(card) ?? factAnswer(card) : factAnswer(card);
+function otherAnswers(card: Card, ctx: GenCtx, want: number): string[] {
+  const mine = factAnswer(card);
   const target = mine.length;
   const cands = ctx.pool
     .filter((c) => c.id !== card.id && c.kind === "fact")
-    .map((c) => (short ? (clozeOf(c) ? displayTerm(c, clozeOf(c)!) : undefined) : factAnswer(c)))
-    .filter((x): x is string => !!x && !containsTerm(card.statement, x))
+    .map(factAnswer)
+    .filter((x) => !!x && !containsTerm(card.statement, x))
     .sort((a, b) => Math.abs(a.length - target) - Math.abs(b.length - target));
   return uniqNorm(cands, [mine]).slice(0, want);
 }
@@ -139,7 +143,7 @@ function otherAnswers(card: Card, ctx: GenCtx, want: number, short: boolean): st
 export function genMC(card: Card, ctx: GenCtx): Exercise {
   const answer = factAnswer(card);
   let distractors = uniqNorm(card.distractors ?? [], [answer]).slice(0, 3);
-  if (distractors.length < 3) distractors = uniqNorm([...distractors, ...otherAnswers(card, ctx, 6, false)], [answer]).slice(0, 3);
+  if (distractors.length < 3) distractors = uniqNorm([...distractors, ...otherAnswers(card, ctx, 6)], [answer]).slice(0, 3);
   return { id: exId(), cardIds: [card.id], projectId: card.projectId, type: "mc", prompt: factQuestion(card), answer, options: shuffle([answer, ...distractors], ctx.rand) };
 }
 
@@ -229,13 +233,26 @@ export function genBank(card: Card, ctx: GenCtx): Exercise | null {
   const c = clozeOf(card);
   if (!c) return null;
   const answer = displayTerm(card, c);
-  const others = otherAnswers(card, ctx, 3, true).filter((w) => wordCount(w) <= 2);
-  const fromStatement = shuffle(
-    longWords(card.statement).map((t) => t.core).filter((w) => normalizeAnswer(w) !== normalizeAnswer(c)),
-    ctx.rand,
-  ).slice(0, 2);
-  const extra = uniqNorm([...others, ...(card.distractors ?? []).filter((d) => wordCount(d) === 1)], [answer]).slice(0, 3);
-  const options = shuffle(uniqNorm([answer, ...extra, ...fromStatement.map((w) => w.toLowerCase())]), ctx.rand);
+  const code = isCode(answer);
+  const normalize = code ? normalizeCode : normalizeAnswer;
+  const others = ctx.pool
+    .filter((other) => other.id !== card.id && other.kind === "fact")
+    .flatMap((other) => {
+      const term = other.term ?? clozeOf(other);
+      return term ? [displayTerm(other, term)] : [];
+    });
+  const candidates = [...(card.distractors ?? []), ...others]
+    .filter((w) => isCode(w) === code && (code || wordCount(w) <= Math.max(2, wordCount(answer))) && !containsTerm(card.statement, w, code))
+    .sort((a, b) => Math.abs(a.length - answer.length) - Math.abs(b.length - answer.length));
+  const seen = new Set([normalize(answer), ""]);
+  const extra = candidates.filter((w) => {
+    const key = normalize(w);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 3);
+  if (!extra.length) return null;
+  const options = shuffle([answer, ...extra], ctx.rand);
   return { id: exId(), cardIds: [card.id], projectId: card.projectId, type: "bank", segments: splitAround(card.statement, c), answers: [answer], options };
 }
 
@@ -473,7 +490,10 @@ export function checkAnswer(ex: Exercise, a: Answer): CheckResult {
     case "q-bank1":
     case "q-bank3": {
       const vals = a.kind === "slots" ? a.value : [];
-      const ok = ex.answers.every((ans, i) => normalizeAnswer(vals[i] ?? "") === normalizeAnswer(ans));
+      const ok = ex.answers.every((ans, i) => {
+        const normalize = ex.type === "bank" && isCode(ans) ? normalizeCode : normalizeAnswer;
+        return normalize(vals[i] ?? "") === normalize(ans);
+      });
       const filled = ex.segments.map((s) => (typeof s === "string" ? s : ex.answers[s.blank])).join("");
       return { verdict: ok ? "correct" : "wrong", solution: filled.trim(), grade: ok ? "good" : "again" };
     }

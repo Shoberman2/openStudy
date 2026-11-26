@@ -7,6 +7,7 @@ import { useState } from "react";
 import { buildProject } from "@/engine/classbuilder";
 import { CATEGORY_NAMES } from "@/engine/categories";
 import { currentLesson, defineWord, extendProject, logEvent, projectLessons, setFocus, unlockedIds, wordsToDefine } from "@/engine/library";
+import { PRACTICE_TEST_READY_LESSONS, READY_LEVEL, readyLessonCount } from "@/engine/plan";
 import { newSrs } from "@/engine/srs";
 import { normalizeForDedupe, splitSentences, truncate, wordCount } from "@/engine/text";
 import type { Lesson, Library, Page as LibPage, Project } from "@/engine/types";
@@ -44,7 +45,8 @@ export default function ProjectPage() {
   const unlocked = unlockedIds(lessons);
   const cur = currentLesson(lessons);
   const pages = lib.pages.filter((p) => p.projectId === project.id);
-  const readyCount = lessons.filter((l) => l.level >= 3).length;
+  const readyCount = readyLessonCount(lessons);
+  const canTest = readyCount >= PRACTICE_TEST_READY_LESSONS;
   const cardCount = (lid: string) => lib.cards.filter((c) => c.lessonId === lid).length;
   const themes = lessons.filter((l) => l.kind === "theme");
   // Spec 13.5: ask once, right after a set is built.
@@ -90,9 +92,9 @@ export default function ProjectPage() {
             </span>
             <span className="min-w-0 flex-1">
               <span className="block text-[13px] font-extrabold text-muted">Practice test</span>
-              <span className="block truncate text-[14px] font-bold">{readyCount >= 2 ? "Scores every lesson" : `Opens when 2 lessons reach level 3 (${readyCount} now)`}</span>
+              <span className="block truncate text-[14px] font-bold">{canTest ? "Scores every lesson" : `Opens when ${PRACTICE_TEST_READY_LESSONS} lessons reach level ${READY_LEVEL} (${readyCount} now)`}</span>
             </span>
-            {readyCount >= 2 ? (
+            {canTest ? (
               <Link href={`/app/test/${project.id}`} className="btn btn-sm btn-yellow flex-none" data-testid="practice-test">
                 Start
               </Link>

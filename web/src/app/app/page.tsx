@@ -97,7 +97,9 @@ export default function Home() {
         {target ? (
           <section className="card overflow-hidden">
             <div className="p-5 sm:p-6">
-              <p className="kicker truncate">{target.project.title}</p>
+              {target.project.title.trim().toLowerCase() !== target.lesson.title.trim().toLowerCase() && (
+                <p className="kicker truncate">{target.project.title}</p>
+              )}
               <h2 className="mt-1 text-[26px] font-black leading-tight tracking-tight">{target.lesson.title}</h2>
               <p className="mt-1.5 text-muted">{target.lesson.summary}</p>
               <div className="mt-4 flex items-center gap-3">

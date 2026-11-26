@@ -102,8 +102,8 @@ export function replaceTerm(text: string, term: string, replacement: string): st
   });
 }
 
-export function containsTerm(text: string, term: string): boolean {
-  const re = new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegExp(term)}(?![\\p{L}\\p{N}])`, "iu");
+export function containsTerm(text: string, term: string, caseSensitive = false): boolean {
+  const re = new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegExp(term)}(?![\\p{L}\\p{N}])`, caseSensitive ? "u" : "iu");
   return re.test(text);
 }
 
