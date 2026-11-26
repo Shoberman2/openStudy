@@ -1,5 +1,5 @@
 // Answer checking (spec 5.3).
-import { isCode, normalizeCode } from "./code";
+import { isCode, typedCodeTokens } from "./code";
 import { normalizeAnswer } from "./text";
 
 export type Verdict = "correct" | "close" | "wrong";
@@ -26,13 +26,12 @@ export function checkTyped(input: string, accepted: string | string[]): Verdict 
   let best: Verdict = "wrong";
   for (const a of Array.isArray(accepted) ? accepted : [accepted]) {
     if (isCode(a)) {
-      // Code keeps its symbols and case (%>% and <- would normalize to nothing): only spacing and quote style may differ.
-      const u = normalizeCode(input);
-      const t = normalizeCode(a);
-      if (!u) continue;
-      if (u === t) return "correct";
-      if (u.toLowerCase() === t.toLowerCase()) best = "close";
-      else if (t.length >= 6 && levenshtein(u.toLowerCase(), t.toLowerCase()) <= Math.max(1, Math.floor(t.length * 0.1))) best = "close";
+      const u = typedCodeTokens(input);
+      const t = typedCodeTokens(a);
+      if (!u.length || u.length !== t.length) continue;
+      if (u.every((token, i) => token === t[i])) return "correct";
+      // Keep the existing case hint for standalone constants. An altered call or argument is wrong.
+      if (t.length === 1 && u[0].toLowerCase() === t[0].toLowerCase()) best = "close";
       continue;
     }
     const target = normalizeAnswer(a);

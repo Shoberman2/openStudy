@@ -90,13 +90,13 @@ describe("syntax cards (spec 16)", () => {
     expect(cards.some((c) => /\w____|____\w/.test(c.question ?? ""))).toBe(false);
   });
 
-  it("checks typed code exactly, ignoring only spacing and quote style", () => {
+  it("checks typed code, preserving identifiers and argument case", () => {
     expect(checkTyped("%>%", "%>%")).toBe("correct");
     expect(checkTyped("%<%", "%>%")).toBe("wrong");
     expect(checkTyped("<-", "<-")).toBe("correct");
     expect(checkTyped("mean(x,na.rm=TRUE)", "mean(x, na.rm = TRUE)")).toBe("correct");
     expect(checkTyped("install.packages('dplyr')", 'install.packages("dplyr")')).toBe("correct");
-    expect(checkTyped("mean(x, na.rm = true)", "mean(x, na.rm = TRUE)")).toBe("close");
+    expect(checkTyped("mean(x, na.rm = true)", "mean(x, na.rm = TRUE)")).toBe("wrong");
     expect(checkTyped("tail(df)", "head(df)")).toBe("wrong");
     expect(checkTyped("na", "NA")).toBe("close");
     expect(checkTyped("No", "NA")).toBe("wrong");

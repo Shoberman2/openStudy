@@ -1,6 +1,6 @@
 "use client";
 
-import { Flame, Gem, Quote, X } from "lucide-react";
+import { Quote, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, type ReactNode } from "react";
 import type { Project } from "@/engine/types";
@@ -37,24 +37,6 @@ export function Ring({ value, size = 44, stroke = 6, color = "var(--yellow)", ch
         />
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">{children}</div>
-    </div>
-  );
-}
-
-export function StreakPill({ streak }: { streak: number }) {
-  return (
-    <div className="flex items-center gap-1.5 font-extrabold" title={`${streak} day streak`}>
-      <Flame size={24} strokeWidth={2.5} className={streak > 0 ? "text-yellow" : "text-muted"} fill={streak > 0 ? "var(--yellow)" : "none"} />
-      <span className={streak > 0 ? "" : "text-muted"}>{streak}</span>
-    </div>
-  );
-}
-
-export function XpPill({ xp }: { xp: number }) {
-  return (
-    <div className="flex items-center gap-1.5 font-extrabold" title={`${xp} XP`}>
-      <Gem size={22} strokeWidth={2.5} className="text-blue" />
-      <span>{xp} XP</span>
     </div>
   );
 }

@@ -280,25 +280,14 @@ export function projectLessons(lib: Library, projectId: string): Lesson[] {
   return lib.lessons.filter((l) => l.projectId === projectId).sort((a, b) => a.order - b.order);
 }
 
-/** Theme lessons unlock when the previous theme lesson has level >= 1; quotes are always open. */
+/** All lessons can be started in any order. */
 export function unlockedIds(lessons: Lesson[]): Set<string> {
-  const out = new Set<string>();
-  let prevOk = true;
-  for (const l of lessons) {
-    if (l.kind === "quotes") {
-      out.add(l.id);
-      continue;
-    }
-    if (prevOk) out.add(l.id);
-    prevOk = prevOk && l.level >= 1;
-  }
-  return out;
+  return new Set(lessons.map((l) => l.id));
 }
 
+/** Next up: first new theme, then any new lesson, then the lowest level. */
 export function currentLesson(lessons: Lesson[]): Lesson | undefined {
-  const open = unlockedIds(lessons);
-  const avail = lessons.filter((l) => open.has(l.id));
-  return avail.find((l) => l.level === 0 && l.kind === "theme") ?? avail.find((l) => l.level === 0) ?? avail.slice().sort((a, b) => a.level - b.level || a.order - b.order)[0];
+  return lessons.find((l) => l.level === 0 && l.kind === "theme") ?? lessons.find((l) => l.level === 0) ?? lessons.slice().sort((a, b) => a.level - b.level || a.order - b.order)[0];
 }
 
 /** "Continue" target: next unfinished lesson of the most recently studied (or created) project. */

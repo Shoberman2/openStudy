@@ -70,7 +70,7 @@ export function TestPlayer({ exercises, title, onDone, onClose }: { exercises: E
       </header>
       <div className="mx-auto w-full max-w-[640px] px-4 pb-48 pt-6 sm:pt-10">
         <p className="kicker mb-1">Practice test: {title}</p>
-        <p className="kicker mb-3 !text-ink">{instructionFor(ex)}</p>
+        {instructionFor(ex) !== "Choose the right answer" && <p className="kicker mb-3 !text-ink">{instructionFor(ex)}</p>}
         <ExerciseView key={ex.id} ex={ex} result={null} onAnswer={setAnswer} onSubmit={(a) => next(a)} />
       </div>
       <div className="fixed inset-x-0 bottom-0 z-30 border-t-2 border-line bg-paper">

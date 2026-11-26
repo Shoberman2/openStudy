@@ -423,7 +423,7 @@ function Apply({ ex, result, onAnswer, compact }: P<"apply">) {
           onAnswer(wordCount(e.target.value) >= 4 ? { kind: "text", value: e.target.value } : null);
         }}
       />
-      <p className="text-[14px] text-muted">Four words or more. Worth 3 XP.</p>
+      <p className="text-[15px] text-muted">Four words or more.</p>
     </div>
   );
 }

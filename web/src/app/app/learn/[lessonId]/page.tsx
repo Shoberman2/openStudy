@@ -5,12 +5,11 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Exercise } from "@/engine/exercises";
-import { logEvent, projectLessons, unlockedIds } from "@/engine/library";
+import { logEvent } from "@/engine/library";
+import { addDays, localDay } from "@/engine/util";
 import { buildSession, conceptExercises } from "@/engine/session";
 import type { Card, Grade } from "@/engine/types";
 import { applyWrittenConcepts, needsWrittenConcepts, writerInput, writerPages } from "@/engine/written";
-import { localDay } from "@/engine/util";
-import { displayStreak } from "@/engine/xp";
 import { applyGrades, finishLesson } from "@/lib/actions";
 import { writeConcepts } from "@/lib/ai";
 import { useLibrary } from "@/lib/store";
@@ -25,6 +24,8 @@ function LearnPageSession() {
   const router = useRouter();
   const [exercises, setExercises] = useState<Exercise[] | null>(null);
   const [done, setDone] = useState<{ xp: number; s: SessionSummary } | null>(null);
+  // Spec 17.2: a class study set without an exam date asks for one after a drill, not in onboarding.
+  const [askExam, setAskExam] = useState(false);
   const built = useRef(false);
   const lesson = lib.lessons.find((l) => l.id === lessonId);
   const project = lesson ? lib.projects.find((p) => p.id === lesson.projectId) : undefined;
@@ -70,8 +71,10 @@ function LearnPageSession() {
         return r.lib;
       });
       setDone({ xp, s });
+      const firstDrill = !lib.lessons.some((l) => l.projectId === project?.id && l.sessions > 0);
+      setAskExam(!!project && !project.sample && project.type !== "book" && !project.goalDate && firstDrill);
     },
-    [update, lessonId],
+    [update, lessonId, project, lib.lessons],
   );
 
   if (!ready) return <Loading />;
@@ -85,18 +88,29 @@ function LearnPageSession() {
       </div>
     );
   if (done) {
-    const now = new Date();
     return (
       <SessionComplete
         title={`${lesson.title} done`}
-        xp={done.xp}
         accuracy={done.s.accuracy}
         seconds={done.s.seconds}
-        streak={displayStreak(lib.stats, now)}
         level={lesson.level}
-        goal={{ today: lib.stats.dayXP[localDay(now)] ?? 0, target: lib.profile.dailyGoalXP }}
         onContinue={() => router.push(`/app/p/${project.id}`)}
-      />
+      >
+        {askExam && (
+          <label className="block rounded-[16px] bg-shelf p-4">
+            <span className="block text-[16px] font-extrabold">Got an exam for {project.title}?</span>
+            <span className="block text-[15px] text-muted">Add the date and your plan works back from it.</span>
+            <input
+              type="date"
+              aria-label="Exam date"
+              min={localDay(addDays(new Date(), 1))}
+              value={project.goalDate ?? ""}
+              onChange={(e) => update((l) => ({ ...l, projects: l.projects.map((x) => (x.id === project.id ? { ...x, goalDate: e.target.value || undefined } : x)) }))}
+              className="input mt-3"
+            />
+          </label>
+        )}
+      </SessionComplete>
     );
   }
   // Shown until the writer is done: applying its result marks the lesson as written (spec 13.6).
@@ -112,7 +126,7 @@ function LearnPageSession() {
       <div className="flex min-h-dvh flex-col items-center justify-center gap-4 p-6 text-center">
         <p className="font-bold text-muted">No cards in this lesson yet.</p>
         <Link href={`/app/p/${project.id}`} className="btn">
-          Back to the path
+          Back to the study set
         </Link>
       </div>
     );
@@ -126,16 +140,6 @@ export default function LearnPage() {
   if (!ready) return <Loading />;
   const lesson = lib.lessons.find((l) => l.id === lessonId);
   const project = lesson ? lib.projects.find((p) => p.id === lesson.projectId) : undefined;
-  if (project && !unlockedIds(projectLessons(lib, project.id)).has(lessonId)) {
-    return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-4 p-6 text-center">
-        <p className="font-bold text-muted">Finish the previous lesson to start this one.</p>
-        <Link href={`/app/p/${project.id}`} className="btn">
-          Back to the path
-        </Link>
-      </div>
-    );
-  }
   return (
     <PlusGate locked={!!project && !project.sample} from="lesson">
       <LearnPageSession key={lessonId} />

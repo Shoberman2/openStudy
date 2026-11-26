@@ -81,6 +81,17 @@ export function normalizeCode(s: string): string {
     .replace(/[.;]+$/, "");
 }
 
+// Keep string contents intact and tokenize before ignoring spacing so split operators stay split.
+// Escaped strings keep their original quotes unless the forms are identical.
+const CODE_TOKEN = /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`[^`]*`|[\p{L}_][\p{L}\p{N}_.]*|\d+(?:\.\d+)?(?:[eE][+-]?\d+)?[\p{L}_]*|%[^%\s]+%|::[:]?|<<?-|->>?|\|>|\*\*|\/\/|<<|>>|[<>=!]=|&&|\|\||[^\s]/gu;
+
+export function typedCodeTokens(code: string): string[] {
+  const parts = code.match(CODE_TOKEN) ?? [];
+  // An optional statement terminator after a call or a literal neither changes its arguments nor adds code.
+  if (parts.at(-1) === ";" && (parts.at(-2) === ")" || CONSTANTS.includes(parts.at(-2) ?? ""))) parts.pop();
+  return parts.map((part) => /^(['"])[^'"\\]*\1$/.test(part) ? `'${part.slice(1, -1)}'` : part);
+}
+
 /**
  * True when `word` (a candidate fill-in word) appears in `text` first as part of code, like
  * "packages" in install.packages("dplyr") or "group" in group_by(). Blanking it would test a

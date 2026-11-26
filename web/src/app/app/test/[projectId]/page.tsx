@@ -16,8 +16,7 @@ import { Ring } from "@/components/ui/basics";
 import { SessionPlayer, type SessionSummary } from "@/components/exercise/SessionPlayer";
 import { TestPlayer, type TestAnswer } from "@/components/exercise/TestPlayer";
 import { SessionComplete } from "@/components/exercise/SessionComplete";
-import { localDay } from "@/engine/util";
-import { addXP, displayStreak } from "@/engine/xp";
+import { addXP } from "@/engine/xp";
 
 function TestPageSession() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -33,7 +32,7 @@ function TestPageSession() {
     if (!ready || built.current || !project) return;
     built.current = true;
     const lessons = lib.lessons.filter((l) => l.projectId === project.id);
-    setExercises(buildPracticeTest(lessons, lib.cards.filter((c) => c.projectId === project.id)));
+    setExercises(buildPracticeTest(lessons, lib.cards.filter((c) => c.projectId === project.id), Math.random, 20, { projectType: project.type }));
   }, [ready, project, lib.lessons, lib.cards]);
 
   const onDone = useCallback(
@@ -78,15 +77,11 @@ function TestPageSession() {
       </div>
     );
   if (reviewDone) {
-    const now = new Date();
     return (
       <SessionComplete
         title="Misses reviewed"
-        xp={reviewDone.xp}
         accuracy={reviewDone.s.accuracy}
         seconds={reviewDone.s.seconds}
-        streak={displayStreak(lib.stats, now)}
-        goal={{ today: lib.stats.dayXP[localDay(now)] ?? 0, target: lib.profile.dailyGoalXP }}
         onContinue={() => router.push(`/app/p/${project.id}`)}
       />
     );
@@ -112,7 +107,7 @@ function TestPageSession() {
             <p className="mt-1 text-muted">{project.title}</p>
           </div>
           <section className="card mt-8 p-5" aria-label="Accuracy by lesson">
-            <h2 className="mb-3 font-black">By lesson</h2>
+            <h2 className="mb-3 font-black">By topic</h2>
             <ul className="grid grid-cols-1 gap-3.5">
               {result.perLesson
                 .slice()
@@ -141,8 +136,8 @@ function TestPageSession() {
             <Link href={`/app/p/${project.id}`} className="btn btn-secondary sm:min-w-[160px]">
               Back to project
             </Link>
-            {missed.length > 0 && (
-              <button className="btn sm:min-w-[200px]" onClick={() => setReview(buildFromCards(missed, lib.cards.filter((c) => c.projectId === project.id)))}>
+            {missed.length > 0 && buildFromCards(missed, lib.cards.filter((c) => c.projectId === project.id), () => 0.5, { projectType: project.type }).length > 0 && (
+              <button className="btn sm:min-w-[200px]" onClick={() => setReview(buildFromCards(missed, lib.cards.filter((c) => c.projectId === project.id), Math.random, { projectType: project.type }))}>
                 Review your misses
               </button>
             )}
@@ -173,7 +168,7 @@ export default function TestPage() {
   if (project && readyLessonCount(lib.lessons.filter((l) => l.projectId === projectId)) < PRACTICE_TEST_READY_LESSONS) {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-4 p-6 text-center">
-        <p className="font-bold text-muted">Reach level {READY_LEVEL} in {PRACTICE_TEST_READY_LESSONS} lessons to take your practice test.</p>
+        <p className="font-bold text-muted">Reach level {READY_LEVEL} in {PRACTICE_TEST_READY_LESSONS} topics to take your practice test.</p>
         <Link href={`/app/p/${project.id}`} className="btn">
           Back to project
         </Link>
