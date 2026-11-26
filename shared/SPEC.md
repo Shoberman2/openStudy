@@ -622,3 +622,12 @@ Agreed by Claude and GPT-6.2-Sol after two rounds (2026-11-23): OpenStudy is a d
 - **Style**: buttons are flat pills (no lip), tiles and word chips have no lip, option tiles have no icon box and show a check when picked, no icons inside buttons, quiet fills instead of bordered boxes, 15px minimum for secondary text.
 - **Dark mode is a choice**: Settings > Appearance (Light, Dark), stored on the device (`openstudy.theme`). App pages open light even when the device is dark; the landing and legal pages always stay light.
 - Copy says "study set" and "topic" instead of "project", "book" and "lesson" on these screens.
+
+## 18. v12 (web): Worth Practicing First (OVERRIDES 9.6 where they conflict)
+
+Planned by GPT-6.2-Sol and built by Claude (2026-11-25). The first of five steps toward a Duolingo-style loop that proves learning. Spencer chose a visible path, a kind streak with a free repair, celebrations, and XP earned only by correct answers from memory (no leagues, no hearts); those arrive in later steps. iOS is not changed.
+
+- **Shortlist** (`engine/salience.ts`): after an import, Sort ranks the four largest suggested groups (up to 60 pages each) with the offline builder and shows up to three ideas from the best one. Each idea links to the sentence on its page it came from; an idea with no locatable sentence is dropped. Score: +3 a term with a definition or code, +1 a rule-based concept, +2 the target is in the page heading, +0 to +3 repetition across pages, +0 to +2 centrality (TF-IDF cosine to the group). At most two ideas from one page, no repeated target, ties broken by source order. A group needs at least one idea that can be typed from memory, or no shortlist is shown.
+- **Screen**: "Worth Practicing First", "From <set>", the ideas as quiet rows (term, then its sentence), and one primary "Start this drill". While it shows, "Create study set" and "Create all" become secondary buttons. The rest of Sort is unchanged.
+- **Start this drill** makes the set (or adds to the matching one) with the existing builder, focus "ideas", no quotes question yet, and opens the topic holding the first idea.
+- **Events** (on the device, counts only): `shortlist_shown {ideas, typed}`, `shortlist_started {ideas, pages, existing}`.
