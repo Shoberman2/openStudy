@@ -139,6 +139,10 @@ try {
   await page.getByRole("link", { name: "Sort pages" }).click();
   await page.waitForURL(/\/app\/sort/);
   await page.getByRole("button", { name: /^Create (study set|all)/ }).first().waitFor();
+  const shortlist = page.getByTestId("shortlist");
+  await shortlist.waitFor({ timeout: 10_000 }).catch(() => {});
+  const ideas = await shortlist.locator("li").count();
+  check("sort shows Worth Practicing First from the notes", ideas >= 2 && (await shortlist.getByRole("button", { name: "Start this drill" }).isVisible()), `${ideas} ideas`);
   await shot("sort");
   const fields = await page.locator("input").evaluateAll((els) => els.map((e) => e.value));
   check("sort uses the file name for the project title", fields.includes("R-basics"), fields.filter(Boolean).join(", "));
@@ -334,6 +338,17 @@ try {
   await click("Review your misses");
   await page.getByRole("button", { name: "Check", exact: true }).waitFor();
   check("practice test opens review of misses", true);
+
+  // 8b. Worth Practicing First (spec 18): one tap from a new pile into a drill on the top idea.
+  await page.goto(`${BASE}/app/import`);
+  const PY = "# Python Lists\n\nlen(xs) returns the number of items in a list.\nxs.append(4) adds an item to the end of a list.\nsorted(xs) returns a new sorted list and leaves the original unchanged.\nlen(xs) is also how you check whether a list is empty.\n";
+  await page.locator('input[type="file"]').setInputFiles({ name: "python-lists.md", mimeType: "text/markdown", buffer: Buffer.from(PY) });
+  await page.getByText(/Added \d+ pages? from 1 file/).first().waitFor({ timeout: 20_000 });
+  await page.getByRole("link", { name: "Sort pages" }).click();
+  await page.getByRole("button", { name: "Start this drill" }).click({ timeout: 15_000 });
+  await page.waitForURL(/\/app\/learn\//, { timeout: 20_000 });
+  await page.getByRole("button", { name: "Check", exact: true }).waitFor({ timeout: 15_000 });
+  check("Start this drill opens a drill on the new pile", true);
 
   // 9. Pages that must always load.
   for (const p of ["/app/plan", "/app/practice", "/app/profile", "/app/settings", "/app/import", "/privacy", "/terms"]) {

@@ -23,6 +23,8 @@ import { PageThumb } from "@/components/app/PageThumb";
 import { Paywall } from "@/components/app/Paywall";
 import { ProgressBar, Sheet } from "@/components/ui/basics";
 import { OptionTile } from "@/components/ui/OptionTile";
+import { StudyShortlist } from "@/components/app/StudyShortlist";
+import { buildShortlist, type Shortlist } from "@/engine/salience";
 
 type Group = { key: string; title: string; author: string; pageIds: string[]; type: ProjectType; category: string };
 
@@ -74,6 +76,9 @@ export default function SortPage() {
   const inbox = useMemo(() => inboxPages(lib), [lib]);
   const inboxIds = useMemo(() => new Set(inbox.map((p) => p.id)), [inbox]);
   const started = useRef(false);
+  const [shortlist, setShortlist] = useState<Shortlist | null>(null);
+  const [startingDrill, setStartingDrill] = useState(false);
+  const ranked = useRef(false);
 
   useEffect(() => {
     if (!ready || started.current) return;
@@ -84,6 +89,19 @@ export default function SortPage() {
       if (g.length) update((l) => logEvent(l, "sort_done", sortDoneProps(g)));
     });
   }, [ready, inbox, lib.projects, update]);
+
+  // Worth Practicing First (spec 18): ranked once, off the first paint, from the groups as first suggested.
+  useEffect(() => {
+    if (!groups || ranked.current) return;
+    ranked.current = true;
+    const t = setTimeout(() => {
+      const named = groups.filter((g) => g.title.trim() && g.title !== UNSORTED);
+      const list = buildShortlist(named, new Map(toBuildPages(inbox).map((p) => [p.id, p])));
+      setShortlist(list);
+      if (list) update((l) => logEvent(l, "shortlist_shown", { ideas: list.ideas.length, typed: list.ideas.filter((i) => i.typed).length }));
+    }, 0);
+    return () => clearTimeout(t);
+  }, [groups, inbox, update]);
 
   // Newly imported pages that are not in any group yet go to Unsorted.
   useEffect(() => {
@@ -201,6 +219,36 @@ export default function SortPage() {
     router.push("/app");
   };
 
+  // One tap from the shortlist: make (or extend) that set and open the topic holding the first idea.
+  const shortGroup = shortlist ? (visible ?? []).find((g) => g.key === shortlist.groupKey) : undefined;
+  const startShortlist = async (g: Group, list: Shortlist) => {
+    setStartingDrill(true);
+    const pages = g.pageIds.map((id) => byId.get(id)!).filter(Boolean);
+    const match = matchingProject(lib.projects, g.title.trim(), g.author);
+    const { result } = await buildLessons(
+      { title: match?.title ?? g.title.trim(), author: (match?.author ?? g.author) || undefined, type: match?.type ?? g.type },
+      toBuildPages(pages),
+      lib.profile,
+    );
+    const projectId = match?.id ?? newId();
+    const fn = (l: Library): Library => {
+      const next = match
+        ? logEvent(extendProject(l, projectId, g.pageIds, result, []), "pages_added", { pages: g.pageIds.length, projectId })
+        : addProject(l, g, { ...materialize(projectId, result, []), projectId }, { focus: "ideas", quotesAsked: false });
+      return logEvent(next, "shortlist_started", { ideas: list.ideas.length, pages: g.pageIds.length, existing: !!match });
+    };
+    // IDs are made inside the update, so the topic to open is read from the same saved library.
+    const goal = list.ideas[0]?.title;
+    let lessonId: string | undefined;
+    update((l) => {
+      const after = fn(l);
+      const card = after.cards.find((c) => c.projectId === projectId && goal && (c.term === goal || c.answer === goal));
+      lessonId = card?.lessonId ?? currentLesson(projectLessons(after, projectId))?.id;
+      return after;
+    });
+    router.push(lessonId ? `/app/learn/${lessonId}` : `/app/p/${projectId}`);
+  };
+
   return (
     <>
       <BackHeader href="/app" title="Sort pages" />
@@ -224,6 +272,14 @@ export default function SortPage() {
           </div>
         ) : (
           <>
+            {shortlist && shortGroup && (
+              <StudyShortlist
+                from={shortGroup.title.trim()}
+                ideas={shortlist.ideas}
+                starting={startingDrill}
+                onStart={() => plusFirst("shortlist", () => void startShortlist(shortGroup, shortlist))}
+              />
+            )}
             <h2 className="text-[26px] font-black leading-tight tracking-tight">
               {visible.length} study set{visible.length === 1 ? "" : "s"}
             </h2>
@@ -247,7 +303,7 @@ export default function SortPage() {
                     </div>
                   </div>
                 ) : (
-                  <button className="btn btn-block" onClick={() => plusFirst("create_all", () => void createAll())}>
+                  <button className={`btn btn-block ${shortlist && shortGroup ? "btn-secondary" : ""}`} onClick={() => plusFirst("create_all", () => void createAll())}>
                     Create all {todo.length} study sets
                   </button>
                 )}
@@ -315,7 +371,7 @@ export default function SortPage() {
                           Add all to {match.title.length > 22 ? match.title.slice(0, 21) + "…" : match.title}
                         </button>
                       ) : (
-                        <button className="btn btn-block" onClick={() => plusFirst("create_project", () => setCreating(g))} disabled={!g.title.trim()}>
+                        <button className={`btn btn-block ${shortlist && shortGroup ? "btn-secondary" : ""}`} onClick={() => plusFirst("create_project", () => setCreating(g))} disabled={!g.title.trim()}>
                           Create study set
                         </button>
                       )}
