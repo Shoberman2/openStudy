@@ -32,6 +32,7 @@ import {
 } from "./exercises";
 import { MAX_PICTURES_PER_SESSION, isPicture } from "./pictures";
 import { isDue } from "./srs";
+import { LOOKED_UP_ID, lookupExercise } from "./lookup";
 import type { Card, Grade, Lesson, Profile, ProjectType } from "./types";
 
 export type SessionProjectOptions = {
@@ -277,6 +278,8 @@ export function buildSession(
 ): Exercise[] {
   const all = cards.filter((c) => c.lessonId === lesson.id);
   if (!all.length) return [];
+  // Looked Up facts (spec 19) play as their own questions: no distractors borrowed from unrelated facts.
+  if (lesson.projectId === LOOKED_UP_ID) return pickOrder(all, now).slice(0, 10).map(lookupExercise);
   // Picture cards (spec 11.2) play only as picture exercises, at most 3, never first.
   const pictures = pickOrder(all.filter(isPicture), now);
   const mine = all.filter((c) => !isPicture(c));
@@ -524,7 +527,9 @@ export function buildPractice(cards: Card[], now: Date, rand: () => number = Mat
     picker.take(card);
     const drill = usesDrillRules(opts, card.projectId);
     let ex: Exercise | null;
-    if (card.kind === "quote") {
+    if (card.projectId === LOOKED_UP_ID) {
+      ex = lookupExercise(card);
+    } else if (card.kind === "quote") {
       ex = rand() < 0.5 ? genQuoteBank(card, ctx, 3) : genQuoteLetters(card);
       if (!ex) ex = genQuoteLetters(card);
     } else if (isDefinition(card)) {

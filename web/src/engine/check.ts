@@ -20,6 +20,35 @@ export function levenshtein(a: string, b: string): number {
 }
 
 /** Typed answer vs one or more accepted answers. */
+const MAGNITUDE: Record<string, number> = { k: 1e3, thousand: 1e3, million: 1e6, billion: 1e9, trillion: 1e12 };
+const QUANTITY = /^(?:about|around|roughly|approximately|approx\.?|nearly|almost|~)?\s*(-?\d[\d,]*(?:\.\d+)?)\s*(k|thousand|million|billion|trillion)?(?![a-z])\s*([a-z%][a-z% ]*)?\.?$/i;
+
+/**
+ * A number with a unit or a size word ("About 238,900 miles", "8 billion people"), or null.
+ * A bare number such as a year is not a quantity, so it keeps exact checking.
+ */
+export function quantity(s: string): { n: number; unit: string } | null {
+  const m = s.trim().match(QUANTITY);
+  if (!m) return null;
+  const unit = (m[3] ?? "").trim().toLowerCase();
+  if (!unit && !m[2]) return null;
+  if (unit.split(/\s+/).length > 3) return null;
+  const n = parseFloat(m[1].replace(/,/g, "")) * (MAGNITUDE[(m[2] ?? "").toLowerCase()] ?? 1);
+  return Number.isFinite(n) ? { n, unit } : null;
+}
+
+/** Typed numbers for a quantity: within 2% is right, within 10% is close. A different unit is wrong. */
+function checkQuantity(input: string, target: { n: number; unit: string }): Verdict | null {
+  const m = input.trim().match(QUANTITY);
+  if (!m) return null;
+  const n = parseFloat(m[1].replace(/,/g, "")) * (MAGNITUDE[(m[2] ?? "").toLowerCase()] ?? 1);
+  if (!Number.isFinite(n)) return null;
+  const unit = (m[3] ?? "").trim().toLowerCase();
+  if (unit && target.unit && unit.split(/\s+/)[0].replace(/s$/, "") !== target.unit.split(/\s+/)[0].replace(/s$/, "")) return "wrong";
+  const off = target.n === 0 ? Math.abs(n) : Math.abs(n - target.n) / Math.abs(target.n);
+  return off <= 0.02 ? "correct" : off <= 0.1 ? "close" : "wrong";
+}
+
 export function checkTyped(input: string, accepted: string | string[]): Verdict {
   const user = normalizeAnswer(input);
   if (!user && !input.trim()) return "wrong";
@@ -32,6 +61,13 @@ export function checkTyped(input: string, accepted: string | string[]): Verdict 
       if (u.every((token, i) => token === t[i])) return "correct";
       // Keep the existing case hint for standalone constants. An altered call or argument is wrong.
       if (t.length === 1 && u[0].toLowerCase() === t[0].toLowerCase()) best = "close";
+      continue;
+    }
+    const q = quantity(a);
+    const qv = q ? checkQuantity(input, q) : null;
+    if (qv === "correct") return "correct";
+    if (qv) {
+      if (qv === "close") best = "close";
       continue;
     }
     const target = normalizeAnswer(a);
