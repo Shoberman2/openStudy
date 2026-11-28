@@ -631,3 +631,14 @@ Planned by GPT-6.2-Sol and built by Claude (2026-11-25). The first of five steps
 - **Screen**: "Worth Practicing First", "From <set>", the ideas as quiet rows (term, then its sentence), and one primary "Start this drill". While it shows, "Create study set" and "Create all" become secondary buttons. The rest of Sort is unchanged.
 - **Start this drill** makes the set (or adds to the matching one) with the existing builder, focus "ideas", no quotes question yet, and opens the topic holding the first idea.
 - **Events** (on the device, counts only): `shortlist_shown {ideas, typed}`, `shortlist_started {ideas, pages, existing}`.
+
+## 19. v13 (web): Remember a Fact
+
+Spencer, 2026-11-28: looking things up is easy, remembering them is not. A seven-day habit test comes before any MCP: if he keeps saving lookups (at least 15 in the week, at least 2 review sessions, at least 70% right on a quiz 7 days later), an OpenStudy MCP tool `remember(question, answer, source)` follows, which needs accounts and sync back on.
+
+- **Screen** `/app/remember`: "Remember a Fact", three fields ("What did you look up?", "The answer", "Where you found it (optional)"), one primary "Remember", then "Saved. First quiz tomorrow." The fields clear for the next one. Below, "Looked Up <n>": every fact, newest first, with its answer, source (a link when it is a URL) and next quiz date; a search field from 8 facts. `?q=`, `?a=` and `?s=` prefill the fields, for an iPhone Shortcut or a bookmark.
+- **Home**: "Remember a fact" next to "Add notes" (and under the empty state). The Looked Up row reads "<n> facts" and opens `/app/remember`.
+- **Data** (`engine/lookup.ts`, Library v1 unchanged): one project `lookedup` ("Looked Up", type other), one lesson `lookedup-facts`, one fact card per lookup with `question`, `answer`, and the source in `attribution`. Saving counts as the first look: SRS starts in review, interval 1, due tomorrow. The plan never schedules Looked Up as a topic to learn; its due cards are reviews.
+- **Questions**: a quantity or an answer of 4 words or fewer is typed from memory; a longer answer is a flashcard (recall, reveal, self-grade). Never multiple choice, since the other facts are unrelated.
+- **Typed quantities** (`check.ts` `quantity`): an answer with a number and a unit or size word ("About 238,900 miles", "8 billion people") accepts a typed number within 2% as right and within 10% as close; a different unit is wrong. A bare number such as a year keeps exact checking.
+- **Event**: `fact_remembered {source, quantity}` (on the device, no text).

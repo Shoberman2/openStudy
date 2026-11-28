@@ -1,5 +1,6 @@
 // Study plan (spec 8.6). Deterministic: recomputed from current state every time it is shown.
 // Only completions are stored (as events); today's completed items are read back from them.
+import { LOOKED_UP_ID } from "./lookup";
 import { isDue, review } from "./srs";
 import type { Card, Lesson, Library, Project } from "./types";
 import { addDays, dayDiff, localDay } from "./util";
@@ -121,7 +122,8 @@ export function buildPlan(lib: Library, now: Date = new Date()): Plan {
 
     // 3. New learning and strengthening, round robin across projects.
     const rotation: Project[] = [];
-    const ordered = lib.projects.slice().sort((a, b) => (a.goalDate ?? "9999").localeCompare(b.goalDate ?? "9999") || a.createdAt.localeCompare(b.createdAt));
+    // Looked Up facts (spec 19) are only reviewed, never scheduled as a topic to learn.
+    const ordered = lib.projects.filter((p) => p.id !== LOOKED_UP_ID).slice().sort((a, b) => (a.goalDate ?? "9999").localeCompare(b.goalDate ?? "9999") || a.createdAt.localeCompare(b.createdAt));
     for (const p of ordered) {
       rotation.push(p);
       const g = p.goalDate ? dayDiff(d, p.goalDate) : -1;

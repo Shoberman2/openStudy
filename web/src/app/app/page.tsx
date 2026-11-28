@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { currentLesson, inboxPages, projectLessons } from "@/engine/library";
+import { LOOKED_UP_ID, lookedUpFacts } from "@/engine/lookup";
 import { buildPlan } from "@/engine/plan";
 import { buildPractice } from "@/engine/session";
 import { useLibrary } from "@/lib/store";
@@ -83,6 +84,9 @@ export default function Home() {
             <Link href="/app/import" className="btn btn-block mx-auto mt-6 max-w-[360px]">
               Add notes
             </Link>
+            <Link href="/app/remember" className="mt-4 inline-block text-[16px] font-extrabold text-blue hover:underline">
+              Remember a fact
+            </Link>
           </section>
         ) : null}
 
@@ -104,14 +108,19 @@ export default function Home() {
               {projects.map((p) => {
                 const lessons = projectLessons(lib, p.id);
                 const next = currentLesson(lessons);
-                const meta = [
-                  `${lessons.length} topic${lessons.length === 1 ? "" : "s"}`,
-                  p.goalDate ? `Exam ${shortDate(p.goalDate)}` : null,
-                  next ? `Next up: ${next.title}` : null,
-                ].filter(Boolean);
+                // Looked Up (spec 19) lists facts, not topics, and opens its own page.
+                const facts = p.id === LOOKED_UP_ID ? lookedUpFacts(lib).length : 0;
+                const meta =
+                  p.id === LOOKED_UP_ID
+                    ? [`${facts} fact${facts === 1 ? "" : "s"}`]
+                    : [
+                        `${lessons.length} topic${lessons.length === 1 ? "" : "s"}`,
+                        p.goalDate ? `Exam ${shortDate(p.goalDate)}` : null,
+                        next ? `Next up: ${next.title}` : null,
+                      ].filter(Boolean);
                 return (
                   <li key={p.id}>
-                    <Link href={`/app/p/${p.id}`} className="block rounded-[14px] px-3 py-3 no-underline hover:bg-shelf">
+                    <Link href={p.id === LOOKED_UP_ID ? "/app/remember" : `/app/p/${p.id}`} className="block rounded-[14px] px-3 py-3 no-underline hover:bg-shelf">
                       <span className="block truncate text-[18px] font-extrabold">{p.title}</span>
                       <span className="block truncate text-[15px] text-muted">{meta.join(" · ")}</span>
                     </Link>
@@ -119,9 +128,14 @@ export default function Home() {
                 );
               })}
             </ul>
-            <Link href="/app/import" className="mt-3 inline-block px-3 text-[16px] font-extrabold text-blue hover:underline">
-              Add notes
-            </Link>
+            <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 px-3">
+              <Link href="/app/import" className="text-[16px] font-extrabold text-blue hover:underline">
+                Add notes
+              </Link>
+              <Link href="/app/remember" className="text-[16px] font-extrabold text-blue hover:underline">
+                Remember a fact
+              </Link>
+            </div>
           </section>
         )}
       </Page>

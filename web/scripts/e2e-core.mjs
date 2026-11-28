@@ -350,8 +350,31 @@ try {
   await page.getByRole("button", { name: "Check", exact: true }).waitFor({ timeout: 15_000 });
   check("Start this drill opens a drill on the new pile", true);
 
+  // 8c. Remember a Fact (spec 19): save a lookup, see it listed, prefill from a Shortcut link.
+  await page.goto(`${BASE}/app`);
+  await page.getByRole("link", { name: "Remember a fact" }).click();
+  await page.waitForURL(/\/app\/remember/);
+  await page.getByLabel("What did you look up?").fill("How far away is the Moon?");
+  await page.getByLabel("The answer").fill("About 238,900 miles");
+  await page.getByRole("button", { name: "Remember" }).click();
+  await page.getByText("Saved. First quiz tomorrow.").waitFor();
+  const listed = await page.getByRole("region", { name: "Looked Up" }).getByText("About 238,900 miles").isVisible();
+  let stored = false;
+  for (let i = 0; i < 20 && !stored; i++) {
+    stored = !!(await storedProject("lookedup"));
+    if (!stored) await page.waitForTimeout(100);
+  }
+  check("Remember a fact saves it to Looked Up", listed && stored);
+  await shot("remember");
+  await page.goto(`${BASE}/app/remember?q=${encodeURIComponent("Speed of light?")}&a=${encodeURIComponent("About 186,000 miles per second")}`);
+  check("a Shortcut link fills in the fact", (await page.getByLabel("The answer").inputValue()) === "About 186,000 miles per second");
+  await page.goto(`${BASE}/app`);
+  const lookedRow = page.getByRole("link", { name: /Looked Up\s*1 fact/ });
+  await lookedRow.waitFor({ timeout: 10_000 }).catch(() => {});
+  check("Home lists Looked Up with its fact count", await lookedRow.isVisible());
+
   // 9. Pages that must always load.
-  for (const p of ["/app/plan", "/app/practice", "/app/profile", "/app/settings", "/app/import", "/privacy", "/terms"]) {
+  for (const p of ["/app/remember", "/app/plan", "/app/practice", "/app/profile", "/app/settings", "/app/import", "/privacy", "/terms"]) {
     const r = await page.goto(`${BASE}${p}`);
     check(`GET ${p}`, !!r && r.ok());
   }
